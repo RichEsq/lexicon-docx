@@ -3,6 +3,10 @@ title: Data Processing Addendum
 date: 2026-01-15
 ref: "OK:RP:20260115"
 author: Richard Prangell (Viridian Lawyers)
+status: draft
+version: 1
+cover_page: true
+toc: true
 parties:
   - name: Okendo Pty Ltd
     specifier: ACN 165 005 989

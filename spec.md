@@ -36,6 +36,8 @@ parties:
   - name: ECorp Limited
     specifier: ACN 123 456 789
     role: Employer
+cover_page: true
+toc: true
 annexures:
   - Office Diagram
   - Employment Obligations
@@ -122,7 +124,27 @@ parties:
 
 Party roles are automatically treated as defined terms. A processor should include them in any generated glossary and may validate that the role appears in the contract body.
 
-#### 2.2.8. `annexures` (optional)
+#### 2.2.8. `cover_page` (optional)
+
+Controls whether the processor generates a full cover page (title, parties block, date, status) as a separate page before the contract body. Defaults to `true` if omitted.
+
+When set to `false`, the processor renders an inline title block (title, status/version, date) at the top of the first page, flowing directly into the table of contents or contract body.
+
+```yaml
+cover_page: false
+```
+
+#### 2.2.9. `toc` (optional)
+
+Controls whether the processor generates a table of contents. Defaults to `true` if omitted.
+
+When a cover page is present, the table of contents appears on a separate page after the cover. When there is no cover page, the table of contents appears on the same page as the inline title block, with a page break before the contract body.
+
+```yaml
+toc: false
+```
+
+#### 2.2.10. `annexures` (optional)
 
 A list of documents to be annexed to the contract. Each entry is the plain-language title of the annexure.
 
@@ -497,7 +519,7 @@ A processor renders these as formatted tables in the output document.
 
 ### 8.1. Declaration
 
-Annexures are declared in the front-matter `annexures` field (see section 2.2.6).
+Annexures are declared in the front-matter `annexures` field (see section 2.2.10).
 
 ### 8.2. Content
 
@@ -532,6 +554,8 @@ parties:
   - name: ECorp Limited
     specifier: ACN 123 456 789
     role: Employer
+cover_page: true
+toc: true
 annexures: []
 ---
 
@@ -658,6 +682,8 @@ At minimum, a processor should support:
 | Feature              | Syntax                                          | Markdown Compatible |
 | -------------------- | ----------------------------------------------- | ------------------- |
 | Meta properties      | YAML front-matter (`---`)                       | Yes (widely supported) |
+| Cover page toggle    | `cover_page: true\|false`                       | Yes (ignored without processor) |
+| TOC toggle           | `toc: true\|false`                              | Yes (ignored without processor) |
 | Top-level clause     | `1. ## Heading`                                 | Yes |
 | Sub-clauses          | Indented ordered lists (4 spaces per level)     | Yes |
 | Multiple paragraphs  | Blank line + indented continuation              | Yes |
