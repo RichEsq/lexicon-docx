@@ -1,2 +1,5 @@
-output.docx
-/lexicon/target/
+# Rust build artifacts
+target/
+
+# Generated output
+*.docx
