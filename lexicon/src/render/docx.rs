@@ -44,15 +44,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         .add_abstract_numbering(create_clause_numbering(style))
         .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID));
 
-    // Header/footer — empty first page (cover), content on subsequent pages
-    let first_header = Header::new();
-    let first_footer = Footer::new();
-    docx = docx.first_header(first_header);
-    docx = docx.first_footer(first_footer);
-
+    // Footer: ref on left, page numbers on right
     let footer_size = StyleConfig::pt_to_half_points(style.font_size - 2.0);
     let mut default_footer = Footer::new();
-    // Footer: ref on left, page numbers on right
     let right_tab_pos = (style.page_width_twips() as i32
         - StyleConfig::cm_to_twips(style.margin_left_cm)
         - StyleConfig::cm_to_twips(style.margin_right_cm)) as usize;
@@ -75,24 +69,35 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     default_footer = default_footer.add_paragraph(footer_para);
     docx = docx.footer(default_footer);
 
-    // Cover page
-    docx = render_cover_page(docx, doc, style);
+    if doc.meta.cover_page {
+        // Empty first-page header/footer so cover page is clean
+        docx = docx.first_header(Header::new());
+        docx = docx.first_footer(Footer::new());
 
-    // Page break after cover
-    docx = docx.add_paragraph(
-        Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-    );
+        // Cover page
+        docx = render_cover_page(docx, doc, style);
 
-    // Table of contents
-    let toc = TableOfContents::new()
-        .heading_styles_range(1, 3)
-        .auto();
-    docx = docx.add_table_of_contents(toc);
+        // Page break after cover
+        docx = docx.add_paragraph(
+            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
+        );
+    } else {
+        // Inline title at top of first page
+        docx = render_inline_title(docx, doc, style);
+    }
 
-    // Page break after TOC
-    docx = docx.add_paragraph(
-        Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-    );
+    if doc.meta.toc {
+        // Table of contents
+        let toc = TableOfContents::new()
+            .heading_styles_range(1, 3)
+            .auto();
+        docx = docx.add_table_of_contents(toc);
+
+        // Page break after TOC
+        docx = docx.add_paragraph(
+            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
+        );
+    }
 
     // Prose before first clause (e.g., recitals)
     // Then clauses
@@ -613,7 +618,65 @@ fn outline_level_for(level: ClauseLevel) -> usize {
     }
 }
 
-// --- Cover page (unchanged from Phase 1) ---
+// --- Inline title (no cover page) ---
+
+fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
+    let meta = &doc.meta;
+    let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
+
+    // Title
+    docx = docx.add_paragraph(
+        Paragraph::new()
+            .add_run(
+                Run::new()
+                    .add_text(&meta.title)
+                    .bold()
+                    .size(StyleConfig::pt_to_half_points(style.heading1_size))
+                    .fonts(
+                        RunFonts::new()
+                            .ascii(&style.heading_font_family)
+                            .hi_ansi(&style.heading_font_family),
+                    ),
+            ),
+    );
+
+    // Status + Version line
+    if meta.status.is_some() || meta.version.is_some() {
+        let mut parts = Vec::new();
+        if let Some(ref status) = meta.status {
+            parts.push(status.to_string());
+        }
+        if let Some(version) = meta.version {
+            parts.push(format!("Version {}", version));
+        }
+        docx = docx.add_paragraph(
+            Paragraph::new()
+                .add_run(
+                    Run::new()
+                        .add_text(parts.join(" — "))
+                        .size(body_half_pts),
+                ),
+        );
+    }
+
+    // Date
+    let formatted_date = format_date(&meta.date);
+    docx = docx.add_paragraph(
+        Paragraph::new()
+            .add_run(
+                Run::new()
+                    .add_text(&formatted_date)
+                    .size(body_half_pts),
+            ),
+    );
+
+    // Spacer before content
+    docx = docx.add_paragraph(Paragraph::new());
+
+    docx
+}
+
+// --- Cover page ---
 
 fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
     let meta = &doc.meta;

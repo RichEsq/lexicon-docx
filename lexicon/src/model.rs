@@ -21,11 +21,19 @@ pub struct DocumentMeta {
     pub status: Option<Status>,
     pub version: Option<u32>,
     pub parties: Vec<Party>,
+    #[serde(default = "default_true")]
+    pub cover_page: bool,
+    #[serde(default = "default_true")]
+    pub toc: bool,
     #[serde(default)]
     pub annexures: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
     Draft,

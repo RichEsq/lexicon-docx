@@ -7,7 +7,7 @@ pub mod resolve;
 pub mod style;
 
 use error::{Diagnostic, Result};
-use model::Document;
+use model::{Document, Status};
 use style::StyleConfig;
 
 pub fn parse(input: &str) -> Result<Document> {
@@ -25,6 +25,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
 pub fn process(input: &str, style: &StyleConfig) -> Result<(Vec<u8>, Vec<Diagnostic>)> {
     let mut doc = parse(input)?;
     resolve(&mut doc);
-    let bytes = render_docx(&doc, style)?;
+    let mut bytes = render_docx(&doc, style)?;
+    if doc.meta.status == Some(Status::Draft) {
+        bytes = render::watermark::inject_watermark(bytes, "DRAFT")?;
+    }
     Ok((bytes, doc.diagnostics))
 }

@@ -12,7 +12,7 @@ The repository contains:
 ## Specification
 
 Lexicon Markdown extends standard Markdown with conventions for legal documents:
-- **YAML front-matter** for contract metadata (title, date, parties, status, version, annexures)
+- **YAML front-matter** for contract metadata (title, date, parties, status, version, cover_page, toc, annexures)
 - **Nested ordered lists** for clause hierarchy (`1. ## Heading` → `1. text` → indented sub-clauses)
 - **Bold = defined terms** — `**Term** means ...` is a definition; any other `**Term**` is a reference
 - **Pandoc-style anchors** (`{#id}`) + standard links (`[clause X](#id)`) for cross-references
@@ -70,6 +70,7 @@ cargo test
 | `src/parser/anchors.rs` | Regex-based `{#id}` stripping |
 | `src/resolve.rs` | Numbering (1., 1.1, (a), (i)), cross-refs, defined term validation |
 | `src/render/docx.rs` | DOCX generation — cover page, clauses, annexures, tables |
+| `src/render/watermark.rs` | Draft watermark injection via ZIP post-processing |
 | `src/style.rs` | Style configuration with TOML override support |
 | `src/error.rs` | Error types and diagnostics |
 
@@ -85,6 +86,7 @@ cargo test
 | `regex` | Anchor pattern matching |
 | `chrono` | Date validation |
 | `thiserror` | Error type derivation |
+| `zip` 2 | ZIP read/write for .docx post-processing (watermark) |
 
 ### Design Decisions
 
@@ -92,6 +94,7 @@ cargo test
 - **Single crate** — structured so `lib.rs` can be extracted to a `lexicon-core` workspace crate later.
 - **comrak for parsing** — produces a full AST. Headings inside list items work correctly. Reference links are resolved during parsing (schedule item values come from the link title attribute).
 - **Defined term matching** — multi-variant stemming for possessives/plurals/verb forms, not a full NLP stemmer.
+- **Draft watermark via ZIP post-processing** — docx-rs doesn't expose VML/watermark APIs, so `render/watermark.rs` post-processes the .docx ZIP to inject VML WordArt shapes into header XML parts. Triggered when `status: draft`.
 
 ### docx-rs Pitfalls
 
@@ -99,6 +102,7 @@ cargo test
 - **Use `AbstractNumbering` IDs starting at 2** — docx-rs adds a default `abstractNum` with ID 1; using the same ID causes conflicts.
 - **Set `multi_level_type` directly** — docx-rs has no builder method: `numbering.multi_level_type = Some("multilevel".to_string())`
 - **Always test .docx output in Word**, not just LibreOffice — Word is much stricter about OOXML compliance.
+- **docx-rs does not expose VML or watermark APIs** — watermarks require ZIP post-processing. The `zip` crate reads/rewrites the .docx archive to inject raw XML into header parts.
 
 ## Planning
 
@@ -107,9 +111,11 @@ Future work and design notes are in `lexicon/planning/`:
 - `library-extraction.md` — plan for extracting lexicon-core as a separate crate
 - `configurable-cover-page.md` — plan for making cover page elements configurable
 - `native-word-numbering.md` — native Word numbering (implemented)
+- `draft-watermark.md` — draft watermark via VML injection (implemented)
+- `cover-page-toc-toggles.md` — cover_page and toc front-matter booleans (implemented)
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedule annexures, TOC, headers/footers, native Word numbering).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedule annexures, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles).
 
 See `lexicon/planning/implementation-status.md` for detailed status.
