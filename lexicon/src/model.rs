@@ -124,6 +124,7 @@ pub enum InlineContent {
     Text(String),
     Bold(String),
     Italic(String),
+    Superscript(String),
     CrossRef {
         display: String,
         anchor_id: String,
@@ -147,7 +148,8 @@ impl InlineContent {
         match self {
             InlineContent::Text(s)
             | InlineContent::Bold(s)
-            | InlineContent::Italic(s) => s.clone(),
+            | InlineContent::Italic(s)
+            | InlineContent::Superscript(s) => s.clone(),
             InlineContent::CrossRef { display, resolved, .. } => {
                 resolved.as_ref().unwrap_or(display).clone()
             }

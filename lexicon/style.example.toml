@@ -1,0 +1,23 @@
+# Lexicon Style Configuration
+# Copy this file and pass it with: cargo run -- build input.md -o output.docx --style style.toml
+# All fields are optional — defaults are shown below.
+
+# Typography
+font_family = "Times New Roman"
+font_size = 12.0
+heading_font_family = "Times New Roman"
+heading1_size = 14.0          # ## headings
+heading2_size = 12.0          # ### headings
+line_spacing = 1.5
+
+# Page setup
+page_size = "a4"              # "a4" or "letter"
+margin_top_cm = 2.54
+margin_bottom_cm = 2.54
+margin_left_cm = 2.54
+margin_right_cm = 2.54
+
+# Clause indentation
+indent_per_level_cm = 1.27    # step between each clause level
+hanging_indent_cm = 1.27      # distance from number position to text indent
+align_first_level = false     # true: levels 0 and 1 share the same indent

@@ -17,6 +17,9 @@ pub struct StyleConfig {
     pub margin_left_cm: f32,
     pub margin_right_cm: f32,
     pub page_size: PageSize,
+    pub indent_per_level_cm: f32,
+    pub hanging_indent_cm: f32,
+    pub align_first_level: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -46,6 +49,9 @@ impl Default for StyleConfig {
             margin_left_cm: 2.54,
             margin_right_cm: 2.54,
             page_size: PageSize::A4,
+            indent_per_level_cm: 1.27,
+            hanging_indent_cm: 1.27,
+            align_first_level: false,
         }
     }
 }

@@ -2,20 +2,17 @@ use docx_rs::{
     AbstractNumbering, AlignmentType, BreakType, Docx, Footer, Header, IndentLevel,
     Level, LevelJc, LevelOverride, LevelText, LineSpacing, LineSpacingType, NumberFormat,
     NumberingId, NumPages, Numbering, PageMargin, PageNum, Paragraph, Run, RunFonts,
-    SpecialIndentType, Start, Table as DocxTable, TableCell, TableOfContents, TableRow,
+    SpecialIndentType, Start, Tab, TabValueType, Table as DocxTable, TableCell,
+    TableOfContents, TableRow, VertAlignType, WidthType,
 };
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
 use crate::style::StyleConfig;
 
-// Indentation per clause level in twips (1 twip = 1/20 of a point)
-const INDENT_PER_LEVEL: i32 = 720; // ~1.27cm / 0.5in
-const HANGING_INDENT: i32 = 360; // ~0.63cm / 0.25in — hanging indent for clause numbers
-
-// Word numbering engine IDs
-const ABSTRACT_NUM_ID: usize = 1;
-const BODY_NUMBERING_ID: usize = 1;
+// Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
+const ABSTRACT_NUM_ID: usize = 2;
+const BODY_NUMBERING_ID: usize = 2;
 
 pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
@@ -55,8 +52,12 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
 
     let footer_size = StyleConfig::pt_to_half_points(style.font_size - 2.0);
     let mut default_footer = Footer::new();
-    // Footer: left-aligned ref | center page numbers | right-aligned version
-    let mut footer_para = Paragraph::new();
+    // Footer: ref on left, page numbers on right
+    let right_tab_pos = (style.page_width_twips() as i32
+        - StyleConfig::cm_to_twips(style.margin_left_cm)
+        - StyleConfig::cm_to_twips(style.margin_right_cm)) as usize;
+    let mut footer_para = Paragraph::new()
+        .add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
     if let Some(ref ref_) = doc.meta.ref_ {
         footer_para = footer_para.add_run(
             Run::new()
@@ -71,16 +72,6 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         .add_page_num(PageNum::new())
         .add_run(Run::new().add_text(" of ").size(footer_size))
         .add_num_pages(NumPages::new());
-    if let Some(version) = doc.meta.version {
-        footer_para = footer_para
-            .add_run(Run::new().add_tab())
-            .add_run(
-                Run::new()
-                    .add_text(format!("Version {}", version))
-                    .size(footer_size)
-                    .italic(),
-            );
-    }
     default_footer = default_footer.add_paragraph(footer_para);
     docx = docx.footer(default_footer);
 
@@ -138,7 +129,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
 }
 
 fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize) -> Docx {
-    let indent = indent_for_level(clause.level);
+    let indent = indent_for_level(clause.level, style);
+    let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
+    let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
     let level_idx = numbering_level_for(clause.level);
     let has_number = clause.number.is_some();
 
@@ -160,9 +153,6 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
         }
 
         docx = docx.add_paragraph(para);
-
-        // Spacer after heading
-        docx = docx.add_paragraph(Paragraph::new());
     }
 
     // Render clause content paragraphs
@@ -179,7 +169,7 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
                         .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
                 } else {
                     // Continuation paragraph — align to text position past the number
-                    Paragraph::new().indent(Some(indent + HANGING_INDENT), None, None, None)
+                    Paragraph::new().indent(Some(indent + hanging), None, None, None)
                 };
 
                 for inline in inlines {
@@ -190,7 +180,7 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
             }
             ClauseContent::Blockquote(inlines) => {
                 let body_size = StyleConfig::pt_to_half_points(style.font_size);
-                let bq_indent = indent + HANGING_INDENT + INDENT_PER_LEVEL;
+                let bq_indent = indent + hanging + step;
                 let mut para = Paragraph::new()
                     .indent(Some(bq_indent), None, None, None);
 
@@ -250,6 +240,14 @@ fn add_inline_run(
         }
         InlineContent::Italic(t) => {
             para.add_run(Run::new().add_text(t).italic().size(size))
+        }
+        InlineContent::Superscript(t) => {
+            let mut run = Run::new().add_text(t).size(size);
+            run.run_property = run.run_property.vert_align(VertAlignType::SuperScript);
+            if heading_bold {
+                run = run.bold();
+            }
+            para.add_run(run)
         }
         InlineContent::CrossRef {
             display,
@@ -337,7 +335,7 @@ fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx {
     }
 
     if !rows.is_empty() {
-        docx = docx.add_table(DocxTable::new(rows));
+        docx = docx.add_table(DocxTable::new(rows).width(5000, WidthType::Pct));
     }
 
     docx
@@ -408,9 +406,10 @@ fn render_annexure(
                 docx = render_table(docx, table, style);
             }
             AnnexureContent::BulletList(items) => {
+                let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
                 for item in items {
                     let mut para = Paragraph::new()
-                        .indent(Some(INDENT_PER_LEVEL), None, None, None);
+                        .indent(Some(step), None, None, None);
                     // Bullet character
                     para = para.add_run(Run::new().add_text("• \t").size(body_size));
                     for inline in item {
@@ -489,15 +488,29 @@ fn render_schedule(
         ]));
     }
 
-    docx = docx.add_table(DocxTable::new(rows));
+    docx = docx.add_table(DocxTable::new(rows).width(5000, WidthType::Pct));
 
     docx
 }
 
 fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
     let h1_size = StyleConfig::pt_to_half_points(style.heading1_size);
+    let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
+    let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
+    let align = style.align_first_level;
 
-    AbstractNumbering::new(ABSTRACT_NUM_ID)
+    let level_indent = |level: usize| -> i32 {
+        let num_steps = if align {
+            match level { 0 | 1 => 0, n => n - 1 }
+        } else {
+            level
+        };
+        num_steps as i32 * step + hanging
+    };
+
+    let mut numbering = AbstractNumbering::new(ABSTRACT_NUM_ID);
+    numbering.multi_level_type = Some("multilevel".to_string());
+    numbering
         // Level 0: TopLevel — "1."
         .add_level(
             Level::new(
@@ -507,7 +520,7 @@ fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
                 LevelText::new("%1."),
                 LevelJc::new("left"),
             )
-            .indent(Some(HANGING_INDENT), Some(SpecialIndentType::Hanging(HANGING_INDENT)), None, None)
+            .indent(Some(level_indent(0)), Some(SpecialIndentType::Hanging(hanging)), None, None)
             .bold()
             .size(h1_size)
             .fonts(
@@ -526,11 +539,10 @@ fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
                 LevelJc::new("left"),
             )
             .indent(
-                Some(INDENT_PER_LEVEL + HANGING_INDENT),
-                Some(SpecialIndentType::Hanging(HANGING_INDENT)),
+                Some(level_indent(1)),
+                Some(SpecialIndentType::Hanging(hanging)),
                 None, None,
             )
-            .level_restart(0)
         )
         // Level 2: SubClause — "(a)"
         .add_level(
@@ -542,11 +554,10 @@ fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
                 LevelJc::new("left"),
             )
             .indent(
-                Some(INDENT_PER_LEVEL * 2 + HANGING_INDENT),
-                Some(SpecialIndentType::Hanging(HANGING_INDENT)),
+                Some(level_indent(2)),
+                Some(SpecialIndentType::Hanging(hanging)),
                 None, None,
             )
-            .level_restart(1)
         )
         // Level 3: SubSubClause — "(i)"
         .add_level(
@@ -558,11 +569,10 @@ fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
                 LevelJc::new("left"),
             )
             .indent(
-                Some(INDENT_PER_LEVEL * 3 + HANGING_INDENT),
-                Some(SpecialIndentType::Hanging(HANGING_INDENT)),
+                Some(level_indent(3)),
+                Some(SpecialIndentType::Hanging(hanging)),
                 None, None,
             )
-            .level_restart(2)
         )
 }
 
@@ -575,12 +585,22 @@ fn numbering_level_for(level: ClauseLevel) -> usize {
     }
 }
 
-fn indent_for_level(level: ClauseLevel) -> i32 {
-    match level {
-        ClauseLevel::TopLevel => 0,
-        ClauseLevel::Clause => INDENT_PER_LEVEL,
-        ClauseLevel::SubClause => INDENT_PER_LEVEL * 2,
-        ClauseLevel::SubSubClause => INDENT_PER_LEVEL * 3,
+fn indent_for_level(level: ClauseLevel, style: &StyleConfig) -> i32 {
+    let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
+    if style.align_first_level {
+        match level {
+            ClauseLevel::TopLevel => 0,
+            ClauseLevel::Clause => 0,
+            ClauseLevel::SubClause => step,
+            ClauseLevel::SubSubClause => step * 2,
+        }
+    } else {
+        match level {
+            ClauseLevel::TopLevel => 0,
+            ClauseLevel::Clause => step,
+            ClauseLevel::SubClause => step * 2,
+            ClauseLevel::SubSubClause => step * 3,
+        }
     }
 }
 

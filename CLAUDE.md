@@ -88,10 +88,17 @@ cargo test
 
 ### Design Decisions
 
-- **Clause numbers as text prefixes** — not Word's numbering engine. Simpler, predictable, no style conflicts.
+- **Native Word numbering** — clause numbers use Word's numbering engine (`AbstractNumbering` + `Numbering` via docx-rs) with `multiLevelType="multilevel"` for proper hanging indents and Word integration.
 - **Single crate** — structured so `lib.rs` can be extracted to a `lexicon-core` workspace crate later.
 - **comrak for parsing** — produces a full AST. Headings inside list items work correctly. Reference links are resolved during parsing (schedule item values come from the link title attribute).
 - **Defined term matching** — multi-variant stemming for possessives/plurals/verb forms, not a full NLP stemmer.
+
+### docx-rs Pitfalls
+
+- **Do NOT use `Level::level_restart()`** — docx-rs 0.4 emits `<w:lvlRestart>` in the wrong position within `<w:lvl>` (after `pPr`/`rPr` instead of after `numFmt` as OOXML requires). Word silently ignores the entire level when this happens, while LibreOffice is lenient and renders it fine. Instead, rely on `multiLevelType="multilevel"` which gives automatic sub-level restarts.
+- **Use `AbstractNumbering` IDs starting at 2** — docx-rs adds a default `abstractNum` with ID 1; using the same ID causes conflicts.
+- **Set `multi_level_type` directly** — docx-rs has no builder method: `numbering.multi_level_type = Some("multilevel".to_string())`
+- **Always test .docx output in Word**, not just LibreOffice — Word is much stricter about OOXML compliance.
 
 ## Planning
 
@@ -99,9 +106,10 @@ Future work and design notes are in `lexicon/planning/`:
 - `implementation-status.md` — what's done, what's remaining, architecture notes
 - `library-extraction.md` — plan for extracting lexicon-core as a separate crate
 - `configurable-cover-page.md` — plan for making cover page elements configurable
+- `native-word-numbering.md` — native Word numbering (implemented)
 
 ## Implementation Status
 
-Phases 1-3 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation). Phases 4-5 remain (schedule annexure generation, styling polish, TOC, headers/footers, watermarks).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedule annexures, TOC, headers/footers, native Word numbering).
 
 See `lexicon/planning/implementation-status.md` for detailed status.

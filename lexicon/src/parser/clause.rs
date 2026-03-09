@@ -277,7 +277,7 @@ pub fn extract_inlines<'a>(node: &'a AstNode<'a>) -> Vec<InlineContent> {
             NodeValue::Superscript => {
                 drop(data);
                 let inner = collect_plain_text(child);
-                inlines.push(InlineContent::Text(inner));
+                inlines.push(InlineContent::Superscript(inner));
             }
             _ => {
                 drop(data);
