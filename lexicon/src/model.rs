@@ -1,0 +1,187 @@
+use crate::error::Diagnostic;
+use serde::Deserialize;
+
+/// The fully parsed and resolved document.
+#[derive(Debug)]
+pub struct Document {
+    pub meta: DocumentMeta,
+    pub body: Vec<BodyElement>,
+    pub annexures: Vec<Annexure>,
+    pub schedule_items: Vec<ScheduleItem>,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DocumentMeta {
+    pub title: String,
+    pub date: String,
+    #[serde(rename = "ref")]
+    pub ref_: Option<String>,
+    pub author: Option<String>,
+    pub status: Option<Status>,
+    pub version: Option<u32>,
+    pub parties: Vec<Party>,
+    #[serde(default)]
+    pub annexures: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+    Draft,
+    Final,
+    Executed,
+}
+
+impl std::fmt::Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Status::Draft => write!(f, "DRAFT"),
+            Status::Final => write!(f, "FINAL"),
+            Status::Executed => write!(f, "EXECUTED"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Party {
+    pub name: String,
+    pub specifier: Option<String>,
+    pub role: String,
+}
+
+#[derive(Debug)]
+pub enum BodyElement {
+    Clause(Clause),
+    Prose(Vec<InlineContent>),
+}
+
+#[derive(Debug)]
+pub struct Clause {
+    pub level: ClauseLevel,
+    pub heading: Option<ClauseHeading>,
+    pub anchor: Option<String>,
+    pub number: Option<ClauseNumber>,
+    pub content: Vec<ClauseContent>,
+    pub children: Vec<Clause>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClauseLevel {
+    TopLevel,
+    Clause,
+    SubClause,
+    SubSubClause,
+}
+
+#[derive(Debug)]
+pub struct ClauseHeading {
+    pub text: Vec<InlineContent>,
+    pub level: u8,
+}
+
+#[derive(Debug, Clone)]
+pub enum ClauseNumber {
+    TopLevel(u32),
+    Clause(u32, u32),
+    SubClause(u32, u32, char),
+    SubSubClause(u32, u32, char, String),
+}
+
+impl std::fmt::Display for ClauseNumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ClauseNumber::TopLevel(a) => write!(f, "{}.", a),
+            ClauseNumber::Clause(a, b) => write!(f, "{}.{}", a, b),
+            ClauseNumber::SubClause(_, _, c) => write!(f, "({})", c),
+            ClauseNumber::SubSubClause(_, _, _, r) => write!(f, "({})", r),
+        }
+    }
+}
+
+impl ClauseNumber {
+    pub fn full_reference(&self) -> String {
+        match self {
+            ClauseNumber::TopLevel(a) => format!("clause {}", a),
+            ClauseNumber::Clause(a, b) => format!("clause {}.{}", a, b),
+            ClauseNumber::SubClause(a, b, c) => format!("clause {}.{}({})", a, b, c),
+            ClauseNumber::SubSubClause(a, b, c, r) => {
+                format!("clause {}.{}({})({})", a, b, c, r)
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ClauseContent {
+    Paragraph(Vec<InlineContent>),
+    Blockquote(Vec<InlineContent>),
+    Table(Table),
+}
+
+#[derive(Debug, Clone)]
+pub enum InlineContent {
+    Text(String),
+    Bold(String),
+    Italic(String),
+    CrossRef {
+        display: String,
+        anchor_id: String,
+        resolved: Option<String>,
+    },
+    ScheduleRef {
+        display: String,
+        ref_id: String,
+        resolved_value: Option<String>,
+    },
+    Link {
+        text: String,
+        url: String,
+    },
+    SoftBreak,
+    LineBreak,
+}
+
+impl InlineContent {
+    pub fn as_plain_text(&self) -> String {
+        match self {
+            InlineContent::Text(s)
+            | InlineContent::Bold(s)
+            | InlineContent::Italic(s) => s.clone(),
+            InlineContent::CrossRef { display, resolved, .. } => {
+                resolved.as_ref().unwrap_or(display).clone()
+            }
+            InlineContent::ScheduleRef { display, .. } => display.clone(),
+            InlineContent::Link { text, .. } => text.clone(),
+            InlineContent::SoftBreak => " ".to_string(),
+            InlineContent::LineBreak => "\n".to_string(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Table {
+    pub headers: Vec<Vec<InlineContent>>,
+    pub rows: Vec<Vec<Vec<InlineContent>>>,
+}
+
+#[derive(Debug)]
+pub struct Annexure {
+    pub heading: String,
+    pub content: Vec<AnnexureContent>,
+}
+
+#[derive(Debug)]
+pub enum AnnexureContent {
+    Paragraph(Vec<InlineContent>),
+    Heading(u8, Vec<InlineContent>),
+    ClauseList(Vec<Clause>),
+    Table(Table),
+    BulletList(Vec<Vec<InlineContent>>),
+}
+
+#[derive(Debug, Clone)]
+pub struct ScheduleItem {
+    pub description: String,
+    pub value: Option<String>,
+}

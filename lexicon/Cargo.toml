@@ -1,0 +1,16 @@
+[package]
+name = "lexicon"
+version = "0.1.0"
+edition = "2024"
+description = "Lexicon Markdown processor for legal contracts"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+comrak = "0.36"
+docx-rs = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+toml = "0.8"
+regex = "1"
+chrono = "0.4"
+thiserror = "2"
