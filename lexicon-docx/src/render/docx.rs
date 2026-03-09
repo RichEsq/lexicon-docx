@@ -13,6 +13,8 @@ use crate::style::StyleConfig;
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
 const ABSTRACT_NUM_ID: usize = 2;
 const BODY_NUMBERING_ID: usize = 2;
+// Simple numbered list (for annexure prose lists)
+const SIMPLE_LIST_ABSTRACT_NUM_ID: usize = 3;
 
 pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
@@ -42,7 +44,8 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     // Register clause numbering definitions
     docx = docx
         .add_abstract_numbering(create_clause_numbering(style))
-        .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID));
+        .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID))
+        .add_abstract_numbering(create_simple_list_numbering(style));
 
     // Footer: ref on left, page numbers on right
     let footer_size = StyleConfig::pt_to_half_points(style.font_size - 2.0);
@@ -112,8 +115,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         }
     }
 
-    // Annexures — each ClauseList gets its own numbering instance
-    let mut next_num_id: usize = BODY_NUMBERING_ID + 1;
+    // Annexures — each ClauseList/NumberedList gets its own numbering instance
+    // Start after the abstract numbering IDs we've registered
+    let mut next_num_id: usize = SIMPLE_LIST_ABSTRACT_NUM_ID + 1;
     for annexure in &doc.annexures {
         docx = render_annexure(docx, annexure, style, &mut next_num_id);
     }
@@ -411,15 +415,15 @@ fn render_annexure(
                 docx = render_table(docx, table, style);
             }
             AnnexureContent::NumberedList(items) => {
-                let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
-                for (i, item) in items.iter().enumerate() {
+                let num_id = *next_num_id;
+                *next_num_id += 1;
+                docx = docx.add_numbering(
+                    Numbering::new(num_id, SIMPLE_LIST_ABSTRACT_NUM_ID)
+                        .add_override(LevelOverride::new(0).start(1)),
+                );
+                for item in items {
                     let mut para = Paragraph::new()
-                        .indent(Some(step), None, None, None);
-                    para = para.add_run(
-                        Run::new()
-                            .add_text(format!("{}.\t", i + 1))
-                            .size(body_size),
-                    );
+                        .numbering(NumberingId::new(num_id), IndentLevel::new(0));
                     for inline in item {
                         para = add_inline_run(para, inline, false, body_size, style);
                     }
@@ -595,6 +599,24 @@ fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
                 None, None,
             )
         )
+}
+
+fn create_simple_list_numbering(style: &StyleConfig) -> AbstractNumbering {
+    let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
+    let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
+
+    let mut numbering = AbstractNumbering::new(SIMPLE_LIST_ABSTRACT_NUM_ID);
+    numbering.multi_level_type = Some("singleLevel".to_string());
+    numbering.add_level(
+        Level::new(
+            0,
+            Start::new(1),
+            NumberFormat::new("decimal"),
+            LevelText::new("%1."),
+            LevelJc::new("left"),
+        )
+        .indent(Some(step + hanging), Some(SpecialIndentType::Hanging(hanging)), None, None),
+    )
 }
 
 fn numbering_level_for(level: ClauseLevel) -> usize {
