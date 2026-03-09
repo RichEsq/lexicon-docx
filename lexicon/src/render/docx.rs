@@ -1,7 +1,8 @@
 use docx_rs::{
-    AlignmentType, BreakType, Docx, Footer, Header, LineSpacing, LineSpacingType,
-    NumPages, PageMargin, PageNum, Paragraph, Run, RunFonts, SpecialIndentType,
-    Table as DocxTable, TableCell, TableOfContents, TableRow,
+    AbstractNumbering, AlignmentType, BreakType, Docx, Footer, Header, IndentLevel,
+    Level, LevelJc, LevelOverride, LevelText, LineSpacing, LineSpacingType, NumberFormat,
+    NumberingId, NumPages, Numbering, PageMargin, PageNum, Paragraph, Run, RunFonts,
+    SpecialIndentType, Start, Table as DocxTable, TableCell, TableOfContents, TableRow,
 };
 
 use crate::error::{LexiconError, Result};
@@ -11,6 +12,10 @@ use crate::style::StyleConfig;
 // Indentation per clause level in twips (1 twip = 1/20 of a point)
 const INDENT_PER_LEVEL: i32 = 720; // ~1.27cm / 0.5in
 const HANGING_INDENT: i32 = 360; // ~0.63cm / 0.25in — hanging indent for clause numbers
+
+// Word numbering engine IDs
+const ABSTRACT_NUM_ID: usize = 1;
+const BODY_NUMBERING_ID: usize = 1;
 
 pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
@@ -36,6 +41,11 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
                 .line_rule(LineSpacingType::Auto)
                 .line(line_spacing_val),
         );
+
+    // Register clause numbering definitions
+    docx = docx
+        .add_abstract_numbering(create_clause_numbering(style))
+        .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID));
 
     // Header/footer — empty first page (cover), content on subsequent pages
     let first_header = Header::new();
@@ -101,14 +111,15 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
                 docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
             }
             BodyElement::Clause(clause) => {
-                docx = render_clause(docx, clause, style);
+                docx = render_clause(docx, clause, style, BODY_NUMBERING_ID);
             }
         }
     }
 
-    // Annexures
+    // Annexures — each ClauseList gets its own numbering instance
+    let mut next_num_id: usize = BODY_NUMBERING_ID + 1;
     for annexure in &doc.annexures {
-        docx = render_annexure(docx, annexure, style);
+        docx = render_annexure(docx, annexure, style, &mut next_num_id);
     }
 
     // Schedule annexure
@@ -126,15 +137,12 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     Ok(cursor.into_inner())
 }
 
-fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig) -> Docx {
+fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize) -> Docx {
     let indent = indent_for_level(clause.level);
-    let number_str = clause
-        .number
-        .as_ref()
-        .map(|n| format!("{}\t", n))
-        .unwrap_or_default();
+    let level_idx = numbering_level_for(clause.level);
+    let has_number = clause.number.is_some();
 
-    // If this clause has a heading, render it as a heading paragraph
+    // If this clause has a heading, render it as a heading paragraph with native numbering
     if let Some(ref heading) = clause.heading {
         let heading_size = match heading.level {
             2 => StyleConfig::pt_to_half_points(style.heading1_size),
@@ -142,29 +150,11 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig) -> Docx {
         };
 
         let mut para = Paragraph::new()
-            .indent(
-                Some(indent + HANGING_INDENT),
-                Some(SpecialIndentType::Hanging(HANGING_INDENT)),
-                None,
-                None,
-            )
+            .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
             .outline_lvl(outline_level_for(clause.level))
             .keep_next(true);
 
-        // Number + heading text as bold
-        let first_run = Run::new()
-            .add_text(&number_str)
-            .bold()
-            .size(heading_size)
-            .fonts(
-                RunFonts::new()
-                    .ascii(&style.heading_font_family)
-                    .hi_ansi(&style.heading_font_family),
-            );
-
-        para = para.add_run(first_run);
-
-        // Render heading inline content
+        // Heading inline content — Word generates the number
         for inline in &heading.text {
             para = add_inline_run(para, inline, true, heading_size, style);
         }
@@ -176,30 +166,21 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig) -> Docx {
     }
 
     // Render clause content paragraphs
+    let mut first_content = true;
     for content in &clause.content {
         match content {
             ClauseContent::Paragraph(inlines) => {
-                // For clauses without a heading, include the number in the first paragraph
-                let needs_number = clause.heading.is_none();
                 let body_size = StyleConfig::pt_to_half_points(style.font_size);
 
-                let mut para = if needs_number && !number_str.is_empty() {
-                    Paragraph::new().indent(
-                        Some(indent + HANGING_INDENT),
-                        Some(SpecialIndentType::Hanging(HANGING_INDENT)),
-                        None,
-                        None,
-                    )
+                let mut para = if clause.heading.is_none() && first_content && has_number {
+                    // First content paragraph of a non-headed clause: attach numbering
+                    first_content = false;
+                    Paragraph::new()
+                        .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
                 } else {
                     // Continuation paragraph — align to text position past the number
                     Paragraph::new().indent(Some(indent + HANGING_INDENT), None, None, None)
                 };
-
-                if needs_number && !number_str.is_empty() {
-                    para = para.add_run(
-                        Run::new().add_text(&number_str).size(body_size),
-                    );
-                }
 
                 for inline in inlines {
                     para = add_inline_run(para, inline, false, body_size, style);
@@ -227,7 +208,7 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig) -> Docx {
 
     // Render children
     for child in &clause.children {
-        docx = render_clause(docx, child, style);
+        docx = render_clause(docx, child, style, numbering_id);
     }
 
     docx
@@ -362,7 +343,12 @@ fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx {
     docx
 }
 
-fn render_annexure(mut docx: Docx, annexure: &Annexure, style: &StyleConfig) -> Docx {
+fn render_annexure(
+    mut docx: Docx,
+    annexure: &Annexure,
+    style: &StyleConfig,
+    next_num_id: &mut usize,
+) -> Docx {
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
     let body_size = StyleConfig::pt_to_half_points(style.font_size);
 
@@ -404,8 +390,18 @@ fn render_annexure(mut docx: Docx, annexure: &Annexure, style: &StyleConfig) -> 
                 docx = docx.add_paragraph(Paragraph::new());
             }
             AnnexureContent::ClauseList(clauses) => {
+                // Create a new numbering instance for this annexure's clauses
+                let num_id = *next_num_id;
+                *next_num_id += 1;
+                docx = docx.add_numbering(
+                    Numbering::new(num_id, ABSTRACT_NUM_ID)
+                        .add_override(LevelOverride::new(0).start(1))
+                        .add_override(LevelOverride::new(1).start(1))
+                        .add_override(LevelOverride::new(2).start(1))
+                        .add_override(LevelOverride::new(3).start(1)),
+                );
                 for clause in clauses {
-                    docx = render_clause(docx, clause, style);
+                    docx = render_clause(docx, clause, style, num_id);
                 }
             }
             AnnexureContent::Table(table) => {
@@ -496,6 +492,87 @@ fn render_schedule(
     docx = docx.add_table(DocxTable::new(rows));
 
     docx
+}
+
+fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
+    let h1_size = StyleConfig::pt_to_half_points(style.heading1_size);
+
+    AbstractNumbering::new(ABSTRACT_NUM_ID)
+        // Level 0: TopLevel — "1."
+        .add_level(
+            Level::new(
+                0,
+                Start::new(1),
+                NumberFormat::new("decimal"),
+                LevelText::new("%1."),
+                LevelJc::new("left"),
+            )
+            .indent(Some(HANGING_INDENT), Some(SpecialIndentType::Hanging(HANGING_INDENT)), None, None)
+            .bold()
+            .size(h1_size)
+            .fonts(
+                RunFonts::new()
+                    .ascii(&style.heading_font_family)
+                    .hi_ansi(&style.heading_font_family),
+            )
+        )
+        // Level 1: Clause — "1.1"
+        .add_level(
+            Level::new(
+                1,
+                Start::new(1),
+                NumberFormat::new("decimal"),
+                LevelText::new("%1.%2"),
+                LevelJc::new("left"),
+            )
+            .indent(
+                Some(INDENT_PER_LEVEL + HANGING_INDENT),
+                Some(SpecialIndentType::Hanging(HANGING_INDENT)),
+                None, None,
+            )
+            .level_restart(0)
+        )
+        // Level 2: SubClause — "(a)"
+        .add_level(
+            Level::new(
+                2,
+                Start::new(1),
+                NumberFormat::new("lowerLetter"),
+                LevelText::new("(%3)"),
+                LevelJc::new("left"),
+            )
+            .indent(
+                Some(INDENT_PER_LEVEL * 2 + HANGING_INDENT),
+                Some(SpecialIndentType::Hanging(HANGING_INDENT)),
+                None, None,
+            )
+            .level_restart(1)
+        )
+        // Level 3: SubSubClause — "(i)"
+        .add_level(
+            Level::new(
+                3,
+                Start::new(1),
+                NumberFormat::new("lowerRoman"),
+                LevelText::new("(%4)"),
+                LevelJc::new("left"),
+            )
+            .indent(
+                Some(INDENT_PER_LEVEL * 3 + HANGING_INDENT),
+                Some(SpecialIndentType::Hanging(HANGING_INDENT)),
+                None, None,
+            )
+            .level_restart(2)
+        )
+}
+
+fn numbering_level_for(level: ClauseLevel) -> usize {
+    match level {
+        ClauseLevel::TopLevel => 0,
+        ClauseLevel::Clause => 1,
+        ClauseLevel::SubClause => 2,
+        ClauseLevel::SubSubClause => 3,
+    }
 }
 
 fn indent_for_level(level: ClauseLevel) -> i32 {

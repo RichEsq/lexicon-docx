@@ -82,6 +82,6 @@ Paragraph::new()
 - Restart behaviour: sub-clause counters must reset when a new parent clause starts — may need `LevelRestart` settings
 - Top-level clauses with headings (## Heading) are currently separate paragraphs from the number — need to combine or ensure numbering attaches correctly to the heading paragraph
 
-### Recommendation
+### Status
 
-Implement as a Phase 5 enhancement. Test with a small example first to verify the docx-rs numbering API produces the expected output in Word before converting the full renderer.
+**Implemented.** Native Word numbering is now active in `render/docx.rs`. The abstract numbering defines 4 levels (decimal → decimal → lowerLetter → lowerRoman) with `level_restart` for automatic counter resets. Annexure clause lists get separate `Numbering` instances with `LevelOverride` start resets. Level 0 has bold/heading-font run properties; levels 1-3 inherit document defaults.

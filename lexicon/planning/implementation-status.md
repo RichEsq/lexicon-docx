@@ -49,7 +49,9 @@
 ### Not yet implemented
 - **Draft watermark** when `status: draft` — docx-rs 0.4 does not expose watermark/VML shape APIs; would require XML post-processing or a future crate version
 - **Sub-headings (`###`)** within clauses — rendering exists but may need styling refinement for specific use cases
-- **Native Word numbering** — see `planning/native-word-numbering.md`; would replace text-prefix numbers with Word's numbering engine for better Word integration
+
+### Recently completed
+- **Native Word numbering** — replaced text-prefix numbers with Word's native numbering engine (`AbstractNumbering` + `Numbering` via docx-rs). See `planning/native-word-numbering.md` for details.
 
 ## Architecture Notes
 
