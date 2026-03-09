@@ -26,12 +26,16 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Annexur
                 });
             }
 
-            // Ordered list at top level = clause structure
+            // Ordered list at top level = clause structure (or simple numbered list in annexures)
             NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Ordered => {
                 if let Some(ref mut annex) = in_annexure {
-                    // Inside an annexure, clauses become annexure content
-                    let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
-                    annex.content.push(AnnexureContent::ClauseList(clauses));
+                    if is_clause_list(child) {
+                        let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
+                        annex.content.push(AnnexureContent::ClauseList(clauses));
+                    } else {
+                        let items = extract_bullet_list(child);
+                        annex.content.push(AnnexureContent::NumberedList(items));
+                    }
                 } else {
                     let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
                     for clause in clauses {
@@ -86,6 +90,32 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Annexur
     }
 
     (body, annexures)
+}
+
+/// Check if an ordered list contains clause structure (headings or nested sub-lists).
+/// If it's just simple paragraph items, it's a plain numbered list.
+fn is_clause_list<'a>(list_node: &'a AstNode<'a>) -> bool {
+    for item in list_node.children() {
+        let item_data = item.data.borrow();
+        if !matches!(item_data.value, NodeValue::Item(_)) {
+            continue;
+        }
+        drop(item_data);
+
+        for child in item.children() {
+            let child_data = child.data.borrow();
+            match &child_data.value {
+                NodeValue::Heading(_) => return true,
+                NodeValue::List(list)
+                    if list.list_type == comrak::nodes::ListType::Ordered =>
+                {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+    }
+    false
 }
 
 /// Extract clauses from an ordered List node.

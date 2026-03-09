@@ -410,6 +410,22 @@ fn render_annexure(
             AnnexureContent::Table(table) => {
                 docx = render_table(docx, table, style);
             }
+            AnnexureContent::NumberedList(items) => {
+                let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
+                for (i, item) in items.iter().enumerate() {
+                    let mut para = Paragraph::new()
+                        .indent(Some(step), None, None, None);
+                    para = para.add_run(
+                        Run::new()
+                            .add_text(format!("{}.\t", i + 1))
+                            .size(body_size),
+                    );
+                    for inline in item {
+                        para = add_inline_run(para, inline, false, body_size, style);
+                    }
+                    docx = docx.add_paragraph(para);
+                }
+            }
             AnnexureContent::BulletList(items) => {
                 let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
                 for item in items {

@@ -200,6 +200,17 @@ fn resolve_annexure_cross_refs(
                     resolve_clause_cross_refs(clause, anchor_map, diagnostics);
                 }
             }
+            AnnexureContent::NumberedList(items)
+            | AnnexureContent::BulletList(items) => {
+                for item_inlines in items {
+                    resolve_inlines_cross_refs(
+                        item_inlines,
+                        anchor_map,
+                        diagnostics,
+                        Some(&annexure.heading),
+                    );
+                }
+            }
             _ => {}
         }
     }
@@ -269,7 +280,8 @@ fn collect_annexure_schedule_items(annexure: &Annexure, items: &mut Vec<Schedule
                     collect_clause_schedule_items(clause, items);
                 }
             }
-            AnnexureContent::BulletList(items_list) => {
+            AnnexureContent::NumberedList(items_list)
+            | AnnexureContent::BulletList(items_list) => {
                 for item_inlines in items_list {
                     collect_inline_schedule_items(item_inlines, items);
                 }
@@ -381,6 +393,12 @@ fn collect_annexure_definitions(annexure: &Annexure, defs: &mut Vec<TermDefiniti
                     collect_clause_definitions(clause, defs);
                 }
             }
+            AnnexureContent::NumberedList(items)
+            | AnnexureContent::BulletList(items) => {
+                for item_inlines in items {
+                    collect_inline_definitions(item_inlines, defs, loc);
+                }
+            }
             _ => {}
         }
     }
@@ -444,7 +462,8 @@ fn collect_annexure_text(annexure: &Annexure, out: &mut String) {
                     collect_clause_text(clause, out);
                 }
             }
-            AnnexureContent::BulletList(items) => {
+            AnnexureContent::NumberedList(items)
+            | AnnexureContent::BulletList(items) => {
                 for item in items {
                     collect_inlines_text(item, out);
                 }

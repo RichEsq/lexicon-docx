@@ -186,6 +186,7 @@ pub enum AnnexureContent {
     Paragraph(Vec<InlineContent>),
     Heading(u8, Vec<InlineContent>),
     ClauseList(Vec<Clause>),
+    NumberedList(Vec<Vec<InlineContent>>),
     Table(Table),
     BulletList(Vec<Vec<InlineContent>>),
 }

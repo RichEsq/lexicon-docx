@@ -50,6 +50,7 @@
 - **Sub-headings (`###`)** within clauses — rendering exists but may need styling refinement for specific use cases
 
 ### Recently completed
+- **Simple numbered lists in annexures** — ordered lists without headings or nested sub-lists are now rendered as plain numbered lists (`1.`, `2.`, `3.`) rather than being fed through the clause numbering system.
 - **Cover page / TOC toggles** — `cover_page: bool` and `toc: bool` front-matter fields (default true). Without cover page, an inline title block is rendered. See `planning/cover-page-toc-toggles.md`.
 - **Draft watermark** when `status: draft` — VML WordArt shape injected via ZIP post-processing of the .docx output. See `planning/draft-watermark.md` for details.
 - **Native Word numbering** — replaced text-prefix numbers with Word's native numbering engine (`AbstractNumbering` + `Numbering` via docx-rs). See `planning/native-word-numbering.md` for details.
