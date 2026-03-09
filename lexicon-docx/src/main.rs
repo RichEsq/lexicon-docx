@@ -49,14 +49,14 @@ fn main() {
             let output_path = output.unwrap_or_else(|| input.with_extension("docx"));
 
             let style_config = match style {
-                Some(path) => match lexicon::style::StyleConfig::load(&path) {
+                Some(path) => match lexicon_docx::style::StyleConfig::load(&path) {
                     Ok(c) => c,
                     Err(e) => {
                         eprintln!("Error loading style config: {}", e);
                         std::process::exit(1);
                     }
                 },
-                None => lexicon::style::StyleConfig::default(),
+                None => lexicon_docx::style::StyleConfig::default(),
             };
 
             let input_text = match std::fs::read_to_string(&input) {
@@ -67,7 +67,7 @@ fn main() {
                 }
             };
 
-            match lexicon::process(&input_text, &style_config) {
+            match lexicon_docx::process(&input_text, &style_config) {
                 Ok((bytes, diagnostics)) => {
                     let has_errors = print_diagnostics(&diagnostics);
 
@@ -102,9 +102,9 @@ fn main() {
                 }
             };
 
-            match lexicon::parse(&input_text) {
+            match lexicon_docx::parse(&input_text) {
                 Ok(mut doc) => {
-                    lexicon::resolve(&mut doc);
+                    lexicon_docx::resolve(&mut doc);
                     let has_errors = print_diagnostics(&doc.diagnostics);
 
                     if has_errors {
@@ -122,11 +122,11 @@ fn main() {
     }
 }
 
-fn print_diagnostics(diagnostics: &[lexicon::error::Diagnostic]) -> bool {
+fn print_diagnostics(diagnostics: &[lexicon_docx::error::Diagnostic]) -> bool {
     let mut has_errors = false;
     for d in diagnostics {
         eprintln!("{}", d);
-        if matches!(d.level, lexicon::error::DiagLevel::Error) {
+        if matches!(d.level, lexicon_docx::error::DiagLevel::Error) {
             has_errors = true;
         }
     }

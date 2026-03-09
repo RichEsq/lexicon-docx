@@ -7,7 +7,7 @@ Lexicon is a plain-text legal contract format built on standard Markdown, plus a
 The repository contains:
 - `spec.md` — the Lexicon Markdown specification (v1.0-draft)
 - `example.md` — a real-world Data Processing Addendum written in Lexicon format
-- `lexicon/` — the Rust CLI processor
+- `lexicon-docx/` — the Rust CLI processor
 
 ## Specification
 
@@ -24,7 +24,7 @@ Full spec is in `spec.md`. The spec is the source of truth for all parsing and v
 
 ```bash
 # Build the processor
-cd lexicon
+cd lexicon-docx
 cargo build
 
 # Build a .docx from a Lexicon contract
@@ -106,7 +106,7 @@ cargo test
 
 ## Planning
 
-Future work and design notes are in `lexicon/planning/`:
+Future work and design notes are in `lexicon-docx/planning/`:
 - `implementation-status.md` — what's done, what's remaining, architecture notes
 - `library-extraction.md` — plan for extracting lexicon-core as a separate crate
 - `configurable-cover-page.md` — plan for making cover page elements configurable
@@ -118,7 +118,7 @@ Future work and design notes are in `lexicon/planning/`:
 
 Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedule annexures, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles).
 
-See `lexicon/planning/implementation-status.md` for detailed status.
+See `lexicon-docx/planning/implementation-status.md` for detailed status.
 
 ## Post-Work Checklist
 
@@ -127,6 +127,6 @@ After every successful piece of work (new feature, bug fix, spec change), comple
 1. **Update `spec.md`** — if the change affects the Lexicon format (new front-matter fields, new syntax, changed behaviour), update the spec to match. The spec is the source of truth.
 2. **Update `example.md`** — if new front-matter fields or syntax features were added, add them to the example document so it exercises the full feature set.
 3. **Update `CLAUDE.md`** — reflect any new files, dependencies, design decisions, or planning docs. Keep the Implementation Status line current.
-4. **Update `lexicon/planning/implementation-status.md`** — move completed items to "Recently completed", remove from "Not yet implemented".
+4. **Update `lexicon-docx/planning/implementation-status.md`** — move completed items to "Recently completed", remove from "Not yet implemented".
 5. **Run `cargo test`** — ensure all tests pass.
 6. **Commit and push** — commit all changes with a descriptive message, then push to the remote.

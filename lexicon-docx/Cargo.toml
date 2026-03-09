@@ -1,8 +1,8 @@
 [package]
-name = "lexicon"
+name = "lexicon-docx"
 version = "0.1.0"
 edition = "2024"
-description = "Lexicon Markdown processor for legal contracts"
+description = "Lexicon Markdown to DOCX processor for legal contracts"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
