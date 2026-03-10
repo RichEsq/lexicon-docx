@@ -120,6 +120,8 @@ cargo test
 - **Set `multi_level_type` directly** — docx-rs has no builder method: `numbering.multi_level_type = Some("multilevel".to_string())`
 - **Always test .docx output in Word**, not just LibreOffice — Word is much stricter about OOXML compliance.
 - **docx-rs does not expose VML or watermark APIs** — watermarks require ZIP post-processing. The `zip` crate reads/rewrites the .docx archive to inject raw XML into header parts.
+- **Do NOT use `TableCell::set_border()` for selective borders** — `set_border()` calls `unwrap_or_default()` internally, and `TableCellBorders::default()` creates all six borders (top, left, bottom, right, insideH, insideV). So setting a single bottom border gives you a full box. Instead, use `cell.set_borders(TableCellBorders::with_empty().set(border))` to start from no borders.
+- **No cell-level margin methods on `TableCell`** — use `table.margins(TableCellMargins::new().margin(...))` at the table level instead.
 
 ## Planning
 

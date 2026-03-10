@@ -1,7 +1,7 @@
 use docx_rs::{
     AlignmentType, BorderType, BreakType, Docx, Paragraph, Run, RunFonts,
     Table as DocxTable, TableCell, TableCellBorder, TableCellBorderPosition,
-    TableCellMargins, TableRow, WidthType,
+    TableCellBorders, TableCellMargins, TableRow, WidthType,
 };
 
 use crate::model::Party;
@@ -149,16 +149,18 @@ fn render_field_cell(
 
     match field.field_type {
         FieldType::Line => {
-            // Signature line — empty cell with a bottom border
+            // Signature line — empty cell with only a bottom border
             let para = Paragraph::new().add_run(
                 Run::new().add_text("").size(body_size),
             );
             cell = cell.add_paragraph(para);
-            cell = cell.set_border(
-                TableCellBorder::new(TableCellBorderPosition::Bottom)
-                    .border_type(BorderType::Single)
-                    .size(4)
-                    .color("000000"),
+            cell = cell.set_borders(
+                TableCellBorders::with_empty().set(
+                    TableCellBorder::new(TableCellBorderPosition::Bottom)
+                        .border_type(BorderType::Single)
+                        .size(4)
+                        .color("000000"),
+                ),
             );
 
             // Label below the line (if any)
