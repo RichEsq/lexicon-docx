@@ -135,6 +135,7 @@ impl Default for PreambleStyle {
 pub struct PreambleConfig {
     pub enabled: bool,
     pub style: PreambleStyle,
+    pub title_size: f32,
 }
 
 impl Default for PreambleConfig {
@@ -142,6 +143,7 @@ impl Default for PreambleConfig {
         PreambleConfig {
             enabled: false,
             style: PreambleStyle::Simple,
+            title_size: 18.0,
         }
     }
 }

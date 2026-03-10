@@ -43,6 +43,7 @@ show_status = true            # show status and version on cover
 [preamble]
 enabled = false               # true: render a parties preamble block before the body
 style = "simple"              # "simple" (block with BETWEEN/AND) or "prose" (single paragraph)
+title_size = 18.0             # inline title font size in points (used when cover page is disabled)
 
 # Footer
 [footer]
