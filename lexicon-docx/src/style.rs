@@ -38,7 +38,6 @@ pub struct StyleConfig {
 pub struct SignaturesConfig {
     pub enabled: bool,
     pub heading: Option<String>,
-    pub definitions: Option<String>,
     pub default_template: Option<String>,
     #[serde(default)]
     pub party: std::collections::HashMap<String, SignaturesPartyOverride>,
@@ -49,7 +48,6 @@ impl Default for SignaturesConfig {
         SignaturesConfig {
             enabled: false,
             heading: None,
-            definitions: None,
             default_template: None,
             party: std::collections::HashMap::new(),
         }

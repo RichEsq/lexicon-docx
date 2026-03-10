@@ -22,15 +22,17 @@ parties:
 ```toml
 [signatures]
 enabled = true
-definitions = "signatures.toml"
 ```
 
-3. Place the `signatures.toml` definitions file alongside your contract (or provide an absolute path).
+3. Place the `signatures.toml` definitions file alongside your contract, or in `$XDG_CONFIG_HOME/lexicon/` for a global default.
 
 4. Build:
 
 ```bash
-cargo run -- build contract.md -o contract.docx --style style.toml
+cargo run -- build contract.md -o contract.docx
+
+# Or with explicit paths:
+cargo run -- build contract.md --style style.toml --signatures signatures.toml
 ```
 
 The processor automatically selects the right signature block template based on each party's `entity_type` and whether the document is a deed or agreement.
@@ -149,9 +151,10 @@ All signature configuration lives in the `[signatures]` section of `style.toml`:
 [signatures]
 enabled = true                          # default: false (opt-in)
 heading = "EXECUTION"                   # optional heading above all blocks
-definitions = "signatures.toml"         # path to definitions file
 default_template = "au.company.deed"    # override template for all parties
 ```
+
+The definitions file (`signatures.toml`) is resolved separately via the `--signatures` CLI flag, or auto-discovered from the input document's directory, then `$XDG_CONFIG_HOME/lexicon/`.
 
 ### Per-party overrides
 

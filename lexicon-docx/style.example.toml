@@ -76,7 +76,6 @@ heading = "Contents"          # heading text above the TOC
 [signatures]
 enabled = false               # true: render signature blocks for each party
 # heading = "EXECUTION"       # optional heading above all signature blocks
-# definitions = "signatures.toml"  # path to template definitions file (default: signatures.toml)
 # default_template = "au.company.deed"  # override default template for all parties
 
 # Per-party overrides (key = party role from front-matter)

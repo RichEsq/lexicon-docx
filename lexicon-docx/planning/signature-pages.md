@@ -156,7 +156,6 @@ The project's `style.toml` can override templates per party role, or set global 
 [signatures]
 enabled = true                         # opt-in, default false
 heading = "EXECUTION"                  # optional heading above blocks, omit for none
-definitions = "signatures.toml"        # path to definitions file
 default_template = "au.company.deed"   # explicit override for all parties
 
 [signatures.party.Google]
@@ -214,7 +213,7 @@ SIGNATURE PAGE (optional heading — TBD)
 
 - `entity_type` field added to `Party` struct in `frontmatter.rs` (optional `String`)
 - New module: `render/signatures.rs` for signature page rendering
-- Definitions file loaded at runtime — path configurable, defaults to bundled location
+- Definitions file resolved via `--signatures` CLI flag, or auto-discovered: input document directory → `$XDG_CONFIG_HOME/lexicon/` (same logic as `--style` / `style.toml`)
 - Template parsing: new `signatures.rs` module in root for template types and resolution
 - Intro text rendered using the existing preamble placeholder/bold system
 - Borderless tables via `Table::without_borders()` with cell-level bottom borders for signature lines

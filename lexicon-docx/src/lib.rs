@@ -7,7 +7,7 @@ pub mod resolve;
 pub mod signatures;
 pub mod style;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use error::{Diagnostic, Result};
 use model::{Document, Status};
@@ -26,25 +26,60 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     render::docx::render_docx(doc, style, input_dir, signature_blocks)
 }
 
-pub fn process(input: &str, style: &StyleConfig, input_dir: Option<&Path>) -> Result<(Vec<u8>, Vec<Diagnostic>)> {
+/// Resolve a config file path by searching:
+/// 1. The input document's directory
+/// 2. $XDG_CONFIG_HOME/lexicon/ (defaults to ~/.config/lexicon/)
+///
+/// Returns the first path that exists, or None.
+pub fn resolve_config_path(filename: &str, input_dir: Option<&Path>) -> Option<PathBuf> {
+    // 1. Same directory as the input document
+    if let Some(dir) = input_dir {
+        let local = dir.join(filename);
+        if local.exists() {
+            return Some(local);
+        }
+    }
+
+    // 2. $XDG_CONFIG_HOME/lexicon/ or ~/.config/lexicon/
+    let config_dir = std::env::var("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home).join(".config")
+        })
+        .join("lexicon");
+
+    let global = config_dir.join(filename);
+    if global.exists() {
+        return Some(global);
+    }
+
+    None
+}
+
+pub fn process(
+    input: &str,
+    style: &StyleConfig,
+    input_dir: Option<&Path>,
+    signatures_path: Option<&Path>,
+) -> Result<(Vec<u8>, Vec<Diagnostic>)> {
     let mut doc = parse(input)?;
     resolve(&mut doc);
 
     // Resolve signature blocks if enabled
     let mut sig_diagnostics = Vec::new();
     let signature_blocks = if style.signatures.enabled {
-        // Load definitions file
-        let defs_path = style.signatures.definitions.as_deref()
-            .unwrap_or("signatures.toml");
-        let defs_path = if Path::new(defs_path).is_absolute() {
-            defs_path.to_string()
-        } else {
-            // Resolve relative to input directory
-            input_dir
-                .map(|d| d.join(defs_path).display().to_string())
-                .unwrap_or_else(|| defs_path.to_string())
+        let definitions = match signatures_path {
+            Some(path) => signatures::load_definitions(path, &mut sig_diagnostics),
+            None => {
+                sig_diagnostics.push(Diagnostic {
+                    level: error::DiagLevel::Warning,
+                    message: "Signatures enabled but no definitions file found (searched input directory and $XDG_CONFIG_HOME/lexicon/)".to_string(),
+                    location: None,
+                });
+                None
+            }
         };
-        let definitions = signatures::load_definitions(Path::new(&defs_path), &mut sig_diagnostics);
 
         signatures::resolve_signature_blocks(
             &doc.meta.parties,

@@ -20,9 +20,15 @@ enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
 
-        /// Style configuration file (TOML)
+        /// Style configuration file (TOML). If not specified, searches for style.toml
+        /// in the input file's directory, then in $XDG_CONFIG_HOME/lexicon/.
         #[arg(short, long)]
         style: Option<PathBuf>,
+
+        /// Signature definitions file (TOML). If not specified, searches for signatures.toml
+        /// in the input file's directory, then in $XDG_CONFIG_HOME/lexicon/.
+        #[arg(long)]
+        signatures: Option<PathBuf>,
 
         /// Fail on warnings (exit code 1)
         #[arg(long)]
@@ -44,11 +50,14 @@ fn main() {
             input,
             output,
             style,
+            signatures,
             strict,
         } => {
             let output_path = output.unwrap_or_else(|| input.with_extension("docx"));
+            let input_dir = input.parent();
 
             let style_config = match style {
+                // Explicit --style flag: use that path directly
                 Some(path) => match lexicon_docx::style::StyleConfig::load(&path) {
                     Ok(c) => c,
                     Err(e) => {
@@ -56,7 +65,25 @@ fn main() {
                         std::process::exit(1);
                     }
                 },
-                None => lexicon_docx::style::StyleConfig::default(),
+                // No flag: search input dir, then XDG
+                None => {
+                    match lexicon_docx::resolve_config_path("style.toml", input_dir) {
+                        Some(path) => match lexicon_docx::style::StyleConfig::load(&path) {
+                            Ok(c) => c,
+                            Err(e) => {
+                                eprintln!("Error loading style config from {}: {}", path.display(), e);
+                                std::process::exit(1);
+                            }
+                        },
+                        None => lexicon_docx::style::StyleConfig::default(),
+                    }
+                }
+            };
+
+            // Resolve signatures definitions: explicit flag, then auto-discover
+            let signatures_path = match signatures {
+                Some(path) => Some(path),
+                None => lexicon_docx::resolve_config_path("signatures.toml", input_dir),
             };
 
             let input_text = match std::fs::read_to_string(&input) {
@@ -67,8 +94,7 @@ fn main() {
                 }
             };
 
-            let input_dir = input.parent();
-            match lexicon_docx::process(&input_text, &style_config, input_dir) {
+            match lexicon_docx::process(&input_text, &style_config, input_dir, signatures_path.as_deref()) {
                 Ok((bytes, diagnostics)) => {
                     let has_errors = print_diagnostics(&diagnostics);
 
