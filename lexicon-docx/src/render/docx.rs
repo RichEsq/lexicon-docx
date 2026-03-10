@@ -2,8 +2,8 @@ use docx_rs::{
     AbstractNumbering, AlignmentType, BreakType, Docx, Footer, Header, IndentLevel,
     Level, LevelJc, LevelOverride, LevelText, LineSpacing, LineSpacingType, NumberFormat,
     NumberingId, NumPages, Numbering, PageMargin, PageNum, Paragraph, Run, RunFonts,
-    RunProperty, SpecialIndentType, Start, Tab, TabValueType, Table as DocxTable,
-    TableCell, TableOfContents, TableRow, VertAlignType, WidthType,
+    RunProperty, SpecialIndentType, Start, Style, StyleType, Tab, TabValueType,
+    Table as DocxTable, TableCell, TableOfContents, TableRow, VertAlignType, WidthType,
 };
 
 use crate::error::{LexiconError, Result};
@@ -46,6 +46,14 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         .add_abstract_numbering(create_clause_numbering(style))
         .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID))
         .add_abstract_numbering(create_simple_list_numbering(style));
+
+    // Register heading styles so the TOC field can find them
+    for i in 1..=3 {
+        docx = docx.add_style(
+            Style::new(format!("Heading{}", i), StyleType::Paragraph)
+                .name(format!("heading {}", i)),
+        );
+    }
 
     // Footer
     let footer_size = StyleConfig::pt_to_half_points(style.font_size - 2.0);
@@ -194,9 +202,13 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
             _ => StyleConfig::pt_to_half_points(style.heading2_size),
         };
 
+        let outline_lvl = outline_level_for(clause.level);
+        let heading_style = format!("Heading{}", outline_lvl + 1);
+
         let mut para = Paragraph::new()
+            .style(&heading_style)
             .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
-            .outline_lvl(outline_level_for(clause.level))
+            .outline_lvl(outline_lvl)
             .keep_next(true)
             .run_property({
                 let mut rp = RunProperty::new().bold().size(heading_size);
