@@ -749,7 +749,6 @@ fn outline_level_for(level: ClauseLevel) -> usize {
 
 fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
     let meta = &doc.meta;
-    let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
 
     // Title
     let mut title_run = Run::new()
@@ -768,38 +767,6 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
         Paragraph::new()
             .align(AlignmentType::Center)
             .add_run(title_run),
-    );
-
-    // Status + Version line
-    if meta.status.is_some() || meta.version.is_some() {
-        let mut parts = Vec::new();
-        if let Some(ref status) = meta.status {
-            parts.push(status.to_string());
-        }
-        if let Some(version) = meta.version {
-            parts.push(format!("Version {}", version));
-        }
-        docx = docx.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(parts.join(" — "))
-                        .size(body_half_pts),
-                ),
-        );
-    }
-
-    // Date
-    let formatted_date = format_date(&meta.date);
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text(&formatted_date)
-                    .size(body_half_pts),
-            ),
     );
 
     docx
@@ -1160,10 +1127,6 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
     }
 
     docx
-}
-
-fn format_date(date_str: &str) -> String {
-    format_date_with_format(date_str, "%e %B %Y")
 }
 
 fn format_date_with_format(date_str: &str, fmt: &str) -> String {
