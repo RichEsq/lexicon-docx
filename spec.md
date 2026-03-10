@@ -225,7 +225,17 @@ Where a clause requires a sub-heading (e.g., for grouped terms within a miscella
         1. If any provision of this Addendum is invalid, it will be severed.
 ```
 
-### 3.7. Prose Sections
+### 3.7. Superscript
+
+Superscript text is marked with `^` delimiters:
+
+```markdown
+^2^
+```
+
+This renders as superscript in the output document. Useful for footnote markers, ordinals, or mathematical notation.
+
+### 3.8. Prose Sections
 
 Some parts of a contract are not structured as numbered clauses (e.g., recitals, annexure content, signature blocks). These are written as standard Markdown paragraphs, headings, lists, and tables outside of the numbered outline structure.
 
@@ -663,6 +673,7 @@ At minimum, a processor should support:
 | Multiple paragraphs  | Blank line + indented continuation              | Yes |
 | Blockquotes          | `>`                                             | Yes |
 | Sub-headings         | `### Heading` inside list item                  | Yes |
+| Superscript          | `^text^`                                        | Partial (some renderers support it) |
 | Formal definition    | `**Term** means ...`                            | Yes (renders as bold) |
 | Inline definition    | `("**Term**")`                                  | Yes (renders as bold) |
 | Term reference       | Plain text (no markup)                          | Yes |
