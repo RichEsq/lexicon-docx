@@ -42,7 +42,19 @@ show_status = true            # show status and version on cover
 # Parties preamble (rendered before the contract body)
 [preamble]
 enabled = false               # true: render a parties preamble block before the body
-style = "simple"              # "simple" (block with BETWEEN/AND) or "prose" (single paragraph)
+style = "simple"              # "simple", "prose", or "custom"
+
+# Custom preamble templates (used when style = "custom")
+# Placeholders: {title}, {short_title}, {date}
+# Use **text** for bold, \n for new paragraphs
+# template = "This {title} (\"**{short_title}**\") is dated {date} between"
+#
+# Party template placeholders: {name}, {specifier}, {role}
+# Empty {specifier} automatically removes surrounding ()
+# party_template = "**{name}** ({specifier}) (\"{role}\")"
+#
+# Separator appended to each party line except the last
+# party_separator = "; and"
 
 # Footer
 [footer]

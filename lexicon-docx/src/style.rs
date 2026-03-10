@@ -121,6 +121,7 @@ impl Default for SchedulePosition {
 pub enum PreambleStyle {
     Simple,
     Prose,
+    Custom,
 }
 
 impl Default for PreambleStyle {
@@ -134,6 +135,9 @@ impl Default for PreambleStyle {
 pub struct PreambleConfig {
     pub enabled: bool,
     pub style: PreambleStyle,
+    pub template: String,
+    pub party_template: String,
+    pub party_separator: String,
 }
 
 impl Default for PreambleConfig {
@@ -141,6 +145,9 @@ impl Default for PreambleConfig {
         PreambleConfig {
             enabled: false,
             style: PreambleStyle::Simple,
+            template: "This {title} (\"**{short_title}**\") is dated {date} between".to_string(),
+            party_template: "**{name}** ({specifier}) (\"{role}\")".to_string(),
+            party_separator: "; and".to_string(),
         }
     }
 }

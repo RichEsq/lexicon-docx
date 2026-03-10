@@ -918,9 +918,109 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             // Spacer after preamble
             docx = docx.add_paragraph(Paragraph::new());
         }
+        PreambleStyle::Custom => {
+            let preamble = &style.preamble;
+
+            // Expand the opening template
+            let expanded_template = preamble.template
+                .replace("{title}", &meta.title)
+                .replace("{short_title}", short_title)
+                .replace("{date}", &formatted_date);
+
+            // Render template lines as paragraphs
+            for line in expanded_template.split("\\n") {
+                let cleaned = clean_empty_parens(line);
+                docx = docx.add_paragraph(
+                    render_template_paragraph(&cleaned, body_half_pts),
+                );
+            }
+
+            // Spacer before parties
+            docx = docx.add_paragraph(Paragraph::new());
+
+            // Render each party
+            let party_count = meta.parties.len();
+            for (i, party) in meta.parties.iter().enumerate() {
+                let expanded_party = preamble.party_template
+                    .replace("{name}", &party.name)
+                    .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
+                    .replace("{role}", &party.role);
+                let cleaned = clean_empty_parens(&expanded_party);
+
+                // Append separator to all but the last party
+                let line = if i < party_count - 1 {
+                    format!("{}{}", cleaned, &preamble.party_separator)
+                } else {
+                    cleaned
+                };
+
+                docx = docx.add_paragraph(
+                    render_template_paragraph(&line, body_half_pts),
+                );
+            }
+
+            // Spacer after preamble
+            docx = docx.add_paragraph(Paragraph::new());
+        }
     }
 
     docx
+}
+
+/// Parse a template string with `**bold**` markers into a paragraph of Runs.
+fn render_template_paragraph(text: &str, size: usize) -> Paragraph {
+    let mut para = Paragraph::new();
+    let mut remaining = text;
+
+    while let Some(start) = remaining.find("**") {
+        // Text before the bold marker
+        if start > 0 {
+            para = para.add_run(
+                Run::new().add_text(&remaining[..start]).size(size),
+            );
+        }
+
+        // Find the closing **
+        let after_open = &remaining[start + 2..];
+        if let Some(end) = after_open.find("**") {
+            let bold_text = &after_open[..end];
+            para = para.add_run(
+                Run::new().add_text(bold_text).bold().size(size),
+            );
+            remaining = &after_open[end + 2..];
+        } else {
+            // No closing **, treat rest as plain text
+            para = para.add_run(
+                Run::new().add_text(remaining).size(size),
+            );
+            remaining = "";
+        }
+    }
+
+    // Remaining plain text
+    if !remaining.is_empty() {
+        para = para.add_run(
+            Run::new().add_text(remaining).size(size),
+        );
+    }
+
+    para
+}
+
+/// Remove empty parentheses left over when {specifier} is absent.
+/// Handles `()`, `( )`, and surrounding whitespace collapse.
+fn clean_empty_parens(text: &str) -> String {
+    let result = text
+        .replace("()", "")
+        .replace("( )", "");
+    // Collapse any resulting double spaces
+    let mut prev = String::new();
+    let mut current = result;
+    while current != prev {
+        prev = current.clone();
+        current = current.replace("  ", " ");
+    }
+    current.trim().to_string()
 }
 
 // --- Cover page ---
