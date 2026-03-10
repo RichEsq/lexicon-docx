@@ -24,6 +24,7 @@ The front-matter block is enclosed by `---` delimiters and must appear at the ve
 ```yaml
 ---
 title: Deed of Release
+short_title: Deed
 date: 2017-11-05
 ref: "VL:RP:20161021"
 author: Richard Prangell (Viridian Lawyers)
@@ -92,7 +93,19 @@ If omitted, no status is assumed. A processor may use this field to render a wat
 status: draft
 ```
 
-#### 2.2.6. `version` (optional)
+#### 2.2.6. `short_title` (optional)
+
+An abbreviated name for the document, used to refer to the document throughout the contract body (e.g., in a parties preamble or recitals). Defaults to `"Agreement"` if not specified.
+
+The `short_title` is automatically treated as a defined term. A processor should include it alongside party roles in the list of automatic definitions.
+
+Common values: `"Agreement"`, `"Deed"`, `"NDA"`, `"Addendum"`, `"Contract"`.
+
+```yaml
+short_title: Deed
+```
+
+#### 2.2.7. `version` (optional)
 
 The version number of the document, expressed as a positive integer. This tracks iterations during negotiation and review. A processor may render the version number in the document header or footer.
 
@@ -100,7 +113,7 @@ The version number of the document, expressed as a positive integer. This tracks
 version: 2
 ```
 
-#### 2.2.7. `parties` (required)
+#### 2.2.8. `parties` (required)
 
 A list of parties to the contract. Each party has three sub-fields:
 
@@ -122,7 +135,7 @@ parties:
 
 Party roles are automatically treated as defined terms. A processor should include them in any generated glossary and may validate that the role appears in the contract body.
 
-#### 2.2.8. `annexures` (optional)
+#### 2.2.9. `annexures` (optional)
 
 A list of documents to be annexed to the contract. Each entry is the plain-language title of the annexure.
 
@@ -530,6 +543,7 @@ Annexures that are separate documents (diagrams, images, external files) are dec
 ```markdown
 ---
 title: Deed of Release
+short_title: Deed
 date: 2017-11-05
 ref: "VL:RP:20161021"
 author: Richard Prangell (Viridian Lawyers)

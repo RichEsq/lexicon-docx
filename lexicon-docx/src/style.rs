@@ -24,6 +24,7 @@ pub struct StyleConfig {
     pub cover: CoverConfig,
     pub toc: TocConfig,
     pub footer: FooterConfig,
+    pub preamble: PreambleConfig,
     pub schedule_position: SchedulePosition,
 }
 
@@ -117,6 +118,35 @@ impl Default for SchedulePosition {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PreambleStyle {
+    Simple,
+    Prose,
+}
+
+impl Default for PreambleStyle {
+    fn default() -> Self {
+        PreambleStyle::Simple
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct PreambleConfig {
+    pub enabled: bool,
+    pub style: PreambleStyle,
+}
+
+impl Default for PreambleConfig {
+    fn default() -> Self {
+        PreambleConfig {
+            enabled: true,
+            style: PreambleStyle::Simple,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PageSize {
     A4,
@@ -150,6 +180,7 @@ impl Default for StyleConfig {
             cover: CoverConfig::default(),
             toc: TocConfig::default(),
             footer: FooterConfig::default(),
+            preamble: PreambleConfig::default(),
             schedule_position: SchedulePosition::default(),
         }
     }

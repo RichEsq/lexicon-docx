@@ -8,7 +8,7 @@ use docx_rs::{
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
-use crate::style::{PartyFormat, SchedulePosition, StyleConfig};
+use crate::style::{PartyFormat, PreambleStyle, SchedulePosition, StyleConfig};
 
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
 const ABSTRACT_NUM_ID: usize = 2;
@@ -126,6 +126,11 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     } else {
         // Inline title at top of first page
         docx = render_inline_title(docx, doc, style);
+        if style.preamble.enabled {
+            docx = render_preamble(docx, doc, style);
+        } else {
+            docx = docx.add_paragraph(Paragraph::new());
+        }
     }
 
     let schedule_after_toc = matches!(style.schedule_position, SchedulePosition::AfterToc)
@@ -792,8 +797,164 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             ),
     );
 
-    // Spacer before content
-    docx = docx.add_paragraph(Paragraph::new());
+    docx
+}
+
+// --- Preamble (parties block when cover page is disabled) ---
+
+fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
+    let meta = &doc.meta;
+    let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
+    let short_title = meta.short_title.as_deref().unwrap_or("Agreement");
+    let formatted_date = format_date_with_format(&meta.date, &style.cover.date_format);
+
+    match style.preamble.style {
+        PreambleStyle::Simple => {
+            // Opening line: This [title] ("[short_title]") is dated [date]
+            let mut opening = Paragraph::new();
+            opening = opening.add_run(
+                Run::new()
+                    .add_text(format!("This {} (\"", &meta.title))
+                    .size(body_half_pts),
+            );
+            opening = opening.add_run(
+                Run::new()
+                    .add_text(short_title)
+                    .bold()
+                    .size(body_half_pts),
+            );
+            opening = opening.add_run(
+                Run::new()
+                    .add_text(format!("\") is dated {}", &formatted_date))
+                    .size(body_half_pts),
+            );
+            docx = docx.add_paragraph(opening);
+
+            // Spacer
+            docx = docx.add_paragraph(Paragraph::new());
+
+            // BETWEEN
+            docx = docx.add_paragraph(
+                Paragraph::new().add_run(
+                    Run::new()
+                        .add_text(&style.cover.between_label)
+                        .size(body_half_pts),
+                ),
+            );
+
+            // Parties
+            for (i, party) in meta.parties.iter().enumerate() {
+                docx = docx.add_paragraph(Paragraph::new());
+
+                // Party line: [name] ([specifier]) ("Role")
+                let mut para = Paragraph::new();
+                para = para.add_run(
+                    Run::new()
+                        .add_text(&party.name)
+                        .bold()
+                        .size(body_half_pts),
+                );
+                if let Some(ref spec) = party.specifier {
+                    para = para.add_run(
+                        Run::new()
+                            .add_text(format!(" ({})", spec))
+                            .size(body_half_pts),
+                    );
+                }
+                para = para.add_run(
+                    Run::new()
+                        .add_text(format!(" (\"{}\")", &party.role))
+                        .size(body_half_pts),
+                );
+                docx = docx.add_paragraph(para);
+
+                // AND between parties
+                if i < meta.parties.len() - 1 {
+                    docx = docx.add_paragraph(Paragraph::new());
+                    docx = docx.add_paragraph(
+                        Paragraph::new().add_run(
+                            Run::new()
+                                .add_text("AND")
+                                .size(body_half_pts),
+                        ),
+                    );
+                }
+            }
+
+            // Spacer after parties
+            docx = docx.add_paragraph(Paragraph::new());
+        }
+        PreambleStyle::Prose => {
+            // Single paragraph: This [title] ("[short_title]"), is entered into as of [date]
+            // between [party1] and [party2].
+            let mut para = Paragraph::new();
+            para = para.add_run(
+                Run::new()
+                    .add_text(format!("This {} (\"", &meta.title))
+                    .size(body_half_pts),
+            );
+            para = para.add_run(
+                Run::new()
+                    .add_text(short_title)
+                    .bold()
+                    .size(body_half_pts),
+            );
+            para = para.add_run(
+                Run::new()
+                    .add_text(format!("\"), is entered into as of {} between ", &formatted_date))
+                    .size(body_half_pts),
+            );
+
+            // Parties
+            let party_count = meta.parties.len();
+            for (i, party) in meta.parties.iter().enumerate() {
+                para = para.add_run(
+                    Run::new()
+                        .add_text(&party.name)
+                        .bold()
+                        .size(body_half_pts),
+                );
+                if let Some(ref spec) = party.specifier {
+                    para = para.add_run(
+                        Run::new()
+                            .add_text(format!(" ({})", spec))
+                            .size(body_half_pts),
+                    );
+                }
+                para = para.add_run(
+                    Run::new()
+                        .add_text(format!(" (\"{}\")", &party.role))
+                        .size(body_half_pts),
+                );
+
+                if party_count > 2 && i < party_count - 1 {
+                    // Comma-separated for 3+ parties
+                    if i < party_count - 2 {
+                        para = para.add_run(
+                            Run::new().add_text(", ").size(body_half_pts),
+                        );
+                    } else {
+                        para = para.add_run(
+                            Run::new().add_text(" and ").size(body_half_pts),
+                        );
+                    }
+                } else if party_count == 2 && i == 0 {
+                    para = para.add_run(
+                        Run::new().add_text(" and ").size(body_half_pts),
+                    );
+                }
+            }
+
+            // Closing period
+            para = para.add_run(
+                Run::new().add_text(".").size(body_half_pts),
+            );
+            docx = docx.add_paragraph(para);
+
+            // Spacer after preamble
+            docx = docx.add_paragraph(Paragraph::new());
+        }
+    }
 
     docx
 }

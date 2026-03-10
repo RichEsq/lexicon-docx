@@ -319,6 +319,13 @@ fn validate_defined_terms(doc: &mut Document) {
         });
     }
 
+    // Short title is an automatic definition
+    let short_title = doc.meta.short_title.as_deref().unwrap_or("Agreement");
+    definitions.push(TermDefinition {
+        term: short_title.to_string(),
+        location: Some("front-matter".to_string()),
+    });
+
     // Collect all bold terms that are definitions (not field labels)
     for element in &doc.body {
         match element {
