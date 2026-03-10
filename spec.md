@@ -40,6 +40,8 @@ parties:
 exhibits:
   - title: Office Diagram
   - title: Employment Obligations
+schedule:
+  - title: Schedule
 ---
 ```
 
@@ -142,7 +144,7 @@ A list of external documents to be exhibited (attached for reference) to the con
 | Sub-field | Required | Description |
 |-----------|----------|-------------|
 | `title`   | Yes      | The title of the exhibit, rendered as a heading on the exhibit page. |
-| `path`    | No       | Path to an image (PNG, JPG) or PDF file to import into the output. Relative paths are resolved against the input document's directory. |
+| `path`    | No       | Path or URL to an image (PNG, JPG) or PDF file to import into the output. Relative paths are resolved against the input document's directory. HTTP and HTTPS URLs are fetched at processing time. |
 
 ```yaml
 exhibits:
@@ -150,6 +152,8 @@ exhibits:
     path: ./plumbing-diagram.png
   - title: Site Plan
     path: ./plans/site-plan.pdf
+  - title: Technical Specifications
+    path: https://example.com/specs/tech-spec.pdf
   - title: Floor Plan
 ```
 
@@ -158,6 +162,29 @@ When `path` is provided, a processor imports the file into the output document:
 - **PDF** files are rendered page-by-page as images (requires `pdftoppm` from poppler-utils).
 
 When `path` is omitted, a processor generates a placeholder page with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Floor Plan").
+
+#### 2.2.10. `schedule` (optional)
+
+A list of schedules to be generated from defined terms in the contract body. Each entry is an object with a `title` field. See section 6 for full details on how schedule items are identified and rendered.
+
+| Sub-field | Required | Description |
+|-----------|----------|-------------|
+| `title`   | Yes      | The title of the schedule, used as the page heading and matched in defined term phrases. |
+
+```yaml
+schedule:
+  - title: Schedule
+```
+
+Multiple schedules:
+
+```yaml
+schedule:
+  - title: Schedule of Particulars
+  - title: Payment Schedule
+```
+
+If omitted, no schedules are generated.
 
 ### 2.3. Markdown Compatibility
 
@@ -421,99 +448,87 @@ A clause may reference itself:
        the Consultant from working with Pearson Hardman. {#avoidance-of-doubt}
 ```
 
-## 6. Schedule Items
+## 6. Schedules
 
 ### 6.1. Overview
 
-Schedule items are variable values within a contract that are either:
+A schedule is a page (or pages) appended to the contract that lists variable terms to be completed at the time of execution. Schedule items are identified automatically from defined terms whose definitions reference the schedule by name.
 
-1. pre-filled at drafting time; or
-2. left blank for completion at the time of execution.
+This approach uses standard Markdown syntax (bold defined terms with ordinary prose), making schedules fully readable and cross-compilable without any special syntax.
 
-They appear inline in the contract body and are collected into a schedule (or schedules) by a processor.
+### 6.2. Declaration
 
-### 6.2. Syntax
+Schedules are declared in the front-matter `schedule` field. Each entry is an object with a `title` field:
 
-A schedule item is represented using Markdown's reference-link syntax:
+```yaml
+schedule:
+  - title: Schedule
+```
+
+Multiple schedules are supported:
+
+```yaml
+schedule:
+  - title: Schedule of Particulars
+  - title: Payment Schedule
+```
+
+If `schedule` is omitted or empty, no schedule page is generated.
+
+### 6.3. Schedule Items
+
+A schedule item is a defined term whose definition text contains a phrase that references a schedule by its title. For example:
 
 ```markdown
-The Employer agrees to pay to the Employee [the Payment][ref-1].
+1. **Objection Period** has the meaning given by the Schedule.
+
+2. **Rent** is set out in the Schedule of Particulars.
+
+3. **Payment Date** has the meaning specified in the Payment Schedule.
 ```
 
-The reference is defined at the end of the document (or at the end of the relevant section) as:
+A processor identifies schedule items by matching the following phrases (case-insensitive) in the text following a bold defined term, where `{title}` is the title of a declared schedule:
 
-```markdown
-[ref-1]: #schedule "AU $10,000"
-```
-
-### 6.3. Reference Definition Format
-
-A schedule item reference definition takes the form:
-
-```
-[ref-id]: #schedule "value"
-```
-
-Where:
-
-| Component  | Description                                                                |
-| ---------- | -------------------------------------------------------------------------- |
-| `ref-id`   | A unique identifier for the schedule item (e.g., `ref-1`, `ref-a`).      |
-| `#schedule`| A fixed URL fragment that identifies this as a schedule item (not a real link). |
-| `"value"`  | The pre-filled value, in quotes. An empty string (`""`) indicates a value to be completed at execution. |
-
-Examples:
-
-```markdown
-[ref-1]: #schedule "AU $10,000"
-[ref-2]: #schedule ""
-```
+| Phrase |
+|--------|
+| given by the {title} |
+| set out in the {title} |
+| specified in the {title} |
+| described in the {title} |
+| defined in the {title} |
+| provided in the {title} |
+| contained in the {title} |
+| stated in the {title} |
+| referred to in the {title} |
+| as per the {title} |
+| in accordance with the {title} |
+| pursuant to the {title} |
+| detailed in the {title} |
 
 ### 6.4. Behaviour
 
 #### 6.4.1. Without a Processor
 
-In standard Markdown, reference links render the link text as a clickable link. The text `[the Payment][ref-1]` renders as a hyperlink with the display text "the Payment" pointing to `#schedule`. This is not ideal but is functional and readable.
+Schedule items are ordinary defined terms in standard Markdown. The text `**Objection Period** has the meaning given by the Schedule.` renders as bold text followed by plain prose — perfectly readable without any processor.
 
 #### 6.4.2. With a Processor
 
 A processor:
 
-1. collects all reference definitions with the `#schedule` URL;
-2. extracts the ref-id, the inline display text, and the pre-filled value (or marks it as blank);
-3. in the body, renders the inline text with the value (e.g., "the Payment (AU $10,000)") or a blank line for hand completion;
-4. generates a schedule page listing all schedule items with their ref-ids, descriptions, and values.
+1. parses the `schedule` field from the front-matter to identify declared schedules;
+2. scans all defined terms (bold text) in the document for phrases matching a declared schedule title;
+3. collects matching terms as schedule items, associated with the referenced schedule;
+4. generates a schedule page for each declared schedule, listing the collected terms with blank spaces for completion; and
+5. warns if a declared schedule has no referencing terms, or if a term references a schedule title not declared in the front-matter.
 
-### 6.5. Multiple Schedules
+### 6.5. Rendering
 
-Where a contract requires multiple schedules, use a naming convention in the ref-id:
+Each schedule renders as a separate page with:
 
-```markdown
-[s1-ref-1]: #schedule "AU $10,000"
-[s1-ref-2]: #schedule "14 days from the date of invoice"
-[s2-ref-1]: #schedule ""
-```
+- the schedule title as a centred heading; and
+- a two-column table listing each schedule item (the defined term name) with a blank column for completion at execution.
 
-The prefix (`s1-`, `s2-`) groups items into Schedule 1, Schedule 2, etc. A processor uses these prefixes to generate separate schedules.
-
-### 6.6. Schedule Reference Definitions Placement
-
-All schedule reference definitions should be placed at the end of the document, grouped under a comment or heading for readability:
-
-```markdown
-<!-- Schedule References -->
-[ref-1]: #schedule "AU $10,000"
-[ref-2]: #schedule ""
-```
-
-Or under a heading (which a processor may strip from the final output):
-
-```markdown
-## Schedule Values
-
-[ref-1]: #schedule "AU $10,000"
-[ref-2]: #schedule ""
-```
+Items appear in document order by default. A processor may support alternative orderings (e.g., alphabetical) via configuration.
 
 ## 7. Tables
 
@@ -534,7 +549,7 @@ Lexicon distinguishes between three types of attachments to a contract:
 
 | Type | Purpose | Where declared | Content |
 |------|---------|----------------|---------|
-| **Schedule** | Variable commercial terms (see section 6) | Inline reference links | Values collected into a schedule page |
+| **Schedule** | Variable terms for completion at execution (see section 6) | Front-matter `schedule` field + defined term phrases | Auto-generated schedule page with blanks |
 | **Addendum** | Substantive attached sections that supplement the body | `# ADDENDUM` headings in the document body | Free-form Markdown |
 | **Exhibit** | Pre-existing external documents included for reference | Front-matter `exhibits` field | Placeholder pages (future: file import) |
 
@@ -576,7 +591,7 @@ When an exhibit has a `path`, a processor imports the referenced file and embeds
 
 When `path` is omitted, a processor generates a placeholder page with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Property Map"). The physical document can then be inserted manually when printing or assembling the final contract.
 
-Relative paths are resolved against the directory containing the input Markdown file. Supported formats are PNG, JPG/JPEG, and PDF. PDF rendering requires `pdftoppm` (from poppler-utils) to be available on the system.
+Relative paths are resolved against the directory containing the input Markdown file. HTTP and HTTPS URLs are fetched at processing time. Supported formats are PNG, JPG/JPEG, and PDF. PDF rendering requires `pdftoppm` (from poppler-utils) to be available on the system.
 
 ## 9. Complete Example
 
@@ -597,19 +612,25 @@ parties:
     specifier: ACN 123 456 789
     role: Employer
 exhibits: []
+schedule:
+  - title: Schedule
 ---
 
 1. ## Definitions {#definitions}
 
     1. **Claim** means any and all claims, investigations, complaints, enquiries, demands, suits, causes of action, damages, debts, costs, proceedings, whether at law or in equity or under any statute (except workers compensation legislation).
 
-    2. **Person** means a natural person, company, partnership, association, joint venture, or any other business or any other organisation, of any description.
+    2. **Payment** has the meaning given by the Schedule.
+
+    3. **Person** means a natural person, company, partnership, association, joint venture, or any other business or any other organisation, of any description.
+
+    4. **Timeframe** has the meaning given by the Schedule.
 
 2. ## Employer's Obligations {#employer-obligations}
 
-    1. The Employer, without admission of any liability whatsoever, agrees to pay to the Employee [the Payment][ref-1].
+    1. The Employer, without admission of any liability whatsoever, agrees to pay to the Employee the Payment.
 
-    2. The Employer shall pay the Payment to the Employee, within [the Timeframe][ref-2] of an executed counterpart of this Deed being received by the Employer, from the Employee. {#payment-timeframe}
+    2. The Employer shall pay the Payment to the Employee, within the Timeframe of an executed counterpart of this Deed being received by the Employer, from the Employee. {#payment-timeframe}
 
 3. ## Employee's Obligations {#employee-obligations}
 
@@ -674,10 +695,6 @@ exhibits: []
     1. The Employer undertakes not to make any statement or intimations derogatory of the Employee, and agrees not to discredit or disparage the Employee.
 
     2. The Employee undertakes not to make any statement or intimations derogatory of the Employer, and agrees not to discredit or disparage the Employer.
-
-<!-- Schedule References -->
-[ref-1]: #schedule "AU $10,000"
-[ref-2]: #schedule ""
 ```
 
 ## 10. Processor Capabilities
@@ -691,14 +708,14 @@ A Lexicon Markdown processor should implement the following capabilities:
 3. Identify all anchors (heading-level and clause-level).
 4. Identify all cross-references.
 5. Identify all defined terms (formal, inline, and party-role).
-6. Identify all schedule items and their reference definitions.
+6. Identify all schedule items by matching defined terms against declared schedule titles and built-in phrases.
 
 ### 10.2. Validation
 
 1. Validate that `date` is in `YYYY-MM-DD` format.
 2. Validate that all cross-references point to existing anchors.
 3. Warn on defined terms that are never used in the document text.
-4. Validate that all schedule item references have a corresponding reference definition.
+4. Warn if a declared schedule has no referencing terms, or if a defined term references a schedule title not declared in the front-matter.
 
 ### 10.3. Transformation
 
@@ -706,14 +723,14 @@ A Lexicon Markdown processor should implement the following capabilities:
 2. Transform numbering to legal convention (`1.1`, `(a)`, `(i)`).
 3. Strip anchor syntax from rendered output.
 4. Generate a definitions glossary / schedule.
-5. Generate a schedule of completion items from schedule references.
+5. Generate schedule pages from defined terms that reference declared schedules.
 6. Render to `.docx` (via Pandoc with custom filters or templates) or `.pdf`.
 
 ### 10.4. Output Formats
 
 At minimum, a processor should support:
 
-1. **Markdown** — a "resolved" Markdown file with cross-references updated, anchors stripped, and schedule values interpolated.
+1. **Markdown** — a "resolved" Markdown file with cross-references updated and anchors stripped.
 2. **DOCX** — a Word document with legal numbering, formatted parties block, cover page, addendum pages, and exhibit pages.
 3. **PDF** — equivalent to the DOCX output.
 
@@ -734,7 +751,8 @@ At minimum, a processor should support:
 | Heading anchor       | `## Heading {#id}`                              | Partial (Pandoc yes, others show literal text) |
 | Clause anchor        | `Text {#id}`                                    | Partial (shows literal text without processor) |
 | Cross-reference      | `[clause X](#id)`                               | Yes (renders as link) |
-| Schedule item        | `[display text][ref-id]` + `[ref-id]: #schedule "value"` | Yes (renders as link) |
+| Schedule item        | `**Term** has the meaning given by the Schedule.` | Yes (renders as bold + prose) |
+| Schedule declaration | Front-matter `schedule` field                   | Yes |
 | Tables               | Standard Markdown tables                        | Yes |
 | Exhibit declaration  | Front-matter `exhibits` field (with optional `path`) | Yes |
 | Addendum content     | `# ADDENDUM` headings after main body           | Yes |

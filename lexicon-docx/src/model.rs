@@ -24,6 +24,13 @@ pub struct DocumentMeta {
     pub parties: Vec<Party>,
     #[serde(default)]
     pub exhibits: Vec<Exhibit>,
+    #[serde(default)]
+    pub schedule: Vec<ScheduleDecl>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ScheduleDecl {
+    pub title: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -137,11 +144,6 @@ pub enum InlineContent {
         anchor_id: String,
         resolved: Option<String>,
     },
-    ScheduleRef {
-        display: String,
-        ref_id: String,
-        resolved_value: Option<String>,
-    },
     Link {
         text: String,
         url: String,
@@ -160,7 +162,6 @@ impl InlineContent {
             InlineContent::CrossRef { display, resolved, .. } => {
                 resolved.as_ref().unwrap_or(display).clone()
             }
-            InlineContent::ScheduleRef { display, .. } => display.clone(),
             InlineContent::Link { text, .. } => text.clone(),
             InlineContent::SoftBreak => " ".to_string(),
             InlineContent::LineBreak => "\n".to_string(),
@@ -204,6 +205,6 @@ pub enum AddendumContent {
 
 #[derive(Debug, Clone)]
 pub struct ScheduleItem {
-    pub description: String,
-    pub value: Option<String>,
+    pub term: String,
+    pub schedule_index: usize,
 }

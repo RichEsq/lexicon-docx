@@ -132,8 +132,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         docx = docx.add_paragraph(Paragraph::new());
     }
 
+    let has_schedule_items = !doc.schedule_items.is_empty();
     let schedule_after_toc = matches!(style.schedule_position, SchedulePosition::AfterToc)
-        && !doc.schedule_items.is_empty();
+        && has_schedule_items;
 
     if style.toc.enabled {
         // TOC heading
@@ -172,7 +173,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
 
     // Schedule before body (if configured)
     if schedule_after_toc {
-        docx = render_schedule(docx, &doc.schedule_items, style);
+        docx = render_schedules(docx, &doc.meta.schedule, &doc.schedule_items, style);
 
         // Page break before body
         docx = docx.add_paragraph(
@@ -211,8 +212,8 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     }
 
     // Schedule at end (if configured, this is the default)
-    if matches!(style.schedule_position, SchedulePosition::End) && !doc.schedule_items.is_empty() {
-        docx = render_schedule(docx, &doc.schedule_items, style);
+    if matches!(style.schedule_position, SchedulePosition::End) && has_schedule_items {
+        docx = render_schedules(docx, &doc.meta.schedule, &doc.schedule_items, style);
     }
 
     // Build
@@ -370,25 +371,6 @@ fn add_inline_run(
         } => {
             let text = resolved.as_ref().unwrap_or(display);
             let run = apply_heading(Run::new().add_text(text).size(size));
-            para.add_run(run)
-        }
-        InlineContent::ScheduleRef {
-            display,
-            resolved_value,
-            ..
-        } => {
-            let mut run = apply_heading(Run::new().size(size));
-            match resolved_value {
-                Some(val) if !val.is_empty() => {
-                    run = run.add_text(format!("{} ({})", display, val));
-                }
-                Some(_) => {
-                    run = run.add_text(format!("{} (____________)", display));
-                }
-                None => {
-                    run = run.add_text(display);
-                }
-            }
             para.add_run(run)
         }
         InlineContent::Link { text, .. } => {
@@ -636,71 +618,83 @@ fn render_exhibit(
     Ok(docx)
 }
 
-fn render_schedule(
+fn render_schedules(
     mut docx: Docx,
+    schedule_configs: &[ScheduleDecl],
     items: &[ScheduleItem],
     style: &StyleConfig,
 ) -> Docx {
+    use crate::style::ScheduleOrder;
+
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
     let body_size = StyleConfig::pt_to_half_points(style.font_size);
 
-    // Page break before schedule
-    docx = docx.add_paragraph(
-        Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-    );
+    for (idx, sched) in schedule_configs.iter().enumerate() {
+        let mut sched_items: Vec<&ScheduleItem> = items
+            .iter()
+            .filter(|item| item.schedule_index == idx)
+            .collect();
 
-    // Schedule heading
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text("SCHEDULE")
-                    .bold()
-                    .size(heading_size),
-            ),
-    );
+        if sched_items.is_empty() {
+            continue;
+        }
 
-    docx = docx.add_paragraph(Paragraph::new());
+        if matches!(style.schedule_order, ScheduleOrder::Alphabetical) {
+            sched_items.sort_by(|a, b| a.term.to_lowercase().cmp(&b.term.to_lowercase()));
+        }
 
-    // Schedule table: Item | Value
-    let mut rows = Vec::new();
+        // Page break before schedule
+        docx = docx.add_paragraph(
+            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
+        );
 
-    // Header row
-    rows.push(TableRow::new(vec![
-        TableCell::new().add_paragraph(
-            Paragraph::new().add_run(
-                Run::new().add_text("Item").bold().size(body_size),
-            ),
-        ),
-        TableCell::new().add_paragraph(
-            Paragraph::new().add_run(
-                Run::new().add_text("Value").bold().size(body_size),
-            ),
-        ),
-    ]));
+        // Schedule heading (use title from YAML, uppercased)
+        docx = docx.add_paragraph(
+            Paragraph::new()
+                .align(AlignmentType::Center)
+                .add_run(
+                    Run::new()
+                        .add_text(sched.title.to_uppercase())
+                        .bold()
+                        .size(heading_size),
+                ),
+        );
 
-    // Data rows
-    for item in items {
-        let value_text = match &item.value {
-            Some(v) if !v.is_empty() => v.clone(),
-            _ => "____________".to_string(),
-        };
+        docx = docx.add_paragraph(Paragraph::new());
+
+        // Schedule table: Item | Particulars
+        let mut rows = Vec::new();
+
+        // Header row
         rows.push(TableRow::new(vec![
             TableCell::new().add_paragraph(
                 Paragraph::new().add_run(
-                    Run::new().add_text(&item.description).size(body_size),
+                    Run::new().add_text("Item").bold().size(body_size),
                 ),
             ),
             TableCell::new().add_paragraph(
                 Paragraph::new().add_run(
-                    Run::new().add_text(&value_text).size(body_size),
+                    Run::new().add_text("Particulars").bold().size(body_size),
                 ),
             ),
         ]));
-    }
 
-    docx = docx.add_table(DocxTable::new(rows).width(5000, WidthType::Pct));
+        // Data rows
+        for item in &sched_items {
+            rows.push(TableRow::new(vec![
+                TableCell::new().add_paragraph(
+                    Paragraph::new().add_run(
+                        Run::new().add_text(&item.term).size(body_size),
+                    ),
+                ),
+                TableCell::new().add_paragraph(
+                    Paragraph::new(),
+                ),
+            ]));
+        }
+
+        docx = docx.add_table(DocxTable::new(rows).width(5000, WidthType::Pct));
+    }
 
     docx
 }

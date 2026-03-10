@@ -62,7 +62,7 @@ cargo test
   → parser/mod.rs: comrak Markdown AST parsing
   → parser/clause.rs: AST walk → Document IR (clauses, inlines, addenda)
   → parser/anchors.rs: {#id} anchor extraction
-  → resolve.rs: clause numbering, cross-ref resolution, term validation
+  → resolve.rs: clause numbering, cross-ref resolution, term validation, schedule phrase detection
   → render/docx.rs: Document IR → .docx via docx-rs
   → main.rs: CLI, file I/O, diagnostic output
 ```
@@ -77,7 +77,7 @@ cargo test
 | `src/frontmatter.rs` | YAML front-matter parsing with serde_yaml |
 | `src/parser/clause.rs` | Core parser: comrak AST → clause tree, inline extraction, addendum parsing |
 | `src/parser/anchors.rs` | Regex-based `{#id}` stripping |
-| `src/resolve.rs` | Numbering (1., 1.1, (a), (i)), cross-refs, defined term validation |
+| `src/resolve.rs` | Numbering (1., 1.1, (a), (i)), cross-refs, defined term validation, schedule phrase detection |
 | `src/render/docx.rs` | DOCX generation — cover page, clauses, addenda, exhibits, tables |
 | `src/render/exhibit.rs` | Exhibit file import — image loading, PDF rendering, sizing |
 | `src/render/watermark.rs` | Draft watermark injection via ZIP post-processing |
@@ -130,7 +130,7 @@ Future work and design notes are in `lexicon-docx/planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF)).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 

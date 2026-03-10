@@ -296,20 +296,9 @@ pub fn extract_inlines<'a>(node: &'a AstNode<'a>) -> Vec<InlineContent> {
             }
             NodeValue::Link(link) => {
                 let link_url = link.url.clone();
-                let link_title = link.title.clone();
                 drop(data);
                 let display = collect_plain_text(child);
-                if link_url == "#schedule" {
-                    inlines.push(InlineContent::ScheduleRef {
-                        display,
-                        ref_id: String::new(), // comrak resolves away the ref-id
-                        resolved_value: if link_title.is_empty() {
-                            None
-                        } else {
-                            Some(link_title)
-                        },
-                    });
-                } else if link_url.starts_with('#') {
+                if link_url.starts_with('#') {
                     inlines.push(InlineContent::CrossRef {
                         display,
                         anchor_id: link_url[1..].to_string(),

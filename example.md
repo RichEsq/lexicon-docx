@@ -14,6 +14,8 @@ parties:
     specifier: as defined in the Principal Agreement
     role: Merchant
 exhibits: []
+schedule:
+  - title: Schedule
 ---
 
 This Addendum forms part of the Principal Agreement between Okendo acting on its own behalf and as agent for each Okendo Affiliate and the Merchant, acting on its own behalf and as agent for each Merchant Affiliate.
@@ -78,23 +80,25 @@ This Addendum forms part of the Principal Agreement between Okendo acting on its
 
         15. **Personal Data** means any information relating to an Identifiable Natural Person and includes the terms 'personal data' and 'personal information' under any applicable Data Protection Laws.
 
-        16. **Personal Data Breach** means a breach of security leading to the accidental or unlawful destruction, loss, alteration, unauthorised disclosure of, or access to, personal data transmitted, stored or otherwise processed.
+        16. **Objection Period** has the meaning given by the Schedule.
 
-        17. **Services** means the services and other activities to be supplied to or carried out by or on behalf of Okendo for Merchant Group Members pursuant to the Principal Agreement.
+        17. **Personal Data Breach** means a breach of security leading to the accidental or unlawful destruction, loss, alteration, unauthorised disclosure of, or access to, personal data transmitted, stored or otherwise processed.
 
-        18. **Standard Contractual Clauses** means:
+        18. **Services** means the services and other activities to be supplied to or carried out by or on behalf of Okendo for Merchant Group Members pursuant to the Principal Agreement.
+
+        19. **Standard Contractual Clauses** means:
 
             1. the European Commission's Standard Contractual Clauses for the transfer of personal data from the European Union to processors established in third countries (controller-to-processor transfers), as set out in European Commission Decision 2021/914/EU under Module Two (transfer controller to processor); and
 
             2. includes, where any Merchant Group Member is subject to the laws of the United Kingdom of Great Britain and Northern Ireland, the International Data Transfer Addendum issued by the United Kingdom Information Commissioner under section 119(A)(1) of the Data Protection Act 2018.
 
-        19. **Subprocessor** means any person (including any third party and any Okendo Affiliate, but excluding an employee of Okendo or any of its sub-contractors) appointed by or on behalf of Okendo or any Okendo Affiliate to Process Personal Data on behalf of any Merchant Group Member in connection with the Principal Agreement.
+        20. **Subprocessor** means any person (including any third party and any Okendo Affiliate, but excluding an employee of Okendo or any of its sub-contractors) appointed by or on behalf of Okendo or any Okendo Affiliate to Process Personal Data on behalf of any Merchant Group Member in connection with the Principal Agreement.
 
-        20. **UK Data Protection Laws** means the UK Data Protection Act 2018, the Digital Markets, Competition and Consumers Act 2024 (UK) and the UK-GDPR.
+        21. **UK Data Protection Laws** means the UK Data Protection Act 2018, the Digital Markets, Competition and Consumers Act 2024 (UK) and the UK-GDPR.
 
-        21. **UK-GDPR** means the GDPR as amended by the Data Protection, Privacy and Electronic Communications (Amendments etc) (EU Exit) Regulations 2019 (SI 2019/419).
+        22. **UK-GDPR** means the GDPR as amended by the Data Protection, Privacy and Electronic Communications (Amendments etc) (EU Exit) Regulations 2019 (SI 2019/419).
 
-        22. **US Data Protection Laws** means the CCPA, the Colorado Privacy Act, Colorado Rev. Stat. 6-1-1301 et seq. (the "**CPA**"); the Connecticut Act Concerning Personal Data Protection and Online Monitoring, Conn. PA 22-15 § 1 et seq. (the "**PDPOM**"); Iowa Consumer Data Protection Act, S.J. 708 (the "**ICDPA**"); the Indiana Consumer Data Protection Act, S.B. 5 (the "**INCDPA**"); the Montana Consumer Data Privacy Act, S.B. 384 (the "**MCDPA**"); the Tennessee Information Protection Act, H.B. 1181 (the "**TIPA**"); the Utah Consumer Privacy Act, Utah Code 13-61-101 et seq. (the "**UCPA**"); the Virginia Consumer Data Protection Act, Code of Virginia title 59.1, Chapter 52 (the "**VCDPA**"); the Fair Credit Reporting Act, 15 U.S.C. § 1681 et seq.; the Gramm-Leach-Bliley Act, 15 U.S.C. § 6801 et seq.; the Children's Online Privacy Protection Act, 15 U.S.C. § 6501 et seq.; Section 5 of the FTC Act, 15 U.S.C. § 45 and any applicable guidance issued by the U.S. Federal Trade Commission, and any data protection or privacy laws of the United States of America and any states therein.
+        23. **US Data Protection Laws** means the CCPA, the Colorado Privacy Act, Colorado Rev. Stat. 6-1-1301 et seq. (the "**CPA**"); the Connecticut Act Concerning Personal Data Protection and Online Monitoring, Conn. PA 22-15 § 1 et seq. (the "**PDPOM**"); Iowa Consumer Data Protection Act, S.J. 708 (the "**ICDPA**"); the Indiana Consumer Data Protection Act, S.B. 5 (the "**INCDPA**"); the Montana Consumer Data Privacy Act, S.B. 384 (the "**MCDPA**"); the Tennessee Information Protection Act, H.B. 1181 (the "**TIPA**"); the Utah Consumer Privacy Act, Utah Code 13-61-101 et seq. (the "**UCPA**"); the Virginia Consumer Data Protection Act, Code of Virginia title 59.1, Chapter 52 (the "**VCDPA**"); the Fair Credit Reporting Act, 15 U.S.C. § 1681 et seq.; the Gramm-Leach-Bliley Act, 15 U.S.C. § 6801 et seq.; the Children's Online Privacy Protection Act, 15 U.S.C. § 6501 et seq.; Section 5 of the FTC Act, 15 U.S.C. § 45 and any applicable guidance issued by the U.S. Federal Trade Commission, and any data protection or privacy laws of the United States of America and any states therein.
 
     2. The terms used in this Addendum shall have the meanings set forth in this Addendum, and their cognate terms shall be construed accordingly. Capitalised terms not otherwise defined herein shall have the meaning given to them in the Principal Agreement. Except as modified below, the terms of the Principal Agreement shall remain in full force and effect.
 
@@ -152,7 +156,7 @@ This Addendum forms part of the Principal Agreement between Okendo acting on its
 
     2. Okendo and each Okendo Affiliate may continue to use those Subprocessors already engaged by Okendo or any Okendo Affiliate as at the date of this Addendum, subject to Okendo and each Okendo Affiliate in each case as soon as practicable meeting the obligations set out in [clause 3.2](#processing-instructions). {#subprocessing-existing}
 
-    3. Okendo shall give Merchant prior written notice of the appointment of any new Subprocessor, including full details of the Processing to be undertaken by the Subprocessor. If, within [the Objection Period][ref-1] of receipt of that notice, Merchant notifies Okendo in writing of any objections (on reasonable grounds) to the proposed appointment. {#subprocessor-notice}
+    3. Okendo shall give Merchant prior written notice of the appointment of any new Subprocessor, including full details of the Processing to be undertaken by the Subprocessor. If, within the Objection Period of receipt of that notice, Merchant notifies Okendo in writing of any objections (on reasonable grounds) to the proposed appointment. {#subprocessor-notice}
 
     4. Neither Okendo nor any Okendo Affiliate shall appoint (or disclose any Merchant Personal Data to) that proposed Subprocessor until reasonable steps have been taken to address the objections raised by any Merchant Group Member and Merchant has been provided with a reasonable written explanation of the steps taken.
 
@@ -389,6 +393,3 @@ The data importer agrees and warrants:
 
 The Merchant has authorised the use of the Subprocessors set out at:
 <https://www.okendo.io/gdpr/>
-
-<!-- Schedule References -->
-[ref-1]: #schedule "7 days"

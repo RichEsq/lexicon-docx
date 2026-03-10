@@ -26,11 +26,11 @@ pub fn resolve(doc: &mut Document) {
         resolve_addendum_cross_refs(addendum, &anchor_map, &mut doc.diagnostics);
     }
 
-    // Collect schedule items
-    collect_schedule_items(doc);
+    // Build schedule phrase patterns from front-matter
+    let schedule_patterns = build_schedule_phrase_patterns(&doc.meta.schedule);
 
-    // Validate defined terms
-    validate_defined_terms(doc);
+    // Collect schedule items and validate defined terms (single pass)
+    collect_and_validate_terms(doc, &schedule_patterns);
 }
 
 // --- Clause numbering ---
@@ -217,84 +217,75 @@ fn resolve_addendum_cross_refs(
     }
 }
 
-// --- Schedule item collection ---
+// --- Schedule phrase pattern building ---
 
-fn collect_schedule_items(doc: &mut Document) {
-    let mut items = Vec::new();
+/// Build regex patterns for matching schedule-referencing phrases in defined term text.
+/// Each schedule title produces one compiled regex with all phrases as alternations.
+fn build_schedule_phrase_patterns(schedules: &[ScheduleDecl]) -> Vec<(usize, Regex)> {
+    let phrase_templates = [
+        "given by the {title}",
+        "set out in the {title}",
+        "specified in the {title}",
+        "described in the {title}",
+        "defined in the {title}",
+        "provided in the {title}",
+        "contained in the {title}",
+        "stated in the {title}",
+        "referred to in the {title}",
+        "as per the {title}",
+        "in accordance with the {title}",
+        "pursuant to the {title}",
+        "detailed in the {title}",
+    ];
 
-    for element in &doc.body {
-        match element {
-            BodyElement::Clause(clause) => {
-                collect_clause_schedule_items(clause, &mut items);
-            }
-            BodyElement::Prose(inlines) => {
-                collect_inline_schedule_items(inlines, &mut items);
-            }
-        }
-    }
-
-    for addendum in &doc.addenda {
-        collect_addendum_schedule_items(addendum, &mut items);
-    }
-
-    doc.schedule_items = items;
+    schedules
+        .iter()
+        .enumerate()
+        .map(|(idx, sched)| {
+            let escaped_title = regex::escape(&sched.title);
+            let alternations: Vec<String> = phrase_templates
+                .iter()
+                .map(|t| t.replace("{title}", &escaped_title))
+                .collect();
+            let pattern = format!(r"(?i)({})", alternations.join("|"));
+            (idx, Regex::new(&pattern).unwrap())
+        })
+        .collect()
 }
 
-fn collect_clause_schedule_items(clause: &Clause, items: &mut Vec<ScheduleItem>) {
-    for content in &clause.content {
-        match content {
-            ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
-                collect_inline_schedule_items(inlines, items);
-            }
+/// Check if inline text following a bold term contains a schedule phrase.
+/// Returns the schedule index if found.
+fn check_schedule_phrase(
+    inlines: &[InlineContent],
+    bold_index: usize,
+    patterns: &[(usize, Regex)],
+) -> Option<usize> {
+    if patterns.is_empty() {
+        return None;
+    }
+
+    // Concatenate all text content after the bold term in this inline sequence
+    let mut after_text = String::new();
+    for inline in &inlines[bold_index + 1..] {
+        match inline {
+            InlineContent::Text(t) => after_text.push_str(t),
+            InlineContent::Bold(t) | InlineContent::Italic(t) => after_text.push_str(t),
             _ => {}
         }
     }
-    for child in &clause.children {
-        collect_clause_schedule_items(child, items);
-    }
-}
 
-fn collect_inline_schedule_items(inlines: &[InlineContent], items: &mut Vec<ScheduleItem>) {
-    for inline in inlines {
-        if let InlineContent::ScheduleRef {
-            display,
-            resolved_value,
-            ..
-        } = inline
-        {
-            items.push(ScheduleItem {
-                description: display.clone(),
-                value: resolved_value.clone(),
-            });
+    for (idx, pattern) in patterns {
+        if pattern.is_match(&after_text) {
+            return Some(*idx);
         }
     }
+    None
 }
 
-fn collect_addendum_schedule_items(addendum: &Addendum, items: &mut Vec<ScheduleItem>) {
-    for content in &addendum.content {
-        match content {
-            AddendumContent::Paragraph(inlines) | AddendumContent::Heading(_, inlines) => {
-                collect_inline_schedule_items(inlines, items);
-            }
-            AddendumContent::ClauseList(clauses) => {
-                for clause in clauses {
-                    collect_clause_schedule_items(clause, items);
-                }
-            }
-            AddendumContent::NumberedList(items_list)
-            | AddendumContent::BulletList(items_list) => {
-                for item_inlines in items_list {
-                    collect_inline_schedule_items(item_inlines, items);
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-// --- Defined term validation ---
+// --- Defined term validation + schedule collection (merged pass) ---
 // Bold text marks definition sites only. References are plain text.
 // We collect definitions from bold, then scan all text for usage.
+// Schedule items are identified by phrase-matching within definition text.
 
 #[derive(Debug)]
 struct TermDefinition {
@@ -304,13 +295,15 @@ struct TermDefinition {
 
 #[derive(Debug, PartialEq)]
 enum TermKind {
-    FormalDefinition,   // **Term** means ...
-    InlineDefinition,   // ("**Term**")
-    FieldLabel,         // **Label**: structural label, not a term
+    FormalDefinition,       // **Term** means ...
+    InlineDefinition,       // ("**Term**")
+    ScheduleDefinition(usize), // **Term** has the meaning given by the Schedule
+    FieldLabel,             // **Label**: structural label, not a term
 }
 
-fn validate_defined_terms(doc: &mut Document) {
+fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, Regex)]) {
     let mut definitions: Vec<TermDefinition> = Vec::new();
+    let mut schedule_items: Vec<ScheduleItem> = Vec::new();
 
     // Party roles are automatic definitions
     for party in &doc.meta.parties {
@@ -327,19 +320,39 @@ fn validate_defined_terms(doc: &mut Document) {
         location: Some("front-matter".to_string()),
     });
 
-    // Collect all bold terms that are definitions (not field labels)
+    // Collect all bold terms — definitions and schedule items in one pass
     for element in &doc.body {
         match element {
             BodyElement::Clause(clause) => {
-                collect_clause_definitions(clause, &mut definitions);
+                collect_clause_terms(clause, &mut definitions, &mut schedule_items, schedule_patterns);
             }
             BodyElement::Prose(inlines) => {
-                collect_inline_definitions(inlines, &mut definitions, None);
+                collect_inline_terms(inlines, &mut definitions, &mut schedule_items, schedule_patterns, None);
             }
         }
     }
     for addendum in &doc.addenda {
-        collect_addendum_definitions(addendum, &mut definitions);
+        collect_addendum_terms(addendum, &mut definitions, &mut schedule_items, schedule_patterns);
+    }
+
+    doc.schedule_items = schedule_items;
+
+    // Warn on declared schedules with no referencing terms
+    let mut referenced_schedules = std::collections::HashSet::new();
+    for item in &doc.schedule_items {
+        referenced_schedules.insert(item.schedule_index);
+    }
+    for (idx, sched) in doc.meta.schedule.iter().enumerate() {
+        if !referenced_schedules.contains(&idx) {
+            doc.diagnostics.push(Diagnostic {
+                level: DiagLevel::Warning,
+                message: format!(
+                    "Schedule '{}' is declared but no terms reference it",
+                    sched.title
+                ),
+                location: Some("front-matter".to_string()),
+            });
+        }
     }
 
     // Build definition set (term → first location)
@@ -360,7 +373,17 @@ fn validate_defined_terms(doc: &mut Document) {
     let text_lower = all_text.to_lowercase();
 
     // Warn on definitions never used in the document text (with fuzzy matching)
+    // Schedule terms are exempt — they appear in the schedule table
+    let schedule_terms: std::collections::HashSet<&str> = doc
+        .schedule_items
+        .iter()
+        .map(|si| si.term.as_str())
+        .collect();
+
     for (term, loc) in &def_map {
+        if schedule_terms.contains(term.as_str()) {
+            continue;
+        }
         let variants = term_variants(term);
         let is_used = variants.iter().any(|v| text_lower.contains(v));
         if !is_used {
@@ -373,39 +396,49 @@ fn validate_defined_terms(doc: &mut Document) {
     }
 }
 
-fn collect_clause_definitions(clause: &Clause, defs: &mut Vec<TermDefinition>) {
+fn collect_clause_terms(
+    clause: &Clause,
+    defs: &mut Vec<TermDefinition>,
+    schedule_items: &mut Vec<ScheduleItem>,
+    patterns: &[(usize, Regex)],
+) {
     let clause_loc = clause.number.as_ref().map(|n| n.full_reference());
 
     for content in &clause.content {
         match content {
             ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
-                collect_inline_definitions(inlines, defs, clause_loc.as_deref());
+                collect_inline_terms(inlines, defs, schedule_items, patterns, clause_loc.as_deref());
             }
             _ => {}
         }
     }
     for child in &clause.children {
-        collect_clause_definitions(child, defs);
+        collect_clause_terms(child, defs, schedule_items, patterns);
     }
 }
 
-fn collect_addendum_definitions(addendum: &Addendum, defs: &mut Vec<TermDefinition>) {
+fn collect_addendum_terms(
+    addendum: &Addendum,
+    defs: &mut Vec<TermDefinition>,
+    schedule_items: &mut Vec<ScheduleItem>,
+    patterns: &[(usize, Regex)],
+) {
     let heading = addendum.heading();
     let loc = Some(heading.as_str());
     for content in &addendum.content {
         match content {
             AddendumContent::Paragraph(inlines) | AddendumContent::Heading(_, inlines) => {
-                collect_inline_definitions(inlines, defs, loc);
+                collect_inline_terms(inlines, defs, schedule_items, patterns, loc);
             }
             AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
-                    collect_clause_definitions(clause, defs);
+                    collect_clause_terms(clause, defs, schedule_items, patterns);
                 }
             }
             AddendumContent::NumberedList(items)
             | AddendumContent::BulletList(items) => {
                 for item_inlines in items {
-                    collect_inline_definitions(item_inlines, defs, loc);
+                    collect_inline_terms(item_inlines, defs, schedule_items, patterns, loc);
                 }
             }
             _ => {}
@@ -413,20 +446,32 @@ fn collect_addendum_definitions(addendum: &Addendum, defs: &mut Vec<TermDefiniti
     }
 }
 
-/// Collect bold terms that are definitions (formal or inline), skipping field labels.
-fn collect_inline_definitions(
+/// Collect bold terms: definitions and schedule items in one pass.
+fn collect_inline_terms(
     inlines: &[InlineContent],
     defs: &mut Vec<TermDefinition>,
+    schedule_items: &mut Vec<ScheduleItem>,
+    patterns: &[(usize, Regex)],
     location: Option<&str>,
 ) {
     for (i, inline) in inlines.iter().enumerate() {
         if let InlineContent::Bold(term) = inline {
-            let kind = classify_term(term, inlines, i);
+            let kind = classify_term(term, inlines, i, patterns);
             match kind {
                 TermKind::FormalDefinition | TermKind::InlineDefinition => {
                     defs.push(TermDefinition {
                         term: term.clone(),
                         location: location.map(String::from),
+                    });
+                }
+                TermKind::ScheduleDefinition(schedule_idx) => {
+                    defs.push(TermDefinition {
+                        term: term.clone(),
+                        location: location.map(String::from),
+                    });
+                    schedule_items.push(ScheduleItem {
+                        term: term.clone(),
+                        schedule_index: schedule_idx,
                     });
                 }
                 TermKind::FieldLabel => {}
@@ -497,10 +542,6 @@ fn collect_inlines_text(inlines: &[InlineContent], out: &mut String) {
                 out.push_str(resolved.as_ref().unwrap_or(display));
                 out.push(' ');
             }
-            InlineContent::ScheduleRef { display, .. } => {
-                out.push_str(display);
-                out.push(' ');
-            }
             InlineContent::Link { text, .. } => {
                 out.push_str(text);
                 out.push(' ');
@@ -552,7 +593,12 @@ fn term_variants(term: &str) -> Vec<String> {
 /// Classify a bold term based on what follows/precedes it in the inline sequence.
 /// In the source, bold marks definition sites only. This classifies the type of
 /// definition, or identifies field labels (structural bold, not a term).
-fn classify_term(_term: &str, inlines: &[InlineContent], index: usize) -> TermKind {
+fn classify_term(
+    _term: &str,
+    inlines: &[InlineContent],
+    index: usize,
+    schedule_patterns: &[(usize, Regex)],
+) -> TermKind {
     // Check for inline definition pattern: ("**Term**") or (the "**Term**")
     if index > 0 {
         if let Some(InlineContent::Text(before)) = inlines.get(index - 1) {
@@ -574,6 +620,10 @@ fn classify_term(_term: &str, inlines: &[InlineContent], index: usize) -> TermKi
     // Check for formal definition: **Term** means ...
     if let Some(InlineContent::Text(after)) = inlines.get(index + 1) {
         if FORMAL_DEF_RE.is_match(after) || FORMAL_DEF_ALT_RE.is_match(after) {
+            // Check if this is a schedule definition (e.g. "has the meaning given by the Schedule")
+            if let Some(schedule_idx) = check_schedule_phrase(inlines, index, schedule_patterns) {
+                return TermKind::ScheduleDefinition(schedule_idx);
+            }
             return TermKind::FormalDefinition;
         }
         // Check for field label pattern: **Label**: (bold followed by colon)
@@ -581,6 +631,12 @@ fn classify_term(_term: &str, inlines: &[InlineContent], index: usize) -> TermKi
         if after.starts_with(':') {
             return TermKind::FieldLabel;
         }
+    }
+
+    // Check for schedule phrase even without "means"/"has the meaning" prefix
+    // e.g. "**Term** is set out in the Schedule."
+    if let Some(schedule_idx) = check_schedule_phrase(inlines, index, schedule_patterns) {
+        return TermKind::ScheduleDefinition(schedule_idx);
     }
 
     // Default: bold text in source is a definition (bold = definition sites only)
@@ -630,4 +686,202 @@ fn to_roman(mut n: u32) -> String {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_schedule_patterns(titles: &[&str]) -> Vec<(usize, Regex)> {
+        let decls: Vec<ScheduleDecl> = titles
+            .iter()
+            .map(|t| ScheduleDecl { title: t.to_string() })
+            .collect();
+        build_schedule_phrase_patterns(&decls)
+    }
+
+    #[test]
+    fn schedule_phrase_given_by() {
+        let patterns = make_schedule_patterns(&["Schedule"]);
+        let inlines = vec![
+            InlineContent::Bold("Objection Period".to_string()),
+            InlineContent::Text(" has the meaning given by the Schedule.".to_string()),
+        ];
+        assert_eq!(check_schedule_phrase(&inlines, 0, &patterns), Some(0));
+    }
+
+    #[test]
+    fn schedule_phrase_set_out_in() {
+        let patterns = make_schedule_patterns(&["Schedule"]);
+        let inlines = vec![
+            InlineContent::Bold("Term".to_string()),
+            InlineContent::Text(" is set out in the Schedule.".to_string()),
+        ];
+        assert_eq!(check_schedule_phrase(&inlines, 0, &patterns), Some(0));
+    }
+
+    #[test]
+    fn schedule_phrase_case_insensitive() {
+        let patterns = make_schedule_patterns(&["Schedule"]);
+        let inlines = vec![
+            InlineContent::Bold("Term".to_string()),
+            InlineContent::Text(" has the meaning GIVEN BY THE SCHEDULE.".to_string()),
+        ];
+        assert_eq!(check_schedule_phrase(&inlines, 0, &patterns), Some(0));
+    }
+
+    #[test]
+    fn schedule_phrase_no_match() {
+        let patterns = make_schedule_patterns(&["Schedule"]);
+        let inlines = vec![
+            InlineContent::Bold("Term".to_string()),
+            InlineContent::Text(" means something ordinary.".to_string()),
+        ];
+        assert_eq!(check_schedule_phrase(&inlines, 0, &patterns), None);
+    }
+
+    #[test]
+    fn schedule_phrase_custom_title() {
+        let patterns = make_schedule_patterns(&["Annexure"]);
+        let inlines = vec![
+            InlineContent::Bold("Rent".to_string()),
+            InlineContent::Text(" has the meaning given by the Annexure.".to_string()),
+        ];
+        assert_eq!(check_schedule_phrase(&inlines, 0, &patterns), Some(0));
+    }
+
+    #[test]
+    fn schedule_phrase_multiple_schedules() {
+        let patterns = make_schedule_patterns(&["Schedule", "Payment Schedule"]);
+        let inlines_1 = vec![
+            InlineContent::Bold("Term A".to_string()),
+            InlineContent::Text(" is specified in the Schedule.".to_string()),
+        ];
+        let inlines_2 = vec![
+            InlineContent::Bold("Term B".to_string()),
+            InlineContent::Text(" is specified in the Payment Schedule.".to_string()),
+        ];
+        assert_eq!(check_schedule_phrase(&inlines_1, 0, &patterns), Some(0));
+        assert_eq!(check_schedule_phrase(&inlines_2, 0, &patterns), Some(1));
+    }
+
+    #[test]
+    fn schedule_phrase_all_variants() {
+        let patterns = make_schedule_patterns(&["Schedule"]);
+        let phrases = [
+            "given by the Schedule",
+            "set out in the Schedule",
+            "specified in the Schedule",
+            "described in the Schedule",
+            "defined in the Schedule",
+            "provided in the Schedule",
+            "contained in the Schedule",
+            "stated in the Schedule",
+            "referred to in the Schedule",
+            "as per the Schedule",
+            "in accordance with the Schedule",
+            "pursuant to the Schedule",
+            "detailed in the Schedule",
+        ];
+        for phrase in &phrases {
+            let inlines = vec![
+                InlineContent::Bold("Term".to_string()),
+                InlineContent::Text(format!(" has the meaning {}.", phrase)),
+            ];
+            assert_eq!(
+                check_schedule_phrase(&inlines, 0, &patterns),
+                Some(0),
+                "Failed to match phrase: {}",
+                phrase,
+            );
+        }
+    }
+
+    #[test]
+    fn classify_term_schedule_definition() {
+        let patterns = make_schedule_patterns(&["Schedule"]);
+        let inlines = vec![
+            InlineContent::Bold("Objection Period".to_string()),
+            InlineContent::Text(" has the meaning given by the Schedule.".to_string()),
+        ];
+        let kind = classify_term("Objection Period", &inlines, 0, &patterns);
+        assert_eq!(kind, TermKind::ScheduleDefinition(0));
+    }
+
+    #[test]
+    fn classify_term_formal_not_schedule() {
+        let patterns = make_schedule_patterns(&["Schedule"]);
+        let inlines = vec![
+            InlineContent::Bold("Term".to_string()),
+            InlineContent::Text(" means something.".to_string()),
+        ];
+        let kind = classify_term("Term", &inlines, 0, &patterns);
+        assert_eq!(kind, TermKind::FormalDefinition);
+    }
+
+    #[test]
+    fn integration_schedule_collection() {
+        let input = r#"---
+title: Test
+date: 2026-01-01
+parties:
+  - name: Alice
+    role: Seller
+  - name: Bob
+    role: Buyer
+schedule:
+  - title: Schedule
+---
+
+1. ## Definitions {#definitions}
+
+    1. **Payment Amount** has the meaning given by the Schedule.
+
+    2. **Delivery Date** is set out in the Schedule.
+
+    3. **Warranty** means the manufacturer's warranty.
+
+2. ## Obligations {#obligations}
+
+    1. The Seller shall deliver the goods by the Delivery Date.
+"#;
+        let mut doc = crate::parse(input).unwrap();
+        crate::resolve(&mut doc);
+
+        assert_eq!(doc.schedule_items.len(), 2);
+        assert_eq!(doc.schedule_items[0].term, "Payment Amount");
+        assert_eq!(doc.schedule_items[0].schedule_index, 0);
+        assert_eq!(doc.schedule_items[1].term, "Delivery Date");
+        assert_eq!(doc.schedule_items[1].schedule_index, 0);
+    }
+
+    #[test]
+    fn integration_unreferenced_schedule_warning() {
+        let input = r#"---
+title: Test
+date: 2026-01-01
+parties:
+  - name: Alice
+    role: Seller
+schedule:
+  - title: Schedule
+  - title: Payment Schedule
+---
+
+1. ## Definitions {#definitions}
+
+    1. **Amount** has the meaning given by the Schedule.
+"#;
+        let mut doc = crate::parse(input).unwrap();
+        crate::resolve(&mut doc);
+
+        // "Payment Schedule" is declared but no terms reference it
+        let warnings: Vec<_> = doc
+            .diagnostics
+            .iter()
+            .filter(|d| d.message.contains("Payment Schedule"))
+            .collect();
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].message.contains("declared but no terms reference it"));
+    }
 }

@@ -29,6 +29,7 @@ pub struct StyleConfig {
     pub footer: FooterConfig,
     pub preamble: PreambleConfig,
     pub schedule_position: SchedulePosition,
+    pub schedule_order: ScheduleOrder,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -113,6 +114,19 @@ pub enum SchedulePosition {
 impl Default for SchedulePosition {
     fn default() -> Self {
         SchedulePosition::End
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleOrder {
+    Document,
+    Alphabetical,
+}
+
+impl Default for ScheduleOrder {
+    fn default() -> Self {
+        ScheduleOrder::Document
     }
 }
 
@@ -205,6 +219,7 @@ impl Default for StyleConfig {
             footer: FooterConfig::default(),
             preamble: PreambleConfig::default(),
             schedule_position: SchedulePosition::default(),
+            schedule_order: ScheduleOrder::default(),
         }
     }
 }
