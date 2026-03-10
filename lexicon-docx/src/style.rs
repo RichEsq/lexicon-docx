@@ -20,6 +20,7 @@ pub struct StyleConfig {
     pub indent_per_level_cm: f32,
     pub hanging_indent_cm: f32,
     pub align_first_level: bool,
+    pub brand_color: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -52,6 +53,7 @@ impl Default for StyleConfig {
             indent_per_level_cm: 1.27,
             hanging_indent_cm: 1.27,
             align_first_level: false,
+            brand_color: None,
         }
     }
 }
@@ -73,6 +75,11 @@ impl StyleConfig {
     /// Convert pt to half-points (docx-rs uses half-points for font size).
     pub fn pt_to_half_points(pt: f32) -> usize {
         (pt * 2.0) as usize
+    }
+
+    /// Return the brand color as a 6-char hex string (no #), or None.
+    pub fn brand_color_hex(&self) -> Option<String> {
+        self.brand_color.as_ref().map(|c| c.trim_start_matches('#').to_uppercase())
     }
 
     pub fn page_width_twips(&self) -> u32 {

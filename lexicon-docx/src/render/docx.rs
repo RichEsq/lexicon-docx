@@ -155,11 +155,20 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
             .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
             .outline_lvl(outline_level_for(clause.level))
             .keep_next(true)
-            .run_property(RunProperty::new().bold().size(heading_size));
+            .run_property({
+                let mut rp = RunProperty::new().bold().size(heading_size);
+                if heading.level == 2 {
+                    if let Some(ref color) = style.brand_color_hex() {
+                        rp = rp.color(color);
+                    }
+                }
+                rp
+            });
 
         // Heading inline content — Word generates the number
+        let heading_color = if heading.level == 2 { style.brand_color_hex() } else { None };
         for inline in &heading.text {
-            para = add_inline_run(para, inline, true, heading_size, style);
+            para = add_inline_run(para, inline, true, heading_size, style, heading_color.as_deref());
         }
 
         docx = docx.add_paragraph(para);
@@ -183,7 +192,7 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
                 };
 
                 for inline in inlines {
-                    para = add_inline_run(para, inline, false, body_size, style);
+                    para = add_inline_run(para, inline, false, body_size, style, None);
                 }
 
                 docx = docx.add_paragraph(para);
@@ -195,7 +204,7 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
                     .indent(Some(bq_indent), None, None, None);
 
                 for inline in inlines {
-                    para = add_inline_run(para, inline, false, body_size, style);
+                    para = add_inline_run(para, inline, false, body_size, style, None);
                 }
 
                 docx = docx.add_paragraph(para);
@@ -225,7 +234,7 @@ fn render_inlines_paragraph(
         para = para.indent(Some(indent), None, None, None);
     }
     for inline in inlines {
-        para = add_inline_run(para, inline, false, body_size, style);
+        para = add_inline_run(para, inline, false, body_size, style, None);
     }
     para
 }
@@ -236,17 +245,24 @@ fn add_inline_run(
     heading_bold: bool,
     size: usize,
     _style: &StyleConfig,
+    color: Option<&str>,
 ) -> Paragraph {
+    // Helper: apply heading formatting (bold + optional color) to a run
+    let apply_heading = |mut run: Run| -> Run {
+        if heading_bold { run = run.bold(); }
+        if let Some(c) = color { run = run.color(c); }
+        run
+    };
+
     match inline {
         InlineContent::Text(t) => {
-            let mut run = Run::new().add_text(t).size(size);
-            if heading_bold {
-                run = run.bold();
-            }
+            let run = apply_heading(Run::new().add_text(t).size(size));
             para.add_run(run)
         }
         InlineContent::Bold(t) => {
-            para.add_run(Run::new().add_text(t).bold().size(size))
+            let mut run = Run::new().add_text(t).bold().size(size);
+            if let Some(c) = color { run = run.color(c); }
+            para.add_run(run)
         }
         InlineContent::Italic(t) => {
             para.add_run(Run::new().add_text(t).italic().size(size))
@@ -254,9 +270,7 @@ fn add_inline_run(
         InlineContent::Superscript(t) => {
             let mut run = Run::new().add_text(t).size(size);
             run.run_property = run.run_property.vert_align(VertAlignType::SuperScript);
-            if heading_bold {
-                run = run.bold();
-            }
+            let run = apply_heading(run);
             para.add_run(run)
         }
         InlineContent::CrossRef {
@@ -265,10 +279,7 @@ fn add_inline_run(
             ..
         } => {
             let text = resolved.as_ref().unwrap_or(display);
-            let mut run = Run::new().add_text(text).size(size);
-            if heading_bold {
-                run = run.bold();
-            }
+            let run = apply_heading(Run::new().add_text(text).size(size));
             para.add_run(run)
         }
         InlineContent::ScheduleRef {
@@ -276,16 +287,12 @@ fn add_inline_run(
             resolved_value,
             ..
         } => {
-            let mut run = Run::new().size(size);
-            if heading_bold {
-                run = run.bold();
-            }
+            let mut run = apply_heading(Run::new().size(size));
             match resolved_value {
                 Some(val) if !val.is_empty() => {
                     run = run.add_text(format!("{} ({})", display, val));
                 }
                 Some(_) => {
-                    // Empty value — show blank line for completion
                     run = run.add_text(format!("{} (____________)", display));
                 }
                 None => {
@@ -295,17 +302,11 @@ fn add_inline_run(
             para.add_run(run)
         }
         InlineContent::Link { text, .. } => {
-            let mut run = Run::new().add_text(text).size(size);
-            if heading_bold {
-                run = run.bold();
-            }
+            let run = apply_heading(Run::new().add_text(text).size(size));
             para.add_run(run)
         }
         InlineContent::SoftBreak => {
-            let mut run = Run::new().add_text(" ").size(size);
-            if heading_bold {
-                run = run.bold();
-            }
+            let run = apply_heading(Run::new().add_text(" ").size(size));
             para.add_run(run)
         }
         InlineContent::LineBreak => {
@@ -324,7 +325,7 @@ fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx {
         for header_cell in &table.headers {
             let mut para = Paragraph::new();
             for inline in header_cell {
-                para = add_inline_run(para, inline, true, body_size, style);
+                para = add_inline_run(para, inline, true, body_size, style, None);
             }
             cells.push(TableCell::new().add_paragraph(para));
         }
@@ -337,7 +338,7 @@ fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx {
         for cell_content in row {
             let mut para = Paragraph::new();
             for inline in cell_content {
-                para = add_inline_run(para, inline, false, body_size, style);
+                para = add_inline_run(para, inline, false, body_size, style, None);
             }
             cells.push(TableCell::new().add_paragraph(para));
         }
@@ -392,7 +393,7 @@ fn render_annexure(
                 };
                 let mut para = Paragraph::new().keep_next(true);
                 for inline in inlines {
-                    para = add_inline_run(para, inline, true, size, style);
+                    para = add_inline_run(para, inline, true, size, style, None);
                 }
                 docx = docx.add_paragraph(para);
                 docx = docx.add_paragraph(Paragraph::new());
@@ -426,7 +427,7 @@ fn render_annexure(
                     let mut para = Paragraph::new()
                         .numbering(NumberingId::new(num_id), IndentLevel::new(0));
                     for inline in item {
-                        para = add_inline_run(para, inline, false, body_size, style);
+                        para = add_inline_run(para, inline, false, body_size, style, None);
                     }
                     docx = docx.add_paragraph(para);
                 }
@@ -439,7 +440,7 @@ fn render_annexure(
                     // Bullet character
                     para = para.add_run(Run::new().add_text("• \t").size(body_size));
                     for inline in item {
-                        para = add_inline_run(para, inline, false, body_size, style);
+                        para = add_inline_run(para, inline, false, body_size, style, None);
                     }
                     docx = docx.add_paragraph(para);
                 }
@@ -536,25 +537,28 @@ fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
 
     let mut numbering = AbstractNumbering::new(ABSTRACT_NUM_ID);
     numbering.multi_level_type = Some("multilevel".to_string());
+    let mut level0 = Level::new(
+        0,
+        Start::new(1),
+        NumberFormat::new("decimal"),
+        LevelText::new("%1."),
+        LevelJc::new("left"),
+    )
+    .indent(Some(level_indent(0)), Some(SpecialIndentType::Hanging(hanging)), None, None)
+    .bold()
+    .size(h1_size)
+    .fonts(
+        RunFonts::new()
+            .ascii(&style.heading_font_family)
+            .hi_ansi(&style.heading_font_family),
+    );
+    if let Some(ref color) = style.brand_color_hex() {
+        level0 = level0.color(color);
+    }
+
     numbering
         // Level 0: TopLevel — "1."
-        .add_level(
-            Level::new(
-                0,
-                Start::new(1),
-                NumberFormat::new("decimal"),
-                LevelText::new("%1."),
-                LevelJc::new("left"),
-            )
-            .indent(Some(level_indent(0)), Some(SpecialIndentType::Hanging(hanging)), None, None)
-            .bold()
-            .size(h1_size)
-            .fonts(
-                RunFonts::new()
-                    .ascii(&style.heading_font_family)
-                    .hi_ansi(&style.heading_font_family),
-            )
-        )
+        .add_level(level0)
         // Level 1: Clause — "1.1"
         .add_level(
             Level::new(
@@ -664,19 +668,20 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
     let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
 
     // Title
+    let mut title_run = Run::new()
+        .add_text(&meta.title)
+        .bold()
+        .size(StyleConfig::pt_to_half_points(style.heading1_size))
+        .fonts(
+            RunFonts::new()
+                .ascii(&style.heading_font_family)
+                .hi_ansi(&style.heading_font_family),
+        );
+    if let Some(ref color) = style.brand_color_hex() {
+        title_run = title_run.color(color);
+    }
     docx = docx.add_paragraph(
-        Paragraph::new()
-            .add_run(
-                Run::new()
-                    .add_text(&meta.title)
-                    .bold()
-                    .size(StyleConfig::pt_to_half_points(style.heading1_size))
-                    .fonts(
-                        RunFonts::new()
-                            .ascii(&style.heading_font_family)
-                            .hi_ansi(&style.heading_font_family),
-                    ),
-            ),
+        Paragraph::new().add_run(title_run),
     );
 
     // Status + Version line
@@ -731,15 +736,21 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
         Paragraph::new()
             .align(AlignmentType::Center)
             .add_run(
-                Run::new()
-                    .add_text(&meta.title)
-                    .bold()
-                    .size(StyleConfig::pt_to_half_points(20.0))
-                    .fonts(
-                        RunFonts::new()
-                            .ascii(&style.heading_font_family)
-                            .hi_ansi(&style.heading_font_family),
-                    ),
+                {
+                    let mut run = Run::new()
+                        .add_text(&meta.title)
+                        .bold()
+                        .size(StyleConfig::pt_to_half_points(20.0))
+                        .fonts(
+                            RunFonts::new()
+                                .ascii(&style.heading_font_family)
+                                .hi_ansi(&style.heading_font_family),
+                        );
+                    if let Some(ref color) = style.brand_color_hex() {
+                        run = run.color(color);
+                    }
+                    run
+                },
             ),
     );
 
