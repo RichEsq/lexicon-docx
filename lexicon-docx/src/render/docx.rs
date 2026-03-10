@@ -874,7 +874,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
         PreambleStyle::Prose => {
             let term_style = &style.defined_term_style;
 
-            // Single paragraph: This [title] ([short_title]), is entered into as of [date]
+            // Single paragraph: This [title] ([short_title]) is entered into as of [date]
             // between [party1] and [party2].
             let mut para = Paragraph::new();
             para = para.add_run(
@@ -886,7 +886,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             para = para.add_run(
                 Run::new()
                     .add_text(format!(
-                        "), is entered into as of {} {} ",
+                        ") is entered into as of {} {} ",
                         &formatted_date,
                         if meta.parties.len() == 1 { "by" } else { "between" }
                     ))
