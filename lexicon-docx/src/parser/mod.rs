@@ -16,7 +16,8 @@ pub fn parse(input: &str) -> Result<Document> {
 
     // Parse body with comrak
     let arena = Arena::new();
-    let opts = Options::default();
+    let mut opts = Options::default();
+    opts.extension.superscript = true;
     let root = parse_document(&arena, &body, &opts);
 
     // Extract clause structure and annexures
