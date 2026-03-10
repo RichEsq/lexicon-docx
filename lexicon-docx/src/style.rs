@@ -30,6 +30,42 @@ pub struct StyleConfig {
     pub preamble: PreambleConfig,
     pub schedule_position: SchedulePosition,
     pub schedule_order: ScheduleOrder,
+    pub signatures: SignaturesConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct SignaturesConfig {
+    pub enabled: bool,
+    pub heading: Option<String>,
+    pub definitions: Option<String>,
+    pub default_template: Option<String>,
+    #[serde(default)]
+    pub party: std::collections::HashMap<String, SignaturesPartyOverride>,
+}
+
+impl Default for SignaturesConfig {
+    fn default() -> Self {
+        SignaturesConfig {
+            enabled: false,
+            heading: None,
+            definitions: None,
+            default_template: None,
+            party: std::collections::HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SignaturesPartyOverride {
+    pub template: Option<String>,
+    pub signatories: Option<Vec<SignatoryOverride>>,
+    pub witness: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SignatoryOverride {
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -220,6 +256,7 @@ impl Default for StyleConfig {
             preamble: PreambleConfig::default(),
             schedule_position: SchedulePosition::default(),
             schedule_order: ScheduleOrder::default(),
+            signatures: SignaturesConfig::default(),
         }
     }
 }

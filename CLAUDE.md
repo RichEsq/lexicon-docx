@@ -63,7 +63,9 @@ cargo test
   → parser/clause.rs: AST walk → Document IR (clauses, inlines, addenda)
   → parser/anchors.rs: {#id} anchor extraction
   → resolve.rs: clause numbering, cross-ref resolution, term validation, schedule phrase detection
+  → signatures.rs: signature template loading, resolution, placeholder expansion
   → render/docx.rs: Document IR → .docx via docx-rs
+  → render/signatures.rs: signature block rendering (borderless tables, cell borders)
   → main.rs: CLI, file I/O, diagnostic output
 ```
 
@@ -78,7 +80,9 @@ cargo test
 | `src/parser/clause.rs` | Core parser: comrak AST → clause tree, inline extraction, addendum parsing |
 | `src/parser/anchors.rs` | Regex-based `{#id}` stripping |
 | `src/resolve.rs` | Numbering (1., 1.1, (a), (i)), cross-refs, defined term validation, schedule phrase detection |
+| `src/signatures.rs` | Signature template types, definitions file loading, resolution, placeholder expansion |
 | `src/render/docx.rs` | DOCX generation — cover page, clauses, addenda, exhibits, tables |
+| `src/render/signatures.rs` | Signature page rendering — borderless tables, cell-border signature lines |
 | `src/render/exhibit.rs` | Exhibit file import — image loading, PDF rendering, sizing |
 | `src/render/watermark.rs` | Draft watermark injection via ZIP post-processing |
 | `src/style.rs` | Style configuration with TOML override support |
@@ -107,6 +111,7 @@ cargo test
 - **comrak for parsing** — produces a full AST. Headings inside list items work correctly. Reference links are resolved during parsing (schedule item values come from the link title attribute).
 - **Defined term matching** — multi-variant stemming for possessives/plurals/verb forms, not a full NLP stemmer.
 - **Draft watermark via ZIP post-processing** — docx-rs doesn't expose VML/watermark APIs, so `render/watermark.rs` post-processes the .docx ZIP to inject VML WordArt shapes into header XML parts. Triggered when `status: draft`.
+- **Signature pages via external template definitions** — templates defined in `signatures.toml` (loaded from disk), keyed by `{jurisdiction}.{entity_type}.{execution_method}`. Two-layer templates: prose intro with `{placeholder}` substitution + structured field layout. Rendered as borderless tables with cell-border signature lines. `entity_type` on parties is a compound `{jurisdiction}-{type}` string (e.g. `au-company`). Execution method inferred from `short_title`.
 
 ### docx-rs Pitfalls
 
@@ -127,10 +132,11 @@ Future work and design notes are in `lexicon-docx/planning/`:
 - `draft-watermark.md` — draft watermark via VML injection (implemented)
 - `cover-page-toc-toggles.md` — cover page and TOC toggles in style TOML (implemented)
 - `footer-and-schedule-config.md` — footer config options and schedule position (implemented)
+- `signature-pages.md` — signature pages with template system and external definitions file (implemented)
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF), signature pages (template-based, external definitions file)).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 

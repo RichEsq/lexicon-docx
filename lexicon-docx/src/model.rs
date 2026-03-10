@@ -62,6 +62,7 @@ pub struct Party {
     pub name: String,
     pub specifier: Option<String>,
     pub role: String,
+    pub entity_type: Option<String>,
 }
 
 #[derive(Debug)]

@@ -11,6 +11,8 @@ use docx_rs::{
 use crate::error::{LexiconError, Result};
 use crate::model::*;
 use crate::render::exhibit as exhibit_loader;
+use crate::render::signatures as sig_renderer;
+use crate::signatures::SignatureBlock;
 use crate::style::{DefinedTermStyle, PartyFormat, PreambleStyle, SchedulePosition, StyleConfig};
 
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
@@ -19,7 +21,7 @@ const BODY_NUMBERING_ID: usize = 2;
 // Simple numbered list (for addendum prose lists)
 const SIMPLE_LIST_ABSTRACT_NUM_ID: usize = 3;
 
-pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>) -> Result<Vec<u8>> {
+pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock]) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
 
     // Page setup
@@ -197,6 +199,11 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                 docx = render_clause(docx, clause, style, BODY_NUMBERING_ID);
             }
         }
+    }
+
+    // Signature pages (after body clauses, before addenda)
+    if style.signatures.enabled && !signature_blocks.is_empty() {
+        docx = sig_renderer::render_signature_pages(docx, signature_blocks, &doc.meta.parties, style);
     }
 
     // Addenda — each ClauseList/NumberedList gets its own numbering instance

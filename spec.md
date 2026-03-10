@@ -34,9 +34,11 @@ parties:
   - name: Elliot Anderson
     specifier: 123 Forth St, New York
     role: Employee
+    entity_type: us-individual
   - name: ECorp Limited
     specifier: ACN 123 456 789
     role: Employer
+    entity_type: au-company
 exhibits:
   - title: Office Diagram
   - title: Employment Obligations
@@ -117,22 +119,25 @@ version: 2
 
 #### 2.2.8. `parties` (required)
 
-A list of parties to the contract. Each party has three sub-fields:
+A list of parties to the contract. Each party has the following sub-fields:
 
-| Sub-field   | Required | Description                                                        |
-| ----------- | -------- | ------------------------------------------------------------------ |
-| `name`      | Yes      | The legal name of the party.                                       |
-| `specifier` | No       | Identifying detail (address, ACN, ABN, registration number, etc.). |
-| `role`      | Yes      | The drafting reference used throughout the contract (e.g., "Employer", "Contractor"). |
+| Sub-field     | Required | Description                                                        |
+| ------------- | -------- | ------------------------------------------------------------------ |
+| `name`        | Yes      | The legal name of the party.                                       |
+| `specifier`   | No       | Identifying detail (address, ACN, ABN, registration number, etc.). |
+| `role`        | Yes      | The drafting reference used throughout the contract (e.g., "Employer", "Contractor"). |
+| `entity_type` | No       | A compound `{jurisdiction}-{type}` string identifying the kind of legal entity (e.g., `au-company`, `uk-individual`). Used by a processor to select the appropriate signature block template. |
 
 ```yaml
 parties:
   - name: Elliot Anderson
     specifier: 123 Forth St, New York
     role: Employee
+    entity_type: us-individual
   - name: ECorp Limited
     specifier: ACN 123 456 789
     role: Employer
+    entity_type: au-company
 ```
 
 Party roles are automatically treated as defined terms. A processor should include them in any generated glossary and may validate that the role appears in the contract body.
@@ -608,9 +613,11 @@ parties:
   - name: Elliot Anderson
     specifier: 123 Forth St, New York
     role: Employee
+    entity_type: us-individual
   - name: ECorp Limited
     specifier: ACN 123 456 789
     role: Employer
+    entity_type: au-company
 exhibits: []
 schedule:
   - title: Schedule

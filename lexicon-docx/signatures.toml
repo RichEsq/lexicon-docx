@@ -1,0 +1,260 @@
+# Signature Block Definitions
+#
+# Structure: [jurisdiction.entity_type.execution_method]
+#
+# Placeholders:
+#   {name}        — party name
+#   {specifier}   — party specifier (e.g. ACN number)
+#   {role}        — party role
+#   {short_title} — document short title
+#   {title}       — signatory title (in field values only)
+#
+# Field types:
+#   type = "line"  — cell with bottom border (signature line)
+#   (default)      — blank/text field
+#
+# Template intro supports **bold** markers.
+
+# ============================================================================
+# AUSTRALIA
+# ============================================================================
+
+[au.company.deed]
+intro = "**Executed as a deed by {name}** ({specifier}) in accordance with section 127 of the Corporations Act 2001 (Cth):"
+signatories = [
+  { title = "Director" },
+  { title = "Director/Secretary" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+]
+witness = false
+
+[au.company.agreement]
+intro = "**Signed for and on behalf of {name}** ({specifier}):"
+signatories = [
+  { title = "Director" },
+  { title = "Director/Secretary" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+]
+witness = false
+
+[au.individual.deed]
+intro = "**Signed sealed and delivered by {name}**:"
+signatories = [{}]
+fields = [
+  { type = "line" },
+  { label = "Name", value = "{name}" },
+  { label = "Date" },
+]
+witness = true
+witness_fields = [
+  { type = "line" },
+  { label = "Witness name" },
+  { label = "Address" },
+]
+
+[au.individual.agreement]
+intro = "**Signed by {name}**:"
+signatories = [{}]
+fields = [
+  { type = "line" },
+  { label = "Name", value = "{name}" },
+  { label = "Date" },
+]
+witness = false
+
+[au.sole_director.deed]
+intro = "**Executed as a deed by {name}** ({specifier}) by its sole director and sole company secretary in accordance with section 127 of the Corporations Act 2001 (Cth):"
+signatories = [
+  { title = "Sole Director and Sole Company Secretary" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+]
+witness = false
+
+[au.sole_director.agreement]
+intro = "**Signed for and on behalf of {name}** ({specifier}):"
+signatories = [
+  { title = "Sole Director and Sole Company Secretary" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+]
+witness = false
+
+# ============================================================================
+# UNITED KINGDOM
+# ============================================================================
+
+[uk.company.deed]
+intro = "**Executed as a deed by {name}** ({specifier}) acting by a director and the company secretary:"
+signatories = [
+  { title = "Director" },
+  { title = "Company Secretary" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+]
+witness = false
+
+[uk.company.agreement]
+intro = "**Signed for and on behalf of {name}** ({specifier}):"
+signatories = [
+  { title = "Director" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+]
+witness = false
+
+[uk.individual.deed]
+intro = "**Signed as a deed by {name}** in the presence of a witness:"
+signatories = [{}]
+fields = [
+  { type = "line" },
+  { label = "Name", value = "{name}" },
+]
+witness = true
+witness_fields = [
+  { type = "line" },
+  { label = "Witness name" },
+  { label = "Address" },
+  { label = "Occupation" },
+]
+
+[uk.individual.agreement]
+intro = "**Signed by {name}**:"
+signatories = [{}]
+fields = [
+  { type = "line" },
+  { label = "Name", value = "{name}" },
+  { label = "Date" },
+]
+witness = false
+
+# ============================================================================
+# UNITED STATES
+# ============================================================================
+
+[us.company.deed]
+intro = "**Executed by {name}**:"
+signatories = [
+  { title = "Authorized Signatory" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+  { label = "Date" },
+]
+witness = false
+
+[us.company.agreement]
+intro = "**{name}**:"
+signatories = [
+  { title = "Authorized Signatory" },
+]
+fields = [
+  { label = "By" },
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+  { label = "Date" },
+]
+witness = false
+
+[us.individual.deed]
+intro = "**Signed by {name}**:"
+signatories = [{}]
+fields = [
+  { type = "line" },
+  { label = "Name", value = "{name}" },
+  { label = "Date" },
+]
+witness = true
+witness_fields = [
+  { type = "line" },
+  { label = "Witness name" },
+  { label = "Address" },
+]
+
+[us.individual.agreement]
+intro = "**Signed by {name}**:"
+signatories = [{}]
+fields = [
+  { type = "line" },
+  { label = "Name", value = "{name}" },
+  { label = "Date" },
+]
+witness = false
+
+# ============================================================================
+# NEW ZEALAND
+# ============================================================================
+
+[nz.company.deed]
+intro = "**Executed as a deed by {name}** ({specifier}):"
+signatories = [
+  { title = "Director" },
+  { title = "Director" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+]
+witness = false
+
+[nz.company.agreement]
+intro = "**Signed for and on behalf of {name}** ({specifier}):"
+signatories = [
+  { title = "Director" },
+]
+fields = [
+  { type = "line" },
+  { label = "Name" },
+  { label = "Title", value = "{title}" },
+]
+witness = false
+
+[nz.individual.deed]
+intro = "**Signed as a deed by {name}**:"
+signatories = [{}]
+fields = [
+  { type = "line" },
+  { label = "Name", value = "{name}" },
+  { label = "Date" },
+]
+witness = true
+witness_fields = [
+  { type = "line" },
+  { label = "Witness name" },
+  { label = "Occupation" },
+  { label = "Address" },
+]
+
+[nz.individual.agreement]
+intro = "**Signed by {name}**:"
+signatories = [{}]
+fields = [
+  { type = "line" },
+  { label = "Name", value = "{name}" },
+  { label = "Date" },
+]
+witness = false

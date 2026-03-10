@@ -124,6 +124,7 @@ cargo run -- build ../example.md --strict
 | Headers/footers | Document ref and page numbering on all pages |
 | Parties preamble | Configurable intro block with party details before the body |
 | Exhibit pages | Placeholder pages or imported images/PDFs for exhibited documents |
+| Signature pages | Template-based execution blocks with jurisdiction-aware defaults |
 | Configurable layout | TOML style overrides for cover page, TOC, footer, numbering, and more |
 
 ## Front-Matter Fields
@@ -141,6 +142,7 @@ parties:                       # required
   - name: Party Name
     specifier: ACN 123 456 789 # optional
     role: Buyer                # used as a defined term
+    entity_type: au-company    # optional: jurisdiction-type for signature blocks
 exhibits:                      # optional
   - title: Exhibit Title
     path: ./diagram.png        # optional: local path or URL to PNG/JPG/PDF
