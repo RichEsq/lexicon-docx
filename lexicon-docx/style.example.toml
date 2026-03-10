@@ -48,3 +48,4 @@ show_version = false           # append version to ref, e.g. "Ref: OK:RP:2026011
 # Table of contents
 [toc]
 enabled = true
+heading = "Contents"          # heading text above the TOC

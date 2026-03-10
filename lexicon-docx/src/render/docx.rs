@@ -129,6 +129,26 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         && !doc.schedule_items.is_empty();
 
     if style.toc.enabled {
+        // TOC heading
+        let toc_heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
+        let mut toc_heading_run = Run::new()
+            .add_text(&style.toc.heading)
+            .bold()
+            .size(toc_heading_size)
+            .fonts(
+                RunFonts::new()
+                    .ascii(&style.heading_font_family)
+                    .hi_ansi(&style.heading_font_family),
+            );
+        if let Some(ref color) = style.brand_color_hex() {
+            toc_heading_run = toc_heading_run.color(color);
+        }
+        docx = docx.add_paragraph(
+            Paragraph::new()
+                .add_run(toc_heading_run),
+        );
+        docx = docx.add_paragraph(Paragraph::new());
+
         // Table of contents
         let toc = TableOfContents::new()
             .heading_styles_range(1, 3)

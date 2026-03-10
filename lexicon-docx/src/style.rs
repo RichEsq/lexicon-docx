@@ -73,11 +73,15 @@ impl Default for PartyFormat {
 #[serde(default)]
 pub struct TocConfig {
     pub enabled: bool,
+    pub heading: String,
 }
 
 impl Default for TocConfig {
     fn default() -> Self {
-        TocConfig { enabled: true }
+        TocConfig {
+            enabled: true,
+            heading: "Contents".to_string(),
+        }
     }
 }
 
