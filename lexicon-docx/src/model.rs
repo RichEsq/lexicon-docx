@@ -29,6 +29,7 @@ pub struct DocumentMeta {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Exhibit {
     pub title: String,
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

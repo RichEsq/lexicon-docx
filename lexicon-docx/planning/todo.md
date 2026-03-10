@@ -7,3 +7,9 @@
 5. ~~TOC doesn't work~~ ✓
 6. ~~TOML config items: reference in footer boolean, page number in footer boolean, version number in footer boolean (appended to reference, e.g. Ref: OK:RP:20260115v3)~~ ✓
 7. ~~TOML style config option for schedule position: end of document (current) or after the TOC~~ ✓
+8. ~~Exhibit file import — local files~~ ✓ (PNG, JPEG, PDF via `pdftoppm`). URL paths (Phase 3) still pending.
+9. Signature pages — a `# SIGNATURE` top-level heading (or similar) for rendering signature blocks with party names, signature lines, witness fields, etc.
+10. Placeholders for front-matter definitions — allow the contract body to reference front-matter values (e.g. party role, name, specifier) as inline placeholders that get resolved during processing
+11. Better fallback syntax for schedule references — current `[display][ref-id]` with `[ref-id]: #schedule "value"` works for processed output but renders poorly in plain Markdown (value hidden in link title attribute, only visible as tooltip in HTML). Explore alternative syntax that makes values visible without a processor.
+12. Auto-inject definitions into the definitions clause — automatically add YAML party roles and schedule reference descriptions into the definitions list in the rendered output. Perhaps behind a TOML toggle. Requires a mechanism to identify which clause is "the definitions clause" (e.g. convention-based heading match, anchor name, or explicit front-matter/TOML reference). Tricky problem.
+13. Auto-alphabetise the definitions clause — if we can identify the definitions clause (see #12), automatically sort its sub-clauses into alphabetical order in the rendered output, regardless of source order.

@@ -67,7 +67,8 @@ fn main() {
                 }
             };
 
-            match lexicon_docx::process(&input_text, &style_config) {
+            let input_dir = input.parent();
+            match lexicon_docx::process(&input_text, &style_config, input_dir) {
                 Ok((bytes, diagnostics)) => {
                     let has_errors = print_diagnostics(&diagnostics);
 

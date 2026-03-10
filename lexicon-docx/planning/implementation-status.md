@@ -47,9 +47,10 @@
 ## Remaining / Future Work
 
 ### Not yet implemented
-- **Exhibit file import** — `path` field on exhibit entries for importing external files (images, PDF) into the output. See `planning/exhibit-file-import.md`.
+- **Exhibit URL import** — `path` field with HTTP/HTTPS URLs for fetching remote exhibit files. Phase 3 of exhibit file import.
 
 ### Recently completed
+- **Exhibit file import** — optional `path` field on exhibit entries. Supports PNG, JPEG (converted to PNG), and PDF (via `pdftoppm`). Images are scaled to fit within page margins preserving aspect ratio. Relative paths resolved against the input document's directory. When `path` is omitted, the existing placeholder page behaviour is preserved. New module: `render/exhibit.rs`. New dependencies: `image` 0.25 (PNG/JPEG decode), `tempfile` 3 (PDF rendering workspace).
 - **Attachment terminology refactor** — renamed "annexures" to three distinct concepts: **Schedule** (inline reference-linked values, unchanged), **Addendum** (body sections with `# ADDENDUM` headings, formerly "ANNEX"), **Exhibit** (front-matter `exhibits` list of external documents, generates placeholder pages with centred title). `Annexure`/`AnnexureContent` types renamed to `Addendum`/`AddendumContent`. Front-matter `annexures: Vec<String>` replaced with `exhibits: Vec<Exhibit>` (objects with `title` field). Addenda are auto-numbered sequentially, case-insensitive heading match, unrecognised `#` headings produce warnings.
 - **Configurable defined term style** — `defined_term_style` in style TOML: `bold` (default), `quoted` (curly quotes, no bold), or `bold_quoted`. Applies to all `**bold**` text in body, preamble party roles/short_title, and custom templates.
 - **Parties preamble** — parties preamble block renders before the contract body (independent of cover page). Three styles: `simple` (block layout), `prose` (single flowing paragraph), and `custom` (user-defined templates with `{title}`, `{short_title}`, `{date}`, `{name}`, `{specifier}`, `{role}` placeholders, `**bold**` markers, `\n` for paragraph breaks). Configured via `[preamble]` section in style TOML. Default disabled.

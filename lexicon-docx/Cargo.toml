@@ -15,3 +15,5 @@ regex = "1"
 chrono = "0.4"
 thiserror = "2"
 zip = "2"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+tempfile = "3"

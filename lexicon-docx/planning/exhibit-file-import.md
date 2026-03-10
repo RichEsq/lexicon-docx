@@ -1,6 +1,6 @@
 # Exhibit File Import
 
-## Status: Future Work
+## Status: Phase 1+2 Complete (image + PDF import). Phase 3 (URL paths) is future work.
 
 ## Goal
 
@@ -22,23 +22,22 @@ The `path` field is optional. When omitted, the processor generates a centred ti
 
 ## File Format Support
 
-Potential formats to support:
+Supported formats:
 - **Images** (PNG, JPG) — embed as inline images in the docx
-- **PDF** — convert pages to images and embed, or use OLE embedding
-- **DOCX** — merge content from the external docx into the output
+- **PDF** — convert each page to an image and embed one per page
 
-PDF and DOCX import are non-trivial. Images are the simplest starting point.
+DOCX merging is out of scope (too complex — style/numbering conflicts).
 
 ## Implementation Considerations
 
-- Need to resolve relative paths against the input document's directory
-- URL paths would require HTTP fetching (add `reqwest` or similar dependency)
-- PDF rendering would require a PDF-to-image library (e.g., `pdf-render`, `pdfium`)
-- DOCX merging is complex — would need to parse and merge styles, numbering, etc.
+- Resolve relative paths against the input document's directory
+- URL paths require HTTP fetching (add `reqwest` or similar dependency)
+- PDF-to-image rendering requires a library (e.g., `pdfium-render`, `pdf-render`, or shelling out to `pdftoppm`/`magick`)
+- Images should be scaled to fit within page margins
+- Each PDF page becomes a full-page image on its own docx page
 
 ## Suggested Phased Approach
 
 1. **Phase 1**: Image files (PNG, JPG) — embed with `docx-rs` image support
-2. **Phase 2**: PDF files — convert to images and embed
+2. **Phase 2**: PDF files — convert each page to an image and insert one per page
 3. **Phase 3**: URL paths — HTTP fetch before import
-4. **Phase 4**: DOCX merging (if needed)

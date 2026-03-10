@@ -1,13 +1,16 @@
+use std::path::Path;
+
 use docx_rs::{
     AbstractNumbering, AlignmentType, BreakType, Docx, Footer, Header, IndentLevel,
     Level, LevelJc, LevelOverride, LevelText, LineSpacing, LineSpacingType, NumberFormat,
-    NumberingId, NumPages, Numbering, PageMargin, PageNum, Paragraph, Run, RunFonts,
+    NumberingId, NumPages, Numbering, PageMargin, PageNum, Paragraph, Pic, Run, RunFonts,
     RunProperty, SpecialIndentType, Start, Style, StyleType, Tab, TabValueType,
     Table as DocxTable, TableCell, TableOfContents, TableRow, VertAlignType, WidthType,
 };
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
+use crate::render::exhibit as exhibit_loader;
 use crate::style::{DefinedTermStyle, PartyFormat, PreambleStyle, SchedulePosition, StyleConfig};
 
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
@@ -16,7 +19,7 @@ const BODY_NUMBERING_ID: usize = 2;
 // Simple numbered list (for addendum prose lists)
 const SIMPLE_LIST_ABSTRACT_NUM_ID: usize = 3;
 
-pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
+pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
 
     // Page setup
@@ -202,9 +205,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         docx = render_addendum(docx, addendum, style, &mut next_num_id);
     }
 
-    // Exhibits — placeholder pages for external documents
+    // Exhibits — placeholder pages or imported images/PDFs
     for (i, exhibit) in doc.meta.exhibits.iter().enumerate() {
-        docx = render_exhibit(docx, exhibit, i + 1, style);
+        docx = render_exhibit(docx, exhibit, i + 1, style, input_dir)?;
     }
 
     // Schedule at end (if configured, this is the default)
@@ -571,7 +574,8 @@ fn render_exhibit(
     exhibit: &Exhibit,
     number: usize,
     style: &StyleConfig,
-) -> Docx {
+    input_dir: Option<&Path>,
+) -> Result<Docx> {
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
 
     // Page break before exhibit
@@ -592,7 +596,44 @@ fn render_exhibit(
             ),
     );
 
-    docx
+    // If path is set, load and embed the file; otherwise leave as placeholder
+    if let Some(ref path) = exhibit.path {
+        let images = exhibit_loader::load_exhibit(path, input_dir)?;
+
+        // Calculate content area in EMU (1 twip = 635 EMU)
+        let margin_left = StyleConfig::cm_to_twips(style.margin_left_cm) as u32;
+        let margin_right = StyleConfig::cm_to_twips(style.margin_right_cm) as u32;
+        let margin_top = StyleConfig::cm_to_twips(style.margin_top_cm) as u32;
+        let margin_bottom = StyleConfig::cm_to_twips(style.margin_bottom_cm) as u32;
+        let max_w_emu = (style.page_width_twips() - margin_left - margin_right) * 635;
+        let max_h_emu = (style.page_height_twips() - margin_top - margin_bottom) * 635;
+
+        // Blank line after heading
+        docx = docx.add_paragraph(Paragraph::new());
+
+        for (i, img) in images.iter().enumerate() {
+            // Page break between multi-page images (e.g. PDF pages), not before the first
+            if i > 0 {
+                docx = docx.add_paragraph(
+                    Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
+                );
+            }
+
+            let (fit_w, fit_h) =
+                exhibit_loader::fit_to_page(img.width_px, img.height_px, max_w_emu, max_h_emu);
+
+            let pic = Pic::new_with_dimensions(img.png_bytes.clone(), img.width_px, img.height_px)
+                .size(fit_w, fit_h);
+
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .align(AlignmentType::Center)
+                    .add_run(Run::new().add_image(pic)),
+            );
+        }
+    }
+
+    Ok(docx)
 }
 
 fn render_schedule(

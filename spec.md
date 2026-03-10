@@ -137,15 +137,27 @@ Party roles are automatically treated as defined terms. A processor should inclu
 
 #### 2.2.9. `exhibits` (optional)
 
-A list of external documents to be exhibited (attached for reference) to the contract. Each entry is an object with a `title` field. Exhibits are pre-existing documents included for reference that do not contain legal terms — for example, a property map exhibited to a lease, or a technical diagram.
+A list of external documents to be exhibited (attached for reference) to the contract. Each entry is an object with a `title` field and an optional `path` field. Exhibits are pre-existing documents included for reference that do not contain legal terms — for example, a property map exhibited to a lease, or a technical diagram.
+
+| Sub-field | Required | Description |
+|-----------|----------|-------------|
+| `title`   | Yes      | The title of the exhibit, rendered as a heading on the exhibit page. |
+| `path`    | No       | Path to an image (PNG, JPG) or PDF file to import into the output. Relative paths are resolved against the input document's directory. |
 
 ```yaml
 exhibits:
   - title: Plumbing Diagram
+    path: ./plumbing-diagram.png
   - title: Site Plan
+    path: ./plans/site-plan.pdf
+  - title: Floor Plan
 ```
 
-A processor generates an exhibit placeholder page for each entry, with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Plumbing Diagram"). Future versions may support a `path` field for importing external files directly into the output document.
+When `path` is provided, a processor imports the file into the output document:
+- **Images** (PNG, JPG) are embedded on the exhibit page, scaled to fit within page margins while preserving aspect ratio.
+- **PDF** files are rendered page-by-page as images (requires `pdftoppm` from poppler-utils).
+
+When `path` is omitted, a processor generates a placeholder page with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Floor Plan").
 
 ### 2.3. Markdown Compatibility
 
@@ -554,15 +566,17 @@ An exhibit is a pre-existing document included for reference that does not conta
 
 #### 8.2.1. Declaration
 
-Exhibits are declared in the front-matter `exhibits` field (see section 2.2.9). Each entry has a `title` field.
+Exhibits are declared in the front-matter `exhibits` field (see section 2.2.9). Each entry has a `title` field and an optional `path` field.
 
 #### 8.2.2. Rendering
 
-A processor generates a placeholder page for each exhibit, with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Property Map"). The physical document can then be inserted manually when printing or assembling the final contract.
+When an exhibit has a `path`, a processor imports the referenced file and embeds it on the exhibit page(s):
+- **Images** (PNG, JPG) are embedded as a single page, scaled to fit within page margins while preserving the original aspect ratio.
+- **PDF** files are converted page-by-page to images and embedded one per page. The exhibit heading appears on the first page.
 
-#### 8.2.3. Future: File Import
+When `path` is omitted, a processor generates a placeholder page with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Property Map"). The physical document can then be inserted manually when printing or assembling the final contract.
 
-A future version of the specification may support a `path` field on exhibit entries, allowing the processor to import the referenced file directly into the output document.
+Relative paths are resolved against the directory containing the input Markdown file. Supported formats are PNG, JPG/JPEG, and PDF. PDF rendering requires `pdftoppm` (from poppler-utils) to be available on the system.
 
 ## 9. Complete Example
 
@@ -722,5 +736,5 @@ At minimum, a processor should support:
 | Cross-reference      | `[clause X](#id)`                               | Yes (renders as link) |
 | Schedule item        | `[display text][ref-id]` + `[ref-id]: #schedule "value"` | Yes (renders as link) |
 | Tables               | Standard Markdown tables                        | Yes |
-| Exhibit declaration  | Front-matter `exhibits` field                   | Yes |
+| Exhibit declaration  | Front-matter `exhibits` field (with optional `path`) | Yes |
 | Addendum content     | `# ADDENDUM` headings after main body           | Yes |

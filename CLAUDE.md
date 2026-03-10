@@ -79,6 +79,7 @@ cargo test
 | `src/parser/anchors.rs` | Regex-based `{#id}` stripping |
 | `src/resolve.rs` | Numbering (1., 1.1, (a), (i)), cross-refs, defined term validation |
 | `src/render/docx.rs` | DOCX generation — cover page, clauses, addenda, exhibits, tables |
+| `src/render/exhibit.rs` | Exhibit file import — image loading, PDF rendering, sizing |
 | `src/render/watermark.rs` | Draft watermark injection via ZIP post-processing |
 | `src/style.rs` | Style configuration with TOML override support |
 | `src/error.rs` | Error types and diagnostics |
@@ -96,6 +97,8 @@ cargo test
 | `chrono` | Date validation |
 | `thiserror` | Error type derivation |
 | `zip` 2 | ZIP read/write for .docx post-processing (watermark) |
+| `image` 0.25 | PNG/JPEG decoding + JPEG→PNG conversion for exhibit import |
+| `tempfile` 3 | Temporary directories for PDF-to-image rendering |
 
 ### Design Decisions
 
@@ -118,7 +121,7 @@ cargo test
 Future work and design notes are in `lexicon-docx/planning/`:
 - `implementation-status.md` — what's done, what's remaining, architecture notes
 - `library-extraction.md` — plan for extracting lexicon-core as a separate crate
-- `exhibit-file-import.md` — future plan for importing external files into exhibit pages
+- `exhibit-file-import.md` — exhibit file import (Phase 1+2 complete, URL import is future)
 - `configurable-cover-page.md` — plan for making cover page elements configurable
 - `native-word-numbering.md` — native Word numbering (implemented)
 - `draft-watermark.md` — draft watermark via VML injection (implemented)
@@ -127,7 +130,7 @@ Future work and design notes are in `lexicon-docx/planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF)).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 
