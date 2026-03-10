@@ -75,25 +75,28 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     }
 
     // Left side: ref and/or version
-    if has_left {
-        let mut parts = Vec::new();
-        if has_ref {
-            if let Some(ref ref_) = doc.meta.ref_ {
-                parts.push(format!("Ref: {}", ref_));
-            }
+    if has_ref {
+        if let Some(ref ref_) = doc.meta.ref_ {
+            footer_para = footer_para.add_run(
+                Run::new()
+                    .add_text(format!("Ref: {}", ref_))
+                    .size(footer_size),
+            );
         }
-        if has_version {
-            if let Some(version) = doc.meta.version {
-                parts.push(format!("v{}", version));
+    }
+    if has_version {
+        if let Some(version) = doc.meta.version {
+            if has_ref {
+                footer_para = footer_para.add_run(
+                    Run::new().add_text(" ").size(footer_size),
+                );
             }
+            footer_para = footer_para.add_run(
+                Run::new()
+                    .add_text(format!("v{}", version))
+                    .size(footer_size),
+            );
         }
-        let left_text = parts.join(" ");
-        footer_para = footer_para.add_run(
-            Run::new()
-                .add_text(left_text)
-                .size(footer_size)
-                .italic(),
-        );
     }
 
     if has_page {
