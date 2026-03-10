@@ -38,17 +38,17 @@ show_version = false           # append version to ref, e.g. "Ref: OK:RP:2026011
 
 ### Goal
 
-Allow the schedule annexure to appear either at the end of the document (after all annexures) or before the contract body (after the TOC).
+Allow the schedule to appear either at the end of the document (after all addenda) or before the contract body (after the TOC).
 
 ### Configuration
 
 ```toml
-schedule_position = "end"      # "end" (after annexures, default) or "after_toc" (before contract body)
+schedule_position = "end"      # "end" (after addenda, default) or "after_toc" (before contract body)
 ```
 
 ### Behaviour
 
-- `end`: schedule renders after all annexures (current behaviour)
+- `end`: schedule renders after all addenda (current behaviour)
 - `after_toc`: schedule renders before the contract body, regardless of whether TOC is enabled
 
 ### Implementation
@@ -57,6 +57,6 @@ schedule_position = "end"      # "end" (after annexures, default) or "after_toc"
 2. Add `schedule_position: SchedulePosition` to `StyleConfig` (top-level, not nested)
 3. In `render/docx.rs`, insert schedule rendering at the position-dependent location:
    - `AfterToc`: render schedule right before the body loop
-   - `End`: render schedule after annexures (existing location)
+   - `End`: render schedule after addenda (existing location)
    - Schedule renders in exactly one location, never both
 4. Update `style.example.toml`

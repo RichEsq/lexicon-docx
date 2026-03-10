@@ -22,8 +22,8 @@ pub fn resolve(doc: &mut Document) {
 
     // Resolve cross-references and validate
     resolve_cross_refs(&mut doc.body, &anchor_map, &mut doc.diagnostics);
-    for annexure in &mut doc.annexures {
-        resolve_annexure_cross_refs(annexure, &anchor_map, &mut doc.diagnostics);
+    for addendum in &mut doc.addenda {
+        resolve_addendum_cross_refs(addendum, &anchor_map, &mut doc.diagnostics);
     }
 
     // Collect schedule items
@@ -172,42 +172,42 @@ fn resolve_inlines_cross_refs(
     }
 }
 
-fn resolve_annexure_cross_refs(
-    annexure: &mut Annexure,
+fn resolve_addendum_cross_refs(
+    addendum: &mut Addendum,
     anchor_map: &HashMap<String, ClauseNumber>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    for content in &mut annexure.content {
+    for content in &mut addendum.content {
         match content {
-            AnnexureContent::Paragraph(inlines) => {
+            AddendumContent::Paragraph(inlines) => {
                 resolve_inlines_cross_refs(
                     inlines,
                     anchor_map,
                     diagnostics,
-                    Some(&annexure.heading),
+                    Some(&addendum.heading),
                 );
             }
-            AnnexureContent::Heading(_, inlines) => {
+            AddendumContent::Heading(_, inlines) => {
                 resolve_inlines_cross_refs(
                     inlines,
                     anchor_map,
                     diagnostics,
-                    Some(&annexure.heading),
+                    Some(&addendum.heading),
                 );
             }
-            AnnexureContent::ClauseList(clauses) => {
+            AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
                     resolve_clause_cross_refs(clause, anchor_map, diagnostics);
                 }
             }
-            AnnexureContent::NumberedList(items)
-            | AnnexureContent::BulletList(items) => {
+            AddendumContent::NumberedList(items)
+            | AddendumContent::BulletList(items) => {
                 for item_inlines in items {
                     resolve_inlines_cross_refs(
                         item_inlines,
                         anchor_map,
                         diagnostics,
-                        Some(&annexure.heading),
+                        Some(&addendum.heading),
                     );
                 }
             }
@@ -232,8 +232,8 @@ fn collect_schedule_items(doc: &mut Document) {
         }
     }
 
-    for annexure in &doc.annexures {
-        collect_annexure_schedule_items(annexure, &mut items);
+    for addendum in &doc.addenda {
+        collect_addendum_schedule_items(addendum, &mut items);
     }
 
     doc.schedule_items = items;
@@ -269,19 +269,19 @@ fn collect_inline_schedule_items(inlines: &[InlineContent], items: &mut Vec<Sche
     }
 }
 
-fn collect_annexure_schedule_items(annexure: &Annexure, items: &mut Vec<ScheduleItem>) {
-    for content in &annexure.content {
+fn collect_addendum_schedule_items(addendum: &Addendum, items: &mut Vec<ScheduleItem>) {
+    for content in &addendum.content {
         match content {
-            AnnexureContent::Paragraph(inlines) | AnnexureContent::Heading(_, inlines) => {
+            AddendumContent::Paragraph(inlines) | AddendumContent::Heading(_, inlines) => {
                 collect_inline_schedule_items(inlines, items);
             }
-            AnnexureContent::ClauseList(clauses) => {
+            AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
                     collect_clause_schedule_items(clause, items);
                 }
             }
-            AnnexureContent::NumberedList(items_list)
-            | AnnexureContent::BulletList(items_list) => {
+            AddendumContent::NumberedList(items_list)
+            | AddendumContent::BulletList(items_list) => {
                 for item_inlines in items_list {
                     collect_inline_schedule_items(item_inlines, items);
                 }
@@ -337,8 +337,8 @@ fn validate_defined_terms(doc: &mut Document) {
             }
         }
     }
-    for annexure in &doc.annexures {
-        collect_annexure_definitions(annexure, &mut definitions);
+    for addendum in &doc.addenda {
+        collect_addendum_definitions(addendum, &mut definitions);
     }
 
     // Build definition set (term → first location)
@@ -353,8 +353,8 @@ fn validate_defined_terms(doc: &mut Document) {
     for element in &doc.body {
         collect_element_text(element, &mut all_text);
     }
-    for annexure in &doc.annexures {
-        collect_annexure_text(annexure, &mut all_text);
+    for addendum in &doc.addenda {
+        collect_addendum_text(addendum, &mut all_text);
     }
     let text_lower = all_text.to_lowercase();
 
@@ -388,20 +388,20 @@ fn collect_clause_definitions(clause: &Clause, defs: &mut Vec<TermDefinition>) {
     }
 }
 
-fn collect_annexure_definitions(annexure: &Annexure, defs: &mut Vec<TermDefinition>) {
-    let loc = Some(annexure.heading.as_str());
-    for content in &annexure.content {
+fn collect_addendum_definitions(addendum: &Addendum, defs: &mut Vec<TermDefinition>) {
+    let loc = Some(addendum.heading.as_str());
+    for content in &addendum.content {
         match content {
-            AnnexureContent::Paragraph(inlines) | AnnexureContent::Heading(_, inlines) => {
+            AddendumContent::Paragraph(inlines) | AddendumContent::Heading(_, inlines) => {
                 collect_inline_definitions(inlines, defs, loc);
             }
-            AnnexureContent::ClauseList(clauses) => {
+            AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
                     collect_clause_definitions(clause, defs);
                 }
             }
-            AnnexureContent::NumberedList(items)
-            | AnnexureContent::BulletList(items) => {
+            AddendumContent::NumberedList(items)
+            | AddendumContent::BulletList(items) => {
                 for item_inlines in items {
                     collect_inline_definitions(item_inlines, defs, loc);
                 }
@@ -458,19 +458,19 @@ fn collect_clause_text(clause: &Clause, out: &mut String) {
     }
 }
 
-fn collect_annexure_text(annexure: &Annexure, out: &mut String) {
-    for content in &annexure.content {
+fn collect_addendum_text(addendum: &Addendum, out: &mut String) {
+    for content in &addendum.content {
         match content {
-            AnnexureContent::Paragraph(inlines) | AnnexureContent::Heading(_, inlines) => {
+            AddendumContent::Paragraph(inlines) | AddendumContent::Heading(_, inlines) => {
                 collect_inlines_text(inlines, out);
             }
-            AnnexureContent::ClauseList(clauses) => {
+            AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
                     collect_clause_text(clause, out);
                 }
             }
-            AnnexureContent::NumberedList(items)
-            | AnnexureContent::BulletList(items) => {
+            AddendumContent::NumberedList(items)
+            | AddendumContent::BulletList(items) => {
                 for item in items {
                     collect_inlines_text(item, out);
                 }

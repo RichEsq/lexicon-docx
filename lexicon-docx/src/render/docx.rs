@@ -13,7 +13,7 @@ use crate::style::{DefinedTermStyle, PartyFormat, PreambleStyle, SchedulePositio
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
 const ABSTRACT_NUM_ID: usize = 2;
 const BODY_NUMBERING_ID: usize = 2;
-// Simple numbered list (for annexure prose lists)
+// Simple numbered list (for addendum prose lists)
 const SIMPLE_LIST_ABSTRACT_NUM_ID: usize = 3;
 
 pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
@@ -195,11 +195,16 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         }
     }
 
-    // Annexures — each ClauseList/NumberedList gets its own numbering instance
+    // Addenda — each ClauseList/NumberedList gets its own numbering instance
     // Start after the abstract numbering IDs we've registered
     let mut next_num_id: usize = SIMPLE_LIST_ABSTRACT_NUM_ID + 1;
-    for annexure in &doc.annexures {
-        docx = render_annexure(docx, annexure, style, &mut next_num_id);
+    for addendum in &doc.addenda {
+        docx = render_addendum(docx, addendum, style, &mut next_num_id);
+    }
+
+    // Exhibits — placeholder pages for external documents
+    for (i, exhibit) in doc.meta.exhibits.iter().enumerate() {
+        docx = render_exhibit(docx, exhibit, i + 1, style);
     }
 
     // Schedule at end (if configured, this is the default)
@@ -461,27 +466,27 @@ fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx {
     docx
 }
 
-fn render_annexure(
+fn render_addendum(
     mut docx: Docx,
-    annexure: &Annexure,
+    addendum: &Addendum,
     style: &StyleConfig,
     next_num_id: &mut usize,
 ) -> Docx {
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
     let body_size = StyleConfig::pt_to_half_points(style.font_size);
 
-    // Page break before annexure
+    // Page break before addendum
     docx = docx.add_paragraph(
         Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
     );
 
-    // Annexure heading
+    // Addendum heading
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)
             .add_run(
                 Run::new()
-                    .add_text(&annexure.heading)
+                    .add_text(&addendum.heading)
                     .bold()
                     .size(heading_size),
             ),
@@ -489,13 +494,13 @@ fn render_annexure(
 
     docx = docx.add_paragraph(Paragraph::new());
 
-    // Annexure content
-    for content in &annexure.content {
+    // Addendum content
+    for content in &addendum.content {
         match content {
-            AnnexureContent::Paragraph(inlines) => {
+            AddendumContent::Paragraph(inlines) => {
                 docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
             }
-            AnnexureContent::Heading(level, inlines) => {
+            AddendumContent::Heading(level, inlines) => {
                 let size = match level {
                     2 => StyleConfig::pt_to_half_points(style.heading1_size),
                     _ => StyleConfig::pt_to_half_points(style.heading2_size),
@@ -507,8 +512,8 @@ fn render_annexure(
                 docx = docx.add_paragraph(para);
                 docx = docx.add_paragraph(Paragraph::new());
             }
-            AnnexureContent::ClauseList(clauses) => {
-                // Create a new numbering instance for this annexure's clauses
+            AddendumContent::ClauseList(clauses) => {
+                // Create a new numbering instance for this addendum's clauses
                 let num_id = *next_num_id;
                 *next_num_id += 1;
                 docx = docx.add_numbering(
@@ -522,10 +527,10 @@ fn render_annexure(
                     docx = render_clause(docx, clause, style, num_id);
                 }
             }
-            AnnexureContent::Table(table) => {
+            AddendumContent::Table(table) => {
                 docx = render_table(docx, table, style);
             }
-            AnnexureContent::NumberedList(items) => {
+            AddendumContent::NumberedList(items) => {
                 let num_id = *next_num_id;
                 *next_num_id += 1;
                 docx = docx.add_numbering(
@@ -541,7 +546,7 @@ fn render_annexure(
                     docx = docx.add_paragraph(para);
                 }
             }
-            AnnexureContent::BulletList(items) => {
+            AddendumContent::BulletList(items) => {
                 let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
                 for item in items {
                     let mut para = Paragraph::new()
@@ -556,6 +561,35 @@ fn render_annexure(
             }
         }
     }
+
+    docx
+}
+
+fn render_exhibit(
+    mut docx: Docx,
+    exhibit: &Exhibit,
+    number: usize,
+    style: &StyleConfig,
+) -> Docx {
+    let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
+
+    // Page break before exhibit
+    docx = docx.add_paragraph(
+        Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
+    );
+
+    // Exhibit heading — centred title
+    let heading_text = format!("EXHIBIT {} - {}", number, exhibit.title);
+    docx = docx.add_paragraph(
+        Paragraph::new()
+            .align(AlignmentType::Center)
+            .add_run(
+                Run::new()
+                    .add_text(&heading_text)
+                    .bold()
+                    .size(heading_size),
+            ),
+    );
 
     docx
 }

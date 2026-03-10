@@ -33,7 +33,7 @@ date_format = "%e %B %Y"     # chrono format string (e.g. "%d/%m/%Y", "%B %d, %Y
 # brand_color = "#2E5090"     # web colour for title and ## heading text
 
 # Schedule placement
-schedule_position = "end"     # "end" (after annexures) or "after_toc" (before contract body)
+schedule_position = "end"     # "end" (after addenda/exhibits) or "after_toc" (before contract body)
 
 # Cover page
 [cover]

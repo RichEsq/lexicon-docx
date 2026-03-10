@@ -15,7 +15,7 @@ Without a processor, a Lexicon Markdown document reads and renders as a well-str
 
 ## 2. Document Meta Properties
 
-Every Lexicon Markdown document begins with a YAML front-matter block. This block contains structured metadata about the contract that does not form part of the substantive terms but is used by a processor for rendering cover pages, headers, footers, party blocks, and annexure lists.
+Every Lexicon Markdown document begins with a YAML front-matter block. This block contains structured metadata about the contract that does not form part of the substantive terms but is used by a processor for rendering cover pages, headers, footers, party blocks, and exhibit pages.
 
 ### 2.1. Syntax
 
@@ -37,9 +37,9 @@ parties:
   - name: ECorp Limited
     specifier: ACN 123 456 789
     role: Employer
-annexures:
-  - Office Diagram
-  - Employment Obligations
+exhibits:
+  - title: Office Diagram
+  - title: Employment Obligations
 ---
 ```
 
@@ -135,17 +135,17 @@ parties:
 
 Party roles are automatically treated as defined terms. A processor should include them in any generated glossary and may validate that the role appears in the contract body.
 
-#### 2.2.9. `annexures` (optional)
+#### 2.2.9. `exhibits` (optional)
 
-A list of documents to be annexed to the contract. Each entry is the plain-language title of the annexure.
+A list of external documents to be exhibited (attached for reference) to the contract. Each entry is an object with a `title` field. Exhibits are pre-existing documents included for reference that do not contain legal terms — for example, a property map exhibited to a lease, or a technical diagram.
 
 ```yaml
-annexures:
-  - Plumbing Diagram
-  - Employment Obligations
+exhibits:
+  - title: Plumbing Diagram
+  - title: Site Plan
 ```
 
-A processor may generate an annexure list or annexure cover pages from this field.
+A processor generates an exhibit placeholder page for each entry, with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Plumbing Diagram"). Future versions may support a `path` field for importing external files directly into the output document.
 
 ### 2.3. Markdown Compatibility
 
@@ -250,7 +250,7 @@ This renders as superscript in the output document. Useful for footnote markers,
 
 ### 3.8. Prose Sections
 
-Some parts of a contract are not structured as numbered clauses (e.g., recitals, annexure content, signature blocks). These are written as standard Markdown paragraphs, headings, lists, and tables outside of the numbered outline structure.
+Some parts of a contract are not structured as numbered clauses (e.g., recitals, addendum content, signature blocks). These are written as standard Markdown paragraphs, headings, lists, and tables outside of the numbered outline structure.
 
 ## 4. Defined Terms
 
@@ -470,7 +470,7 @@ A processor:
 1. collects all reference definitions with the `#schedule` URL;
 2. extracts the ref-id, the inline display text, and the pre-filled value (or marks it as blank);
 3. in the body, renders the inline text with the value (e.g., "the Payment (AU $10,000)") or a blank line for hand completion;
-4. generates a schedule as an annexure to the contract, listing all schedule items with their ref-ids, descriptions, and values.
+4. generates a schedule page listing all schedule items with their ref-ids, descriptions, and values.
 
 ### 6.5. Multiple Schedules
 
@@ -516,27 +516,49 @@ Standard Markdown tables are used where a contract requires tabular data:
 
 A processor renders these as formatted tables in the output document.
 
-## 8. Annexures
+## 8. Addenda and Exhibits
 
-### 8.1. Declaration
+Lexicon distinguishes between three types of attachments to a contract:
 
-Annexures are declared in the front-matter `annexures` field (see section 2.2.8).
+| Type | Purpose | Where declared | Content |
+|------|---------|----------------|---------|
+| **Schedule** | Variable commercial terms (see section 6) | Inline reference links | Values collected into a schedule page |
+| **Addendum** | Substantive attached sections that supplement the body | `# ADDENDUM` headings in the document body | Free-form Markdown |
+| **Exhibit** | Pre-existing external documents included for reference | Front-matter `exhibits` field | Placeholder pages (future: file import) |
 
-### 8.2. Content
+### 8.1. Addenda
 
-Annexure content, if included in the same document, appears after the main contract body under a top-level heading:
+An addendum is an attached part of the contract that supplements but does not form part of the main body. Addenda may contain substantive terms, amend provisions in the body, or provide additional detail. If an addendum is removed, the contract body remains fully functional.
+
+#### 8.1.1. Syntax
+
+Addendum content appears after the main contract body under a top-level heading:
 
 ```markdown
-# ANNEX 1 - Details of Processing
+# ADDENDUM 1 - Details of Processing
 
-This annex includes details of processing...
+This addendum includes details of processing...
 ```
 
-Annexure content is free-form Markdown (paragraphs, lists, tables, headings). It does not follow the numbered clause structure of the main body unless appropriate.
+#### 8.1.2. Content
 
-### 8.3. External Annexures
+Addendum content is free-form Markdown (paragraphs, lists, tables, headings). It may include numbered clause lists, but does not follow the numbered clause structure of the main body unless appropriate.
 
-Annexures that are separate documents (diagrams, images, external files) are declared in the front-matter only. A processor may generate placeholder annexure cover pages.
+### 8.2. Exhibits
+
+An exhibit is a pre-existing document included for reference that does not contain legal terms — for example, a property map, a technical diagram, or an organisational chart.
+
+#### 8.2.1. Declaration
+
+Exhibits are declared in the front-matter `exhibits` field (see section 2.2.9). Each entry has a `title` field.
+
+#### 8.2.2. Rendering
+
+A processor generates a placeholder page for each exhibit, with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Property Map"). The physical document can then be inserted manually when printing or assembling the final contract.
+
+#### 8.2.3. Future: File Import
+
+A future version of the specification may support a `path` field on exhibit entries, allowing the processor to import the referenced file directly into the output document.
 
 ## 9. Complete Example
 
@@ -556,7 +578,7 @@ parties:
   - name: ECorp Limited
     specifier: ACN 123 456 789
     role: Employer
-annexures: []
+exhibits: []
 ---
 
 1. ## Definitions {#definitions}
@@ -674,7 +696,7 @@ A Lexicon Markdown processor should implement the following capabilities:
 At minimum, a processor should support:
 
 1. **Markdown** — a "resolved" Markdown file with cross-references updated, anchors stripped, and schedule values interpolated.
-2. **DOCX** — a Word document with legal numbering, formatted parties block, cover page, and annexure pages.
+2. **DOCX** — a Word document with legal numbering, formatted parties block, cover page, addendum pages, and exhibit pages.
 3. **PDF** — equivalent to the DOCX output.
 
 ## 11. Summary of Syntax
@@ -696,5 +718,5 @@ At minimum, a processor should support:
 | Cross-reference      | `[clause X](#id)`                               | Yes (renders as link) |
 | Schedule item        | `[display text][ref-id]` + `[ref-id]: #schedule "value"` | Yes (renders as link) |
 | Tables               | Standard Markdown tables                        | Yes |
-| Annexure declaration | Front-matter `annexures` field                  | Yes |
-| Annexure content     | `# ANNEX` headings after main body              | Yes |
+| Exhibit declaration  | Front-matter `exhibits` field                   | Yes |
+| Addendum content     | `# ADDENDUM` headings after main body           | Yes |

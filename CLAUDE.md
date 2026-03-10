@@ -9,10 +9,19 @@ The repository contains:
 - `example.md` — a real-world Data Processing Addendum written in Lexicon format
 - `lexicon-docx/` — the Rust CLI processor
 
+## First Steps
+
+Before starting any work, read these files to understand the current state of the project:
+
+1. **`spec.md`** — the Lexicon Markdown specification. The spec is the source of truth for all parsing and validation rules.
+2. **`lexicon-docx/planning/implementation-status.md`** — what's done and what's remaining.
+3. **`lexicon-docx/planning/todo.md`** — open tasks and questions.
+4. **Other planning files in `lexicon-docx/planning/`** — design notes for specific features.
+
 ## Specification
 
 Lexicon Markdown extends standard Markdown with conventions for legal documents:
-- **YAML front-matter** for contract metadata (title, date, parties, status, version, annexures)
+- **YAML front-matter** for contract metadata (title, date, parties, status, version, exhibits)
 - **Nested ordered lists** for clause hierarchy (`1. ## Heading` → `1. text` → indented sub-clauses)
 - **Bold = defined terms** — `**Term** means ...` is a definition; any other `**Term**` is a reference
 - **Pandoc-style anchors** (`{#id}`) + standard links (`[clause X](#id)`) for cross-references
@@ -51,7 +60,7 @@ cargo test
 .md input
   → frontmatter.rs: YAML front-matter parsing + validation
   → parser/mod.rs: comrak Markdown AST parsing
-  → parser/clause.rs: AST walk → Document IR (clauses, inlines, annexures)
+  → parser/clause.rs: AST walk → Document IR (clauses, inlines, addenda)
   → parser/anchors.rs: {#id} anchor extraction
   → resolve.rs: clause numbering, cross-ref resolution, term validation
   → render/docx.rs: Document IR → .docx via docx-rs
@@ -66,10 +75,10 @@ cargo test
 | `src/lib.rs` | Public API: `parse()`, `resolve()`, `render_docx()`, `process()` |
 | `src/model.rs` | Intermediate representation — Document, Clause, InlineContent, etc. |
 | `src/frontmatter.rs` | YAML front-matter parsing with serde_yaml |
-| `src/parser/clause.rs` | Core parser: comrak AST → clause tree, inline extraction |
+| `src/parser/clause.rs` | Core parser: comrak AST → clause tree, inline extraction, addendum parsing |
 | `src/parser/anchors.rs` | Regex-based `{#id}` stripping |
 | `src/resolve.rs` | Numbering (1., 1.1, (a), (i)), cross-refs, defined term validation |
-| `src/render/docx.rs` | DOCX generation — cover page, clauses, annexures, tables |
+| `src/render/docx.rs` | DOCX generation — cover page, clauses, addenda, exhibits, tables |
 | `src/render/watermark.rs` | Draft watermark injection via ZIP post-processing |
 | `src/style.rs` | Style configuration with TOML override support |
 | `src/error.rs` | Error types and diagnostics |
@@ -109,6 +118,7 @@ cargo test
 Future work and design notes are in `lexicon-docx/planning/`:
 - `implementation-status.md` — what's done, what's remaining, architecture notes
 - `library-extraction.md` — plan for extracting lexicon-core as a separate crate
+- `exhibit-file-import.md` — future plan for importing external files into exhibit pages
 - `configurable-cover-page.md` — plan for making cover page elements configurable
 - `native-word-numbering.md` — native Word numbering (implemented)
 - `draft-watermark.md` — draft watermark via VML injection (implemented)
@@ -117,7 +127,7 @@ Future work and design notes are in `lexicon-docx/planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedule annexures, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits)).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 

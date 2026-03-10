@@ -84,4 +84,4 @@ Paragraph::new()
 
 ### Status
 
-**Implemented.** Native Word numbering is now active in `render/docx.rs`. The abstract numbering defines 4 levels (decimal → decimal → lowerLetter → lowerRoman) with `level_restart` for automatic counter resets. Annexure clause lists get separate `Numbering` instances with `LevelOverride` start resets. Level 0 has bold/heading-font run properties; levels 1-3 inherit document defaults.
+**Implemented.** Native Word numbering is now active in `render/docx.rs`. The abstract numbering defines 4 levels (decimal → decimal → lowerLetter → lowerRoman) with `level_restart` for automatic counter resets. Addendum clause lists get separate `Numbering` instances with `LevelOverride` start resets. Level 0 has bold/heading-font run properties; levels 1-3 inherit document defaults.

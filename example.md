@@ -13,11 +13,7 @@ parties:
   - name: The Merchant
     specifier: as defined in the Principal Agreement
     role: Merchant
-annexures:
-  - "Details of Processing of Merchant Personal Data"
-  - "Technical and Organisational Safety Measures"
-  - "Standard Contractual Clauses - Supplementary Terms To Provide Additional Safeguards"
-  - "List of Sub-processors"
+exhibits: []
 ---
 
 This Addendum forms part of the Principal Agreement between Okendo acting on its own behalf and as agent for each Okendo Affiliate and the Merchant, acting on its own behalf and as agent for each Merchant Affiliate.
@@ -226,15 +222,15 @@ This Addendum forms part of the Principal Agreement between Okendo acting on its
 
 12. ## GDPR Specific Provisions {#gdpr-provisions}
 
-    1. ANNEX 1 to this Addendum sets out certain information regarding the Contracted Processors' Processing of the Merchant Personal Data as required by article 28(3) of the GDPR (and equivalent requirements of other Data Protection Laws). Nothing in ANNEX 1 (including as amended pursuant to [this clause](#gdpr-provisions)) confers any right or imposes any obligation on any party to this Addendum.
+    1. ADDENDUM 1 to this Addendum sets out certain information regarding the Contracted Processors' Processing of the Merchant Personal Data as required by article 28(3) of the GDPR (and equivalent requirements of other Data Protection Laws). Nothing in ADDENDUM 1 (including as amended pursuant to [this clause](#gdpr-provisions)) confers any right or imposes any obligation on any party to this Addendum.
 
     2. Okendo and each Okendo Affiliate shall provide reasonable assistance to each Merchant Group Member with any data protection impact assessments, and prior consultations with Supervisory Authorities or other competent data privacy authorities, which Merchant reasonably considers to be required of any Merchant Group Member by article 35 or 36 of the GDPR or equivalent provisions of any other Data Protection Laws, in each case solely in relation to Processing of Merchant Personal Data by, and taking into account the nature of the Processing and information available to, the Contracted Processors.
 
     3. To the extent that Okendo processes any personal data under this Addendum that originates from a GDPR Zone to a country that has not been designated by the Commission as providing an adequate level of protection for personal data, the parties agree to enter into the Standard Contractual Clauses, which are hereby incorporated into and form part of this Addendum. The parties hereby agree that:
 
-        1. Data processing details set out in ANNEX 1 of this Addendum shall apply for the purposes of Appendix 1 of the Standard Contractual Clauses;
+        1. Data processing details set out in ADDENDUM 1 of this Addendum shall apply for the purposes of Appendix 1 of the Standard Contractual Clauses;
 
-        2. The technical and organizational security measures set out in ANNEX 2 of this Addendum shall apply for the purpose of Appendix 2 to the Standard Contractual Clauses; and
+        2. The technical and organizational security measures set out in ADDENDUM 2 of this Addendum shall apply for the purpose of Appendix 2 to the Standard Contractual Clauses; and
 
         3. Okendo shall be deemed the "data importer" and the Merchant the "data exporter" under the Standard Contractual Clauses.
 
@@ -274,9 +270,9 @@ This Addendum forms part of the Principal Agreement between Okendo acting on its
 
             2. construed in a manner as if the invalid or unenforceable part had never been contained therein.
 
-# ANNEX 1 - Details of Processing of Merchant Personal Data
+# ADDENDUM 1 - Details of Processing of Merchant Personal Data
 
-This ANNEX 1 includes certain details of the Processing of Merchant Personal Data as required by Article 28(3) GDPR.
+This ADDENDUM 1 includes certain details of the Processing of Merchant Personal Data as required by Article 28(3) GDPR.
 
 1. ## LIST OF PARTIES
 
@@ -345,7 +341,7 @@ Question content including:
 
 **Sensitive data transferred (if applicable) and applied restrictions or safeguards**
 
-Any sensitive data included by the Merchant or End Users, the extent of which is determined and controlled by the Merchant in its sole discretion. See ANNEX 2 for applied restrictions and safeguards.
+Any sensitive data included by the Merchant or End Users, the extent of which is determined and controlled by the Merchant in its sole discretion. See ADDENDUM 2 for applied restrictions and safeguards.
 
 **Frequency of the transfer**
 
@@ -369,17 +365,17 @@ The personal data will be retained until termination or expiry of the Principal 
 
 **For transfers to (sub-) processors, also specify subject matter, nature and duration of the processing**
 
-See ANNEX 4.
+See ADDENDUM 4.
 
-# ANNEX 2 - Technical and Organisational Safety Measures
+# ADDENDUM 2 - Technical and Organisational Safety Measures
 
 Okendo will maintain administrative, physical and technical safeguards designed to protect the security, confidentiality and integrity of the Merchant's personal data Processed by Okendo, as described in the Principal Agreement and this Addendum.
 
 Okendo will not materially decrease the overall security of the Services during a subscription term.
 
-# ANNEX 3 - Standard Contractual Clauses - Supplementary Terms To Provide Additional Safeguards
+# ADDENDUM 3 - Standard Contractual Clauses - Supplementary Terms To Provide Additional Safeguards
 
-This ANNEX is supplemental to, and should be read in conjunction with, the Standard Contractual Clauses. Any references to the 'Clauses' in this ANNEX should be read as references to the Standard Contractual Clauses.
+This ADDENDUM is supplemental to, and should be read in conjunction with, the Standard Contractual Clauses. Any references to the 'Clauses' in this ADDENDUM should be read as references to the Standard Contractual Clauses.
 
 The data importer agrees and warrants:
 
@@ -387,9 +383,9 @@ The data importer agrees and warrants:
 
 2. to assist the data exporter with the data exporter's continuing assessment of the adequacy of the protection of the personal data in accordance with the requirements of the applicable Data Protection Laws and pursuant to Clause 5(a) of the Clauses; and
 
-3. that, in the event the data transfer and data processing activities are suspended or terminated pursuant to the Clauses or this ANNEX, its cessation of the data processing activities will not be prevented by, or be in breach of, and will not give rise to any third party rights or remedies pursuant to, any binding obligation on the data importer under the Clauses or any other agreement between the data importer and the data exporter (or any of its affiliates) in relation to the personal data and data processing activities.
+3. that, in the event the data transfer and data processing activities are suspended or terminated pursuant to the Clauses or this ADDENDUM, its cessation of the data processing activities will not be prevented by, or be in breach of, and will not give rise to any third party rights or remedies pursuant to, any binding obligation on the data importer under the Clauses or any other agreement between the data importer and the data exporter (or any of its affiliates) in relation to the personal data and data processing activities.
 
-# ANNEX 4 - List of Sub-processors
+# ADDENDUM 4 - List of Sub-processors
 
 The Merchant has authorised the use of the Subprocessors set out at:
 <https://www.okendo.io/gdpr/>

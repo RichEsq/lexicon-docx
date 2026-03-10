@@ -14,10 +14,10 @@
 
 ### Phase 2: Clause Parsing + Legal Numbering ✓
 - `parser/mod.rs` — orchestrator: comrak parse → AST walk → IR
-- `parser/clause.rs` — recursive clause extraction from nested ordered lists, inline content extraction (bold, italic, links, cross-refs, schedule refs), annexure parsing (headings, paragraphs, tables, bullet lists, clause lists)
+- `parser/clause.rs` — recursive clause extraction from nested ordered lists, inline content extraction (bold, italic, links, cross-refs, schedule refs), addendum parsing (headings, paragraphs, tables, bullet lists, clause lists)
 - `parser/anchors.rs` — regex-based `{#id}` stripping from text nodes
 - `resolve.rs` — clause number assignment (1., 1.1, (a), (i) with roman numerals), anchor→number map, cross-reference resolution
-- `render/docx.rs` — clause rendering with headings, legal numbering as text prefixes, indentation per level (720 twips/level), blockquotes, tables, annexure pages with cover headings, bullet lists
+- `render/docx.rs` — clause rendering with headings, legal numbering as text prefixes, indentation per level (720 twips/level), blockquotes, tables, addendum pages with cover headings, exhibit placeholder pages, bullet lists
 
 **Key finding**: comrak produces proper `Heading` nodes inside list `Item` nodes for `1. ## Heading` syntax. Anchors appear as literal text — stripped by regex. Schedule reference links are fully resolved by comrak (URL = `#schedule`, title = value).
 
@@ -26,16 +26,16 @@
   - Classifies bold text as: FormalDefinition (`**Term** means`), InlineDefinition (`("**Term**")`), PartyRole (from front-matter), FieldLabel (`**Label**:`), or Reference
   - Handles grouped definitions (`The terms "**X**", "**Y**" shall have the same meaning...`)
   - Fuzzy matching via multi-variant normalisation (possessives, plurals, verb forms like -ing, -ed, -es, -ies)
-  - Filters structural field labels in annexures
+  - Filters structural field labels in addenda
   - Cross-reference validation with broken anchor warnings
 - Validation output: 10 warnings on example.md, all legitimate (1 undefined `Addendum`, 8 unused US privacy acronyms, 1 unused `include`)
 
 **Note**: `parser/terms.rs`, `parser/references.rs`, and `parser/schedule.rs` were NOT created as separate files. All term detection, cross-reference handling, and schedule item extraction is handled within `parser/clause.rs` (inline extraction) and `resolve.rs` (validation). This is simpler than the original plan since comrak handles most of the heavy lifting during AST parsing.
 
-### Phase 4: Schedule Annexure Generation ✓
+### Phase 4: Schedule Generation ✓
 - `model.rs` — replaced `ScheduleDef` with `ScheduleItem { description, value }`, renamed `schedule_defs` → `schedule_items`
-- `resolve.rs` — `collect_schedule_items()` walks entire document (body, annexures) collecting all `ScheduleRef` inline elements
-- `render/docx.rs` — "SCHEDULE" annexure page with two-column table (Item | Value), blank items show "____________"
+- `resolve.rs` — `collect_schedule_items()` walks entire document (body, addenda) collecting all `ScheduleRef` inline elements
+- `render/docx.rs` — "SCHEDULE" page with two-column table (Item | Value), blank items show "____________"
 
 ### Phase 5: Styling, TOC, Headers/Footers, Polish ✓
 - **Line spacing** — `style.line_spacing` applied as document-wide default via `default_line_spacing()` (Auto rule, value = spacing × 240 twips)
@@ -47,9 +47,10 @@
 ## Remaining / Future Work
 
 ### Not yet implemented
-(None currently planned — see planning docs for future work.)
+- **Exhibit file import** — `path` field on exhibit entries for importing external files (images, PDF) into the output. See `planning/exhibit-file-import.md`.
 
 ### Recently completed
+- **Attachment terminology refactor** — renamed "annexures" to three distinct concepts: **Schedule** (inline reference-linked values, unchanged), **Addendum** (body sections with `# ADDENDUM N - Title` headings, formerly "ANNEX"), **Exhibit** (front-matter `exhibits` list of external documents, generates placeholder pages with centred title). `Annexure`/`AnnexureContent` types renamed to `Addendum`/`AddendumContent`. Front-matter `annexures: Vec<String>` replaced with `exhibits: Vec<Exhibit>` (objects with `title` field).
 - **Configurable defined term style** — `defined_term_style` in style TOML: `bold` (default), `quoted` (curly quotes, no bold), or `bold_quoted`. Applies to all `**bold**` text in body, preamble party roles/short_title, and custom templates.
 - **Parties preamble** — parties preamble block renders before the contract body (independent of cover page). Three styles: `simple` (block layout), `prose` (single flowing paragraph), and `custom` (user-defined templates with `{title}`, `{short_title}`, `{date}`, `{name}`, `{specifier}`, `{role}` placeholders, `**bold**` markers, `\n` for paragraph breaks). Configured via `[preamble]` section in style TOML. Default disabled.
 - **`short_title` front-matter field** — optional (defaults to "Agreement"), used in preamble text, automatically treated as a defined term.
@@ -57,11 +58,11 @@
 - **Promoted `date_format` to top-level** — single `date_format` (default `%e %B %Y`) used by cover page, preamble, and any future date rendering. Removed from `[cover]`.
 - **Centred inline title** — when cover page is disabled, the title is centre-aligned. Status/version and date lines removed (handled by preamble/watermark/footer).
 - **Sub-heading numbering styling** — clause numbers on heading paragraphs now inherit bold + heading size via paragraph `rPr`, so `###` sub-heading numbers match the heading text.
-- **Simple numbered lists in annexures** — ordered lists without headings or nested sub-lists are now rendered as plain numbered lists (`1.`, `2.`, `3.`) rather than being fed through the clause numbering system.
+- **Simple numbered lists in addenda** — ordered lists without headings or nested sub-lists are now rendered as plain numbered lists (`1.`, `2.`, `3.`) rather than being fed through the clause numbering system.
 - **Cover page / TOC toggles** — `[cover] enabled` and `[toc] enabled` in style TOML (default true). Without cover page, an inline title block is rendered. See `planning/cover-page-toc-toggles.md`.
 - **Configurable cover page** — `[cover]` section in style TOML: title_size, date_format, between_label, party_format, show_ref, show_author, show_status. See `planning/configurable-cover-page.md`.
 - **Footer config** — `[footer]` section in style TOML: show_ref, show_page_number, show_version (appends version to ref). See `planning/footer-and-schedule-config.md`.
-- **Schedule position** — `schedule_position` in style TOML: `end` (default, after annexures) or `after_toc` (before contract body). See `planning/footer-and-schedule-config.md`.
+- **Schedule position** — `schedule_position` in style TOML: `end` (default, after addenda/exhibits) or `after_toc` (before contract body). See `planning/footer-and-schedule-config.md`.
 - **Draft watermark** when `status: draft` — VML WordArt shape injected via ZIP post-processing of the .docx output. See `planning/draft-watermark.md` for details.
 - **Native Word numbering** — replaced text-prefix numbers with Word's native numbering engine (`AbstractNumbering` + `Numbering` via docx-rs). See `planning/native-word-numbering.md` for details.
 
@@ -88,8 +89,8 @@ Document
         Item
           Paragraph       ← clause text with Strong/Link/Text children
           List(ordered)   ← sub-sub-clauses (recursive)
-  Heading(level=1)        ← # ANNEX headings
-  Paragraph               ← prose/annexure content
+  Heading(level=1)        ← # ADDENDUM headings
+  Paragraph               ← prose/addendum content
   Table                   ← markdown tables
 ```
 

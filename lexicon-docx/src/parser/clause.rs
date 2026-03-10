@@ -5,36 +5,36 @@ use super::anchors::strip_anchor;
 
 /// Walk a comrak AST and extract the document body as a list of BodyElements.
 /// `root` should be the Document node from comrak.
-pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Annexure>) {
+pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendum>) {
     let mut body = Vec::new();
-    let mut annexures = Vec::new();
-    let mut in_annexure: Option<Annexure> = None;
+    let mut addenda = Vec::new();
+    let mut in_addendum: Option<Addendum> = None;
 
     for child in root.children() {
         let data = child.data.borrow();
         match &data.value {
-            // Top-level heading (# ANNEX ...) marks annexure start
+            // Top-level heading (# ADDENDUM ...) marks addendum start
             NodeValue::Heading(h) if h.level == 1 => {
-                // Save previous annexure if any
-                if let Some(annex) = in_annexure.take() {
-                    annexures.push(annex);
+                // Save previous addendum if any
+                if let Some(add) = in_addendum.take() {
+                    addenda.push(add);
                 }
                 let heading_text = collect_plain_text(child);
-                in_annexure = Some(Annexure {
+                in_addendum = Some(Addendum {
                     heading: heading_text,
                     content: Vec::new(),
                 });
             }
 
-            // Ordered list at top level = clause structure (or simple numbered list in annexures)
+            // Ordered list at top level = clause structure (or simple numbered list in addenda)
             NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Ordered => {
-                if let Some(ref mut annex) = in_annexure {
+                if let Some(ref mut add) = in_addendum {
                     if is_clause_list(child) {
                         let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
-                        annex.content.push(AnnexureContent::ClauseList(clauses));
+                        add.content.push(AddendumContent::ClauseList(clauses));
                     } else {
                         let items = extract_bullet_list(child);
-                        annex.content.push(AnnexureContent::NumberedList(items));
+                        add.content.push(AddendumContent::NumberedList(items));
                     }
                 } else {
                     let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
@@ -48,35 +48,35 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Annexur
             NodeValue::Paragraph => {
                 let inlines = extract_inlines(child);
                 if !inlines.is_empty() {
-                    if let Some(ref mut annex) = in_annexure {
-                        annex.content.push(AnnexureContent::Paragraph(inlines));
+                    if let Some(ref mut add) = in_addendum {
+                        add.content.push(AddendumContent::Paragraph(inlines));
                     } else {
                         body.push(BodyElement::Prose(inlines));
                     }
                 }
             }
 
-            // Headings inside annexures (## or ###)
+            // Headings inside addenda (## or ###)
             NodeValue::Heading(h) if h.level >= 2 => {
-                if let Some(ref mut annex) = in_annexure {
+                if let Some(ref mut add) = in_addendum {
                     let inlines = extract_inlines(child);
-                    annex.content.push(AnnexureContent::Heading(h.level, inlines));
+                    add.content.push(AddendumContent::Heading(h.level, inlines));
                 }
             }
 
             // Tables
             NodeValue::Table(_) => {
                 let table = extract_table(child);
-                if let Some(ref mut annex) = in_annexure {
-                    annex.content.push(AnnexureContent::Table(table));
+                if let Some(ref mut add) = in_addendum {
+                    add.content.push(AddendumContent::Table(table));
                 }
             }
 
-            // Bullet lists in annexures
+            // Bullet lists in addenda
             NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Bullet => {
-                if let Some(ref mut annex) = in_annexure {
+                if let Some(ref mut add) = in_addendum {
                     let items = extract_bullet_list(child);
-                    annex.content.push(AnnexureContent::BulletList(items));
+                    add.content.push(AddendumContent::BulletList(items));
                 }
             }
 
@@ -84,12 +84,12 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Annexur
         }
     }
 
-    // Save last annexure
-    if let Some(annex) = in_annexure {
-        annexures.push(annex);
+    // Save last addendum
+    if let Some(add) = in_addendum {
+        addenda.push(add);
     }
 
-    (body, annexures)
+    (body, addenda)
 }
 
 /// Check if an ordered list contains clause structure (headings or nested sub-lists).

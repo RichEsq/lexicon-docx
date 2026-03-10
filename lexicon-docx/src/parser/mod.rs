@@ -20,13 +20,13 @@ pub fn parse(input: &str) -> Result<Document> {
     opts.extension.superscript = true;
     let root = parse_document(&arena, &body, &opts);
 
-    // Extract clause structure and annexures
-    let (body_elements, annexures) = clause::extract_body(root);
+    // Extract clause structure and addenda
+    let (body_elements, addenda) = clause::extract_body(root);
 
     Ok(Document {
         meta,
         body: body_elements,
-        annexures,
+        addenda,
         schedule_items: Vec::new(),
         diagnostics,
     })

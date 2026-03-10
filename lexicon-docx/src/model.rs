@@ -6,7 +6,7 @@ use serde::Deserialize;
 pub struct Document {
     pub meta: DocumentMeta,
     pub body: Vec<BodyElement>,
-    pub annexures: Vec<Annexure>,
+    pub addenda: Vec<Addendum>,
     pub schedule_items: Vec<ScheduleItem>,
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -23,7 +23,12 @@ pub struct DocumentMeta {
     pub version: Option<u32>,
     pub parties: Vec<Party>,
     #[serde(default)]
-    pub annexures: Vec<String>,
+    pub exhibits: Vec<Exhibit>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Exhibit {
+    pub title: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -169,13 +174,13 @@ pub struct Table {
 }
 
 #[derive(Debug)]
-pub struct Annexure {
+pub struct Addendum {
     pub heading: String,
-    pub content: Vec<AnnexureContent>,
+    pub content: Vec<AddendumContent>,
 }
 
 #[derive(Debug)]
-pub enum AnnexureContent {
+pub enum AddendumContent {
     Paragraph(Vec<InlineContent>),
     Heading(u8, Vec<InlineContent>),
     ClauseList(Vec<Clause>),

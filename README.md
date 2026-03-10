@@ -12,7 +12,7 @@ Lexicon Markdown extends standard Markdown with conventions for legal documents.
 - **Cross-reference resolution** — anchors like `{#termination}` and links like `[clause 3](#termination)` are auto-resolved to correct clause numbers
 - **Defined term validation** — `**Confidential Information** means ...` defines a term; the processor warns if it's never used
 - **Cover pages, TOC, headers/footers** — generated from YAML front-matter metadata
-- **Schedule generation** — variable values collected into a schedule annexure
+- **Schedule generation** — variable values collected into a schedule page
 - **Draft watermarks** — automatic "DRAFT" watermark when `status: draft`
 
 Without a processor, Lexicon Markdown reads as a clean, well-structured document. With a processor, it becomes a production-ready legal contract.
@@ -114,7 +114,7 @@ cargo run -- build ../example.md --strict
 | Legal numbering | Native Word numbering: `1.`, `1.1`, `(a)`, `(i)` |
 | Cross-references | `{#id}` anchors resolved to clause numbers |
 | Defined terms | Bold terms validated for usage; warnings for unused terms |
-| Schedule annexures | Reference-link items collected into a schedule table |
+| Schedule page | Reference-link items collected into a schedule table |
 | Draft watermark | Diagonal "DRAFT" watermark when `status: draft` |
 | Headers/footers | Document ref and page numbering on all pages |
 | Configurable layout | `cover_page` and `toc` booleans; TOML style overrides |
@@ -135,8 +135,8 @@ parties:                       # required
   - name: Party Name
     specifier: ACN 123 456 789 # optional
     role: Buyer                # used as a defined term
-annexures:                     # optional
-  - Annexure Title
+exhibits:                      # optional
+  - title: Exhibit Title
 ---
 ```
 
@@ -148,7 +148,7 @@ The full Lexicon Markdown specification is in [`spec.md`](spec.md). It covers:
 - Defined terms and term validation rules
 - Cross-reference anchors and resolution
 - Schedule items and reference-link syntax
-- Annexure declarations and content
+- Addenda and exhibit declarations
 - Processor capabilities and validation requirements
 
 ## License
