@@ -8,7 +8,7 @@ use docx_rs::{
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
-use crate::style::{PartyFormat, PreambleStyle, SchedulePosition, StyleConfig};
+use crate::style::{DefinedTermStyle, PartyFormat, PreambleStyle, SchedulePosition, StyleConfig};
 
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
 const ABSTRACT_NUM_ID: usize = 2;
@@ -328,7 +328,7 @@ fn add_inline_run(
     inline: &InlineContent,
     heading_bold: bool,
     size: usize,
-    _style: &StyleConfig,
+    style: &StyleConfig,
     color: Option<&str>,
 ) -> Paragraph {
     // Helper: apply heading formatting (bold + optional color) to a run
@@ -344,9 +344,7 @@ fn add_inline_run(
             para.add_run(run)
         }
         InlineContent::Bold(t) => {
-            let mut run = Run::new().add_text(t).bold().size(size);
-            if let Some(c) = color { run = run.color(c); }
-            para.add_run(run)
+            render_defined_term(para, t, size, color, &style.defined_term_style)
         }
         InlineContent::Italic(t) => {
             para.add_run(Run::new().add_text(t).italic().size(size))
@@ -395,6 +393,33 @@ fn add_inline_run(
         }
         InlineContent::LineBreak => {
             para.add_run(Run::new().add_break(BreakType::TextWrapping))
+        }
+    }
+}
+
+/// Render a defined term according to the configured style.
+fn render_defined_term(
+    para: Paragraph,
+    text: &str,
+    size: usize,
+    color: Option<&str>,
+    term_style: &DefinedTermStyle,
+) -> Paragraph {
+    match term_style {
+        DefinedTermStyle::Bold => {
+            let mut run = Run::new().add_text(text).bold().size(size);
+            if let Some(c) = color { run = run.color(c); }
+            para.add_run(run)
+        }
+        DefinedTermStyle::Quoted => {
+            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", text)).size(size);
+            if let Some(c) = color { run = run.color(c); }
+            para.add_run(run)
+        }
+        DefinedTermStyle::BoldQuoted => {
+            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", text)).bold().size(size);
+            if let Some(c) = color { run = run.color(c); }
+            para.add_run(run)
         }
     }
 }
@@ -782,6 +807,8 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
 
     match style.preamble.style {
         PreambleStyle::Simple => {
+            let term_bold = !matches!(style.defined_term_style, DefinedTermStyle::Quoted);
+
             // Opening line: This [title] ("[short_title]") is dated [date] between
             let between_word = if meta.parties.len() == 1 { "by" } else { "between" };
             let mut opening = Paragraph::new();
@@ -790,12 +817,9 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                     .add_text(format!("This {} (\"", &meta.title))
                     .size(body_half_pts),
             );
-            opening = opening.add_run(
-                Run::new()
-                    .add_text(short_title)
-                    .bold()
-                    .size(body_half_pts),
-            );
+            let mut st_run = Run::new().add_text(short_title).size(body_half_pts);
+            if term_bold { st_run = st_run.bold(); }
+            opening = opening.add_run(st_run);
             opening = opening.add_run(
                 Run::new()
                     .add_text(format!("\") is dated {} {}", &formatted_date, between_word))
@@ -827,12 +851,9 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                         .add_text(" (\"")
                         .size(body_half_pts),
                 );
-                para = para.add_run(
-                    Run::new()
-                        .add_text(&party.role)
-                        .bold()
-                        .size(body_half_pts),
-                );
+                let mut role_run = Run::new().add_text(&party.role).size(body_half_pts);
+                if term_bold { role_run = role_run.bold(); }
+                para = para.add_run(role_run);
                 para = para.add_run(
                     Run::new()
                         .add_text("\")")
@@ -855,6 +876,8 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             docx = docx.add_paragraph(Paragraph::new());
         }
         PreambleStyle::Prose => {
+            let term_bold = !matches!(style.defined_term_style, DefinedTermStyle::Quoted);
+
             // Single paragraph: This [title] ("[short_title]"), is entered into as of [date]
             // between [party1] and [party2].
             let mut para = Paragraph::new();
@@ -863,12 +886,9 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                     .add_text(format!("This {} (\"", &meta.title))
                     .size(body_half_pts),
             );
-            para = para.add_run(
-                Run::new()
-                    .add_text(short_title)
-                    .bold()
-                    .size(body_half_pts),
-            );
+            let mut st_run = Run::new().add_text(short_title).size(body_half_pts);
+            if term_bold { st_run = st_run.bold(); }
+            para = para.add_run(st_run);
             para = para.add_run(
                 Run::new()
                     .add_text(format!(
@@ -899,12 +919,9 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                         .add_text(" (\"")
                         .size(body_half_pts),
                 );
-                para = para.add_run(
-                    Run::new()
-                        .add_text(&party.role)
-                        .bold()
-                        .size(body_half_pts),
-                );
+                let mut role_run = Run::new().add_text(&party.role).size(body_half_pts);
+                if term_bold { role_run = role_run.bold(); }
+                para = para.add_run(role_run);
                 para = para.add_run(
                     Run::new()
                         .add_text("\")")
@@ -951,7 +968,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             for line in expanded_template.split("\\n") {
                 let cleaned = clean_empty_parens(line);
                 docx = docx.add_paragraph(
-                    render_template_paragraph(&cleaned, body_half_pts),
+                    render_template_paragraph(&cleaned, body_half_pts, &style.defined_term_style),
                 );
             }
 
@@ -975,7 +992,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                 };
 
                 docx = docx.add_paragraph(
-                    render_template_paragraph(&line, body_half_pts),
+                    render_template_paragraph(&line, body_half_pts, &style.defined_term_style),
                 );
             }
 
@@ -988,7 +1005,8 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
 }
 
 /// Parse a template string with `**bold**` markers into a paragraph of Runs.
-fn render_template_paragraph(text: &str, size: usize) -> Paragraph {
+/// Bold markers represent defined terms and are rendered according to `term_style`.
+fn render_template_paragraph(text: &str, size: usize, term_style: &DefinedTermStyle) -> Paragraph {
     let mut para = Paragraph::new();
     let mut remaining = text;
 
@@ -1003,10 +1021,8 @@ fn render_template_paragraph(text: &str, size: usize) -> Paragraph {
         // Find the closing **
         let after_open = &remaining[start + 2..];
         if let Some(end) = after_open.find("**") {
-            let bold_text = &after_open[..end];
-            para = para.add_run(
-                Run::new().add_text(bold_text).bold().size(size),
-            );
+            let term_text = &after_open[..end];
+            para = render_defined_term(para, term_text, size, None, term_style);
             remaining = &after_open[end + 2..];
         } else {
             // No closing **, treat rest as plain text

@@ -22,6 +22,7 @@ pub struct StyleConfig {
     pub hanging_indent_cm: f32,
     pub align_first_level: bool,
     pub brand_color: Option<String>,
+    pub defined_term_style: DefinedTermStyle,
     pub cover: CoverConfig,
     pub toc: TocConfig,
     pub footer: FooterConfig,
@@ -165,6 +166,20 @@ impl Default for PageSize {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DefinedTermStyle {
+    Bold,
+    Quoted,
+    BoldQuoted,
+}
+
+impl Default for DefinedTermStyle {
+    fn default() -> Self {
+        DefinedTermStyle::Bold
+    }
+}
+
 impl Default for StyleConfig {
     fn default() -> Self {
         StyleConfig {
@@ -184,6 +199,7 @@ impl Default for StyleConfig {
             hanging_indent_cm: 1.27,
             align_first_level: false,
             brand_color: None,
+            defined_term_style: DefinedTermStyle::default(),
             cover: CoverConfig::default(),
             toc: TocConfig::default(),
             footer: FooterConfig::default(),

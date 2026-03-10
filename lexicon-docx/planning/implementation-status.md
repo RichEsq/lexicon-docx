@@ -50,6 +50,7 @@
 (None currently planned — see planning docs for future work.)
 
 ### Recently completed
+- **Configurable defined term style** — `defined_term_style` in style TOML: `bold` (default), `quoted` (curly quotes, no bold), or `bold_quoted`. Applies to all `**bold**` text in body, preamble party roles/short_title, and custom templates.
 - **Parties preamble** — when cover page is disabled, a parties preamble block renders after the inline title. Two styles: `simple` (block layout with BETWEEN/AND) and `prose` (single flowing paragraph). Configured via `[preamble]` section in style TOML. New `short_title` front-matter field (defaults to "Agreement") is auto-treated as a defined term.
 - **Sub-heading numbering styling** — clause numbers on heading paragraphs now inherit bold + heading size via paragraph `rPr`, so `###` sub-heading numbers match the heading text.
 - **Simple numbered lists in annexures** — ordered lists without headings or nested sub-lists are now rendered as plain numbered lists (`1.`, `2.`, `3.`) rather than being fed through the clause numbering system.
