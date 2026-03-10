@@ -2,8 +2,8 @@ use docx_rs::{
     AbstractNumbering, AlignmentType, BreakType, Docx, Footer, Header, IndentLevel,
     Level, LevelJc, LevelOverride, LevelText, LineSpacing, LineSpacingType, NumberFormat,
     NumberingId, NumPages, Numbering, PageMargin, PageNum, Paragraph, Run, RunFonts,
-    SpecialIndentType, Start, Tab, TabValueType, Table as DocxTable, TableCell,
-    TableOfContents, TableRow, VertAlignType, WidthType,
+    RunProperty, SpecialIndentType, Start, Tab, TabValueType, Table as DocxTable,
+    TableCell, TableOfContents, TableRow, VertAlignType, WidthType,
 };
 
 use crate::error::{LexiconError, Result};
@@ -154,7 +154,8 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
         let mut para = Paragraph::new()
             .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
             .outline_lvl(outline_level_for(clause.level))
-            .keep_next(true);
+            .keep_next(true)
+            .run_property(RunProperty::new().bold().size(heading_size));
 
         // Heading inline content — Word generates the number
         for inline in &heading.text {
