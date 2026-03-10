@@ -12,7 +12,7 @@ Lexicon Markdown extends standard Markdown with conventions for legal documents.
 - **Cross-reference resolution** — anchors like `{#termination}` and links like `[clause 3](#termination)` are auto-resolved to correct clause numbers
 - **Defined term validation** — `**Confidential Information** means ...` defines a term; the processor warns if it's never used
 - **Cover pages, TOC, headers/footers** — generated from YAML front-matter metadata
-- **Schedule generation** — variable values collected into a schedule page
+- **Schedule generation** — defined terms referencing a schedule are auto-collected into a schedule page
 - **Draft watermarks** — automatic "DRAFT" watermark when `status: draft`
 
 Without a processor, Lexicon Markdown reads as a clean, well-structured document. With a processor, it becomes a production-ready legal contract.
@@ -40,6 +40,7 @@ Lexicon Markdown makes contracts a first-class input and output format for AI-as
 ```markdown
 ---
 title: Deed of Release
+short_title: Deed
 date: 2026-01-15
 status: draft
 parties:
@@ -48,20 +49,24 @@ parties:
   - name: Acme Corp
     specifier: ACN 123 456 789
     role: Employer
+schedule:
+  - title: Schedule
 ---
 
 1. ## Definitions {#definitions}
 
     1. **Claim** means any and all claims, demands, or causes of action.
 
-    1. **Confidential Information** means all information disclosed
+    2. **Confidential Information** means all information disclosed
        by one party to the other.
+
+    3. **Payment** has the meaning given by the Schedule.
 
 2. ## Release {#release}
 
-    1. The **Employee** releases the **Employer** from all Claims.
+    1. The Employee releases the Employer from all Claims.
 
-    1. The obligations in [clause 1](#definitions) survive termination.
+    2. The obligations in [clause 1](#definitions) survive termination.
 
         1. This includes any Confidential Information held by the Employee.
 ```
@@ -114,29 +119,33 @@ cargo run -- build ../example.md --strict
 | Legal numbering | Native Word numbering: `1.`, `1.1`, `(a)`, `(i)` |
 | Cross-references | `{#id}` anchors resolved to clause numbers |
 | Defined terms | Bold terms validated for usage; warnings for unused terms |
-| Schedule page | Reference-link items collected into a schedule table |
+| Schedule page | Defined terms referencing a schedule auto-collected into a completion table |
 | Draft watermark | Diagonal "DRAFT" watermark when `status: draft` |
 | Headers/footers | Document ref and page numbering on all pages |
-| Configurable layout | `cover_page` and `toc` booleans; TOML style overrides |
+| Parties preamble | Configurable intro block with party details before the body |
+| Exhibit pages | Placeholder pages or imported images/PDFs for exhibited documents |
+| Configurable layout | TOML style overrides for cover page, TOC, footer, numbering, and more |
 
 ## Front-Matter Fields
 
 ```yaml
 ---
 title: Contract Title          # required
+short_title: Agreement         # optional, defaults to "Agreement"
 date: 2026-01-15               # required, YYYY-MM-DD
 ref: "ABC:123"                 # optional, drafter's reference
 author: Jane Doe (Law Firm)    # optional
 status: draft                  # optional: draft | final | executed
 version: 2                     # optional, positive integer
-cover_page: true               # optional, default true
-toc: true                      # optional, default true
 parties:                       # required
   - name: Party Name
     specifier: ACN 123 456 789 # optional
     role: Buyer                # used as a defined term
 exhibits:                      # optional
   - title: Exhibit Title
+    path: ./diagram.png        # optional: local path or URL to PNG/JPG/PDF
+schedule:                      # optional
+  - title: Schedule            # generates a schedule page from defined terms
 ---
 ```
 
@@ -147,7 +156,7 @@ The full Lexicon Markdown specification is in [`spec.md`](spec.md). It covers:
 - Document structure and clause hierarchy
 - Defined terms and term validation rules
 - Cross-reference anchors and resolution
-- Schedule items and reference-link syntax
+- Schedule declaration and phrase-based item detection
 - Addenda and exhibit declarations
 - Processor capabilities and validation requirements
 
