@@ -238,11 +238,12 @@ fn empty_cell(col_width: usize) -> TableCell {
 }
 
 /// Parse a template string with `**bold**` markers into a paragraph.
-/// Replicates the logic from render_template_paragraph in docx.rs.
+/// Bold in signature intros is always rendered as bold (not as defined term style),
+/// since this is emphasis, not a term definition.
 fn render_intro_paragraph(
     text: &str,
     size: usize,
-    term_style: &DefinedTermStyle,
+    _term_style: &DefinedTermStyle,
 ) -> Paragraph {
     let mut para = Paragraph::new();
     let mut remaining = text;
@@ -257,22 +258,7 @@ fn render_intro_paragraph(
         let after_open = &remaining[start + 2..];
         if let Some(end) = after_open.find("**") {
             let term_text = &after_open[..end];
-            para = match term_style {
-                DefinedTermStyle::Bold => {
-                    para.add_run(Run::new().add_text(term_text).bold().size(size))
-                }
-                DefinedTermStyle::Quoted => para.add_run(
-                    Run::new()
-                        .add_text(format!("\u{201C}{}\u{201D}", term_text))
-                        .size(size),
-                ),
-                DefinedTermStyle::BoldQuoted => para.add_run(
-                    Run::new()
-                        .add_text(format!("\u{201C}{}\u{201D}", term_text))
-                        .bold()
-                        .size(size),
-                ),
-            };
+            para = para.add_run(Run::new().add_text(term_text).bold().size(size));
             remaining = &after_open[end + 2..];
         } else {
             para = para.add_run(Run::new().add_text(remaining).size(size));
