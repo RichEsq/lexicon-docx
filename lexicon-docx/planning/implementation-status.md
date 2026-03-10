@@ -54,6 +54,8 @@
 - **Simple numbered lists in annexures** — ordered lists without headings or nested sub-lists are now rendered as plain numbered lists (`1.`, `2.`, `3.`) rather than being fed through the clause numbering system.
 - **Cover page / TOC toggles** — `[cover] enabled` and `[toc] enabled` in style TOML (default true). Without cover page, an inline title block is rendered. See `planning/cover-page-toc-toggles.md`.
 - **Configurable cover page** — `[cover]` section in style TOML: title_size, date_format, between_label, party_format, show_ref, show_author, show_status. See `planning/configurable-cover-page.md`.
+- **Footer config** — `[footer]` section in style TOML: show_ref, show_page_number, show_version (appends version to ref). See `planning/footer-and-schedule-config.md`.
+- **Schedule position** — `schedule_position` in style TOML: `end` (default, after annexures) or `after_toc` (before contract body). See `planning/footer-and-schedule-config.md`.
 - **Draft watermark** when `status: draft` — VML WordArt shape injected via ZIP post-processing of the .docx output. See `planning/draft-watermark.md` for details.
 - **Native Word numbering** — replaced text-prefix numbers with Word's native numbering engine (`AbstractNumbering` + `Numbering` via docx-rs). See `planning/native-word-numbering.md` for details.
 

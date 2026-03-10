@@ -113,10 +113,11 @@ Future work and design notes are in `lexicon-docx/planning/`:
 - `native-word-numbering.md` — native Word numbering (implemented)
 - `draft-watermark.md` — draft watermark via VML injection (implemented)
 - `cover-page-toc-toggles.md` — cover page and TOC toggles in style TOML (implemented)
+- `footer-and-schedule-config.md` — footer config options and schedule position (implemented)
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedule annexures, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedule annexures, TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 

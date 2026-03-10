@@ -497,7 +497,7 @@ A processor renders these as formatted tables in the output document.
 
 ### 8.1. Declaration
 
-Annexures are declared in the front-matter `annexures` field (see section 2.2.10).
+Annexures are declared in the front-matter `annexures` field (see section 2.2.8).
 
 ### 8.2. Content
 

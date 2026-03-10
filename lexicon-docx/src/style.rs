@@ -23,6 +23,8 @@ pub struct StyleConfig {
     pub brand_color: Option<String>,
     pub cover: CoverConfig,
     pub toc: TocConfig,
+    pub footer: FooterConfig,
+    pub schedule_position: SchedulePosition,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -80,6 +82,37 @@ impl Default for TocConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct FooterConfig {
+    pub show_ref: bool,
+    pub show_page_number: bool,
+    pub show_version: bool,
+}
+
+impl Default for FooterConfig {
+    fn default() -> Self {
+        FooterConfig {
+            show_ref: true,
+            show_page_number: true,
+            show_version: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SchedulePosition {
+    End,
+    AfterToc,
+}
+
+impl Default for SchedulePosition {
+    fn default() -> Self {
+        SchedulePosition::End
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PageSize {
     A4,
@@ -112,6 +145,8 @@ impl Default for StyleConfig {
             brand_color: None,
             cover: CoverConfig::default(),
             toc: TocConfig::default(),
+            footer: FooterConfig::default(),
+            schedule_position: SchedulePosition::default(),
         }
     }
 }

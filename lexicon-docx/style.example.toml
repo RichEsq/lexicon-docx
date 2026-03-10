@@ -25,6 +25,9 @@ align_first_level = false     # true: levels 0 and 1 share the same indent
 # Branding
 # brand_color = "#2E5090"     # web colour for title and ## heading text
 
+# Schedule placement
+schedule_position = "end"     # "end" (after annexures) or "after_toc" (before contract body)
+
 # Cover page
 [cover]
 enabled = true                # false: inline title block instead of full cover page
@@ -35,6 +38,12 @@ party_format = "name_spec_role" # "name_spec_role", "name_role", or "name_only"
 show_ref = true               # show reference number on cover
 show_author = true            # show author/firm on cover
 show_status = true            # show status and version on cover
+
+# Footer
+[footer]
+show_ref = true               # show reference number in footer
+show_page_number = true        # show "Page X of Y" in footer
+show_version = false           # append version to ref, e.g. "Ref: OK:RP:20260115v3"
 
 # Table of contents
 [toc]

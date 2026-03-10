@@ -8,7 +8,7 @@ use docx_rs::{
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
-use crate::style::{PartyFormat, StyleConfig};
+use crate::style::{PartyFormat, SchedulePosition, StyleConfig};
 
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
 const ABSTRACT_NUM_ID: usize = 2;
@@ -47,28 +47,53 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID))
         .add_abstract_numbering(create_simple_list_numbering(style));
 
-    // Footer: ref on left, page numbers on right
+    // Footer
     let footer_size = StyleConfig::pt_to_half_points(style.font_size - 2.0);
     let mut default_footer = Footer::new();
+    let has_ref = style.footer.show_ref && doc.meta.ref_.is_some();
+    let has_page = style.footer.show_page_number;
+
     let right_tab_pos = (style.page_width_twips() as i32
         - StyleConfig::cm_to_twips(style.margin_left_cm)
         - StyleConfig::cm_to_twips(style.margin_right_cm)) as usize;
-    let mut footer_para = Paragraph::new()
-        .add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
-    if let Some(ref ref_) = doc.meta.ref_ {
-        footer_para = footer_para.add_run(
-            Run::new()
-                .add_text(format!("Ref: {}", ref_))
-                .size(footer_size)
-                .italic(),
-        );
+    let mut footer_para = Paragraph::new();
+
+    if has_ref && has_page {
+        footer_para = footer_para
+            .add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
     }
-    footer_para = footer_para
-        .add_run(Run::new().add_tab())
-        .add_run(Run::new().add_text("Page ").size(footer_size))
-        .add_page_num(PageNum::new())
-        .add_run(Run::new().add_text(" of ").size(footer_size))
-        .add_num_pages(NumPages::new());
+
+    if has_ref {
+        if let Some(ref ref_) = doc.meta.ref_ {
+            let ref_text = if style.footer.show_version {
+                if let Some(version) = doc.meta.version {
+                    format!("Ref: {}v{}", ref_, version)
+                } else {
+                    format!("Ref: {}", ref_)
+                }
+            } else {
+                format!("Ref: {}", ref_)
+            };
+            footer_para = footer_para.add_run(
+                Run::new()
+                    .add_text(ref_text)
+                    .size(footer_size)
+                    .italic(),
+            );
+        }
+    }
+
+    if has_page {
+        if has_ref {
+            footer_para = footer_para.add_run(Run::new().add_tab());
+        }
+        footer_para = footer_para
+            .add_run(Run::new().add_text("Page ").size(footer_size))
+            .add_page_num(PageNum::new())
+            .add_run(Run::new().add_text(" of ").size(footer_size))
+            .add_num_pages(NumPages::new());
+    }
+
     default_footer = default_footer.add_paragraph(footer_para);
     docx = docx.footer(default_footer);
 
@@ -102,6 +127,11 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         );
     }
 
+    // Schedule before body (if configured)
+    if matches!(style.schedule_position, SchedulePosition::AfterToc) && !doc.schedule_items.is_empty() {
+        docx = render_schedule(docx, &doc.schedule_items, style);
+    }
+
     // Prose before first clause (e.g., recitals)
     // Then clauses
     for element in &doc.body {
@@ -122,8 +152,8 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         docx = render_annexure(docx, annexure, style, &mut next_num_id);
     }
 
-    // Schedule annexure
-    if !doc.schedule_items.is_empty() {
+    // Schedule at end (if configured, this is the default)
+    if matches!(style.schedule_position, SchedulePosition::End) && !doc.schedule_items.is_empty() {
         docx = render_schedule(docx, &doc.schedule_items, style);
     }
 
