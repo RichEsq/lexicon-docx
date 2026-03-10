@@ -51,7 +51,7 @@ style = "simple"              # "simple", "prose", or "custom"
 #
 # Party template placeholders: {name}, {specifier}, {role}
 # Empty {specifier} automatically removes surrounding ()
-# party_template = "**{name}** ({specifier}) (\"{role}\")"
+# party_template = "{name} ({specifier}) (\"**{role}**\")"
 #
 # Separator appended to each party line except the last
 # party_separator = "; and"

@@ -813,7 +813,6 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                 para = para.add_run(
                     Run::new()
                         .add_text(&party.name)
-                        .bold()
                         .size(body_half_pts),
                 );
                 if let Some(ref spec) = party.specifier {
@@ -825,7 +824,18 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                 }
                 para = para.add_run(
                     Run::new()
-                        .add_text(format!(" (\"{}\")", &party.role))
+                        .add_text(" (\"")
+                        .size(body_half_pts),
+                );
+                para = para.add_run(
+                    Run::new()
+                        .add_text(&party.role)
+                        .bold()
+                        .size(body_half_pts),
+                );
+                para = para.add_run(
+                    Run::new()
+                        .add_text("\")")
                         .size(body_half_pts),
                 );
 
@@ -875,7 +885,6 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                 para = para.add_run(
                     Run::new()
                         .add_text(&party.name)
-                        .bold()
                         .size(body_half_pts),
                 );
                 if let Some(ref spec) = party.specifier {
@@ -887,7 +896,18 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                 }
                 para = para.add_run(
                     Run::new()
-                        .add_text(format!(" (\"{}\")", &party.role))
+                        .add_text(" (\"")
+                        .size(body_half_pts),
+                );
+                para = para.add_run(
+                    Run::new()
+                        .add_text(&party.role)
+                        .bold()
+                        .size(body_half_pts),
+                );
+                para = para.add_run(
+                    Run::new()
+                        .add_text("\")")
                         .size(body_half_pts),
                 );
 
