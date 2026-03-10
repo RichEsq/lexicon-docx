@@ -754,7 +754,7 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
     let mut title_run = Run::new()
         .add_text(&meta.title)
         .bold()
-        .size(StyleConfig::pt_to_half_points(style.preamble.title_size))
+        .size(StyleConfig::pt_to_half_points(style.title_size))
         .fonts(
             RunFonts::new()
                 .ascii(&style.heading_font_family)
@@ -956,7 +956,7 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
                     let mut run = Run::new()
                         .add_text(&meta.title)
                         .bold()
-                        .size(StyleConfig::pt_to_half_points(cover.title_size))
+                        .size(StyleConfig::pt_to_half_points(style.title_size))
                         .fonts(
                             RunFonts::new()
                                 .ascii(&style.heading_font_family)

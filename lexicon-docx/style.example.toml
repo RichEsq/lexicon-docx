@@ -6,6 +6,7 @@
 font_family = "Times New Roman"
 font_size = 12.0
 heading_font_family = "Times New Roman"
+title_size = 20.0             # document title (cover page or inline)
 heading1_size = 14.0          # ## headings
 heading2_size = 12.0          # ### headings
 line_spacing = 1.5
@@ -31,7 +32,6 @@ schedule_position = "end"     # "end" (after annexures) or "after_toc" (before c
 # Cover page
 [cover]
 enabled = true                # false: inline title block instead of full cover page
-title_size = 20.0             # cover page title font size in points
 date_format = "%e %B %Y"     # chrono format string (e.g. "%d/%m/%Y", "%B %d, %Y")
 between_label = "BETWEEN"    # heading above parties block
 party_format = "name_spec_role" # "name_spec_role", "name_role", or "name_only"
@@ -43,7 +43,6 @@ show_status = true            # show status and version on cover
 [preamble]
 enabled = false               # true: render a parties preamble block before the body
 style = "simple"              # "simple" (block with BETWEEN/AND) or "prose" (single paragraph)
-title_size = 18.0             # inline title font size in points (used when cover page is disabled)
 
 # Footer
 [footer]

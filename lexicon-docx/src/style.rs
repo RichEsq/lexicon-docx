@@ -9,6 +9,7 @@ pub struct StyleConfig {
     pub font_family: String,
     pub font_size: f32,
     pub heading_font_family: String,
+    pub title_size: f32,
     pub heading1_size: f32,
     pub heading2_size: f32,
     pub line_spacing: f32,
@@ -32,7 +33,6 @@ pub struct StyleConfig {
 #[serde(default)]
 pub struct CoverConfig {
     pub enabled: bool,
-    pub title_size: f32,
     pub date_format: String,
     pub between_label: String,
     pub party_format: PartyFormat,
@@ -45,7 +45,6 @@ impl Default for CoverConfig {
     fn default() -> Self {
         CoverConfig {
             enabled: true,
-            title_size: 20.0,
             date_format: "%e %B %Y".to_string(),
             between_label: "BETWEEN".to_string(),
             party_format: PartyFormat::default(),
@@ -135,7 +134,6 @@ impl Default for PreambleStyle {
 pub struct PreambleConfig {
     pub enabled: bool,
     pub style: PreambleStyle,
-    pub title_size: f32,
 }
 
 impl Default for PreambleConfig {
@@ -143,7 +141,6 @@ impl Default for PreambleConfig {
         PreambleConfig {
             enabled: false,
             style: PreambleStyle::Simple,
-            title_size: 18.0,
         }
     }
 }
@@ -167,6 +164,7 @@ impl Default for StyleConfig {
             font_family: "Times New Roman".to_string(),
             font_size: 12.0,
             heading_font_family: "Times New Roman".to_string(),
+            title_size: 20.0,
             heading1_size: 14.0,
             heading2_size: 12.0,
             line_spacing: 1.5,
