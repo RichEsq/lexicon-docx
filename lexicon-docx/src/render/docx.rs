@@ -238,7 +238,6 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
     let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
     let level_idx = numbering_level_for(clause.level);
-    let has_number = clause.number.is_some();
 
     // If this clause has a heading, render it as a heading paragraph with native numbering
     if let Some(ref heading) = clause.heading {
@@ -281,8 +280,10 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
             ClauseContent::Paragraph(inlines) => {
                 let body_size = StyleConfig::pt_to_half_points(style.font_size);
 
-                let mut para = if clause.heading.is_none() && first_content && has_number {
-                    // First content paragraph of a non-headed clause: attach numbering
+                let mut para = if clause.heading.is_none() && first_content {
+                    // First content paragraph of a non-headed clause: attach numbering.
+                    // Word's numbering engine handles the actual count — we don't need
+                    // an internally assigned clause.number for this to work.
                     first_content = false;
                     Paragraph::new()
                         .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
