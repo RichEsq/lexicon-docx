@@ -782,7 +782,8 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
 
     match style.preamble.style {
         PreambleStyle::Simple => {
-            // Opening line: This [title] ("[short_title]") is dated [date]
+            // Opening line: This [title] ("[short_title]") is dated [date] between
+            let between_word = if meta.parties.len() == 1 { "by" } else { "between" };
             let mut opening = Paragraph::new();
             opening = opening.add_run(
                 Run::new()
@@ -797,7 +798,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             );
             opening = opening.add_run(
                 Run::new()
-                    .add_text(format!("\") is dated {}", &formatted_date))
+                    .add_text(format!("\") is dated {} {}", &formatted_date, between_word))
                     .size(body_half_pts),
             );
             docx = docx.add_paragraph(opening);
@@ -805,20 +806,9 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             // Spacer
             docx = docx.add_paragraph(Paragraph::new());
 
-            // BETWEEN
-            docx = docx.add_paragraph(
-                Paragraph::new().add_run(
-                    Run::new()
-                        .add_text(&style.cover.between_label)
-                        .size(body_half_pts),
-                ),
-            );
-
             // Parties
+            let party_count = meta.parties.len();
             for (i, party) in meta.parties.iter().enumerate() {
-                docx = docx.add_paragraph(Paragraph::new());
-
-                // Party line: [name] ([specifier]) ("Role")
                 let mut para = Paragraph::new();
                 para = para.add_run(
                     Run::new()
@@ -838,19 +828,17 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                         .add_text(format!(" (\"{}\")", &party.role))
                         .size(body_half_pts),
                 );
-                docx = docx.add_paragraph(para);
 
-                // AND between parties
-                if i < meta.parties.len() - 1 {
-                    docx = docx.add_paragraph(Paragraph::new());
-                    docx = docx.add_paragraph(
-                        Paragraph::new().add_run(
-                            Run::new()
-                                .add_text("AND")
-                                .size(body_half_pts),
-                        ),
+                // "; and" suffix on all but the last party
+                if i < party_count - 1 {
+                    para = para.add_run(
+                        Run::new()
+                            .add_text("; and")
+                            .size(body_half_pts),
                     );
                 }
+
+                docx = docx.add_paragraph(para);
             }
 
             // Spacer after parties
