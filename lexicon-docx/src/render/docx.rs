@@ -901,7 +901,11 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             );
             para = para.add_run(
                 Run::new()
-                    .add_text(format!("\"), is entered into as of {} between ", &formatted_date))
+                    .add_text(format!(
+                        "\"), is entered into as of {} {} ",
+                        &formatted_date,
+                        if meta.parties.len() == 1 { "by" } else { "between" }
+                    ))
                     .size(body_half_pts),
             );
 
