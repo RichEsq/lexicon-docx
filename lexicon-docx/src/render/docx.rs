@@ -126,11 +126,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     } else {
         // Inline title at top of first page
         docx = render_inline_title(docx, doc, style);
-        if style.preamble.enabled {
-            docx = render_preamble(docx, doc, style);
-        } else {
-            docx = docx.add_paragraph(Paragraph::new());
-        }
+        docx = docx.add_paragraph(Paragraph::new());
     }
 
     let schedule_after_toc = matches!(style.schedule_position, SchedulePosition::AfterToc)
@@ -179,6 +175,11 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         docx = docx.add_paragraph(
             Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
         );
+    }
+
+    // Parties preamble (before body, after cover/TOC/schedule)
+    if style.preamble.enabled {
+        docx = render_preamble(docx, doc, style);
     }
 
     // Prose before first clause (e.g., recitals)

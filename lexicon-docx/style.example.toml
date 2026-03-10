@@ -39,9 +39,9 @@ show_ref = true               # show reference number on cover
 show_author = true            # show author/firm on cover
 show_status = true            # show status and version on cover
 
-# Parties preamble (rendered when cover page is disabled)
+# Parties preamble (rendered before the contract body)
 [preamble]
-enabled = true                # false: no parties block after inline title
+enabled = false               # true: render a parties preamble block before the body
 style = "simple"              # "simple" (block with BETWEEN/AND) or "prose" (single paragraph)
 
 # Footer

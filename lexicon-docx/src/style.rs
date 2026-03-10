@@ -140,7 +140,7 @@ pub struct PreambleConfig {
 impl Default for PreambleConfig {
     fn default() -> Self {
         PreambleConfig {
-            enabled: true,
+            enabled: false,
             style: PreambleStyle::Simple,
         }
     }
