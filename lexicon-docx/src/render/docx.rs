@@ -803,7 +803,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
     let meta = &doc.meta;
     let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
     let short_title = meta.short_title.as_deref().unwrap_or("Agreement");
-    let formatted_date = format_date_with_format(&meta.date, &style.cover.date_format);
+    let formatted_date = format_date_with_format(&meta.date, &style.date_format);
 
     match style.preamble.style {
         PreambleStyle::Simple => {
@@ -1112,7 +1112,7 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
     }
 
     // Date
-    let formatted_date = format_date_with_format(&meta.date, &cover.date_format);
+    let formatted_date = format_date_with_format(&meta.date, &style.date_format);
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)

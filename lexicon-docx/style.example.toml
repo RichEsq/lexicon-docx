@@ -26,6 +26,9 @@ align_first_level = false     # true: levels 0 and 1 share the same indent
 # Defined terms
 defined_term_style = "bold"   # "bold", "quoted" (curly quotes), or "bold_quoted"
 
+# Date formatting
+date_format = "%e %B %Y"     # chrono format string (e.g. "%d/%m/%Y", "%B %d, %Y")
+
 # Branding
 # brand_color = "#2E5090"     # web colour for title and ## heading text
 
@@ -35,7 +38,6 @@ schedule_position = "end"     # "end" (after annexures) or "after_toc" (before c
 # Cover page
 [cover]
 enabled = true                # false: inline title block instead of full cover page
-date_format = "%e %B %Y"     # chrono format string (e.g. "%d/%m/%Y", "%B %d, %Y")
 between_label = "BETWEEN"    # heading above parties block
 party_format = "name_spec_role" # "name_spec_role", "name_role", or "name_only"
 show_ref = true               # show reference number on cover

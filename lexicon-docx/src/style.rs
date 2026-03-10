@@ -22,6 +22,7 @@ pub struct StyleConfig {
     pub hanging_indent_cm: f32,
     pub align_first_level: bool,
     pub brand_color: Option<String>,
+    pub date_format: String,
     pub defined_term_style: DefinedTermStyle,
     pub cover: CoverConfig,
     pub toc: TocConfig,
@@ -34,7 +35,6 @@ pub struct StyleConfig {
 #[serde(default)]
 pub struct CoverConfig {
     pub enabled: bool,
-    pub date_format: String,
     pub between_label: String,
     pub party_format: PartyFormat,
     pub show_ref: bool,
@@ -46,7 +46,6 @@ impl Default for CoverConfig {
     fn default() -> Self {
         CoverConfig {
             enabled: true,
-            date_format: "%e %B %Y".to_string(),
             between_label: "BETWEEN".to_string(),
             party_format: PartyFormat::default(),
             show_ref: true,
@@ -199,6 +198,7 @@ impl Default for StyleConfig {
             hanging_indent_cm: 1.27,
             align_first_level: false,
             brand_color: None,
+            date_format: "%e %B %Y".to_string(),
             defined_term_style: DefinedTermStyle::default(),
             cover: CoverConfig::default(),
             toc: TocConfig::default(),
