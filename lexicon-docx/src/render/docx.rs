@@ -480,13 +480,14 @@ fn render_addendum(
         Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
     );
 
-    // Addendum heading
+    // Addendum heading (auto-numbered)
+    let heading_text = addendum.heading();
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)
             .add_run(
                 Run::new()
-                    .add_text(&addendum.heading)
+                    .add_text(&heading_text)
                     .bold()
                     .size(heading_size),
             ),

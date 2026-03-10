@@ -177,6 +177,7 @@ fn resolve_addendum_cross_refs(
     anchor_map: &HashMap<String, ClauseNumber>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let loc = addendum.heading();
     for content in &mut addendum.content {
         match content {
             AddendumContent::Paragraph(inlines) => {
@@ -184,7 +185,7 @@ fn resolve_addendum_cross_refs(
                     inlines,
                     anchor_map,
                     diagnostics,
-                    Some(&addendum.heading),
+                    Some(&loc),
                 );
             }
             AddendumContent::Heading(_, inlines) => {
@@ -192,7 +193,7 @@ fn resolve_addendum_cross_refs(
                     inlines,
                     anchor_map,
                     diagnostics,
-                    Some(&addendum.heading),
+                    Some(&loc),
                 );
             }
             AddendumContent::ClauseList(clauses) => {
@@ -207,7 +208,7 @@ fn resolve_addendum_cross_refs(
                         item_inlines,
                         anchor_map,
                         diagnostics,
-                        Some(&addendum.heading),
+                        Some(&loc),
                     );
                 }
             }
@@ -389,7 +390,8 @@ fn collect_clause_definitions(clause: &Clause, defs: &mut Vec<TermDefinition>) {
 }
 
 fn collect_addendum_definitions(addendum: &Addendum, defs: &mut Vec<TermDefinition>) {
-    let loc = Some(addendum.heading.as_str());
+    let heading = addendum.heading();
+    let loc = Some(heading.as_str());
     for content in &addendum.content {
         match content {
             AddendumContent::Paragraph(inlines) | AddendumContent::Heading(_, inlines) => {

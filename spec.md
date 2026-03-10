@@ -532,13 +532,17 @@ An addendum is an attached part of the contract that supplements but does not fo
 
 #### 8.1.1. Syntax
 
-Addendum content appears after the main contract body under a top-level heading:
+Addendum content appears after the main contract body under a top-level heading beginning with `ADDENDUM` (case-insensitive):
 
 ```markdown
-# ADDENDUM 1 - Details of Processing
+# ADDENDUM - Details of Processing
 
 This addendum includes details of processing...
 ```
+
+The heading may optionally include a number (`# ADDENDUM 1 - Title`), but a processor auto-numbers addenda sequentially regardless of any number in the source heading. The title text is extracted from after the dash separator (any of `-`, `–`, `—`).
+
+Any top-level heading (`#`) that does not begin with `ADDENDUM` will generate a warning. Only `ADDENDUM` headings are parsed as addendum content.
 
 #### 8.1.2. Content
 

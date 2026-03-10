@@ -1,29 +1,56 @@
 use comrak::nodes::{AstNode, NodeValue};
+use regex::Regex;
+use std::sync::LazyLock;
 
+use crate::error::{DiagLevel, Diagnostic};
 use crate::model::*;
 use super::anchors::strip_anchor;
 
+static ADDENDUM_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^addendum(?:\s+\d+)?(?:\s*[-–—]\s*(.*))?$").unwrap()
+});
+
 /// Walk a comrak AST and extract the document body as a list of BodyElements.
 /// `root` should be the Document node from comrak.
-pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendum>) {
+pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendum>, Vec<Diagnostic>) {
     let mut body = Vec::new();
     let mut addenda = Vec::new();
+    let mut diagnostics = Vec::new();
     let mut in_addendum: Option<Addendum> = None;
+    let mut addendum_counter = 0u32;
 
     for child in root.children() {
         let data = child.data.borrow();
         match &data.value {
-            // Top-level heading (# ADDENDUM ...) marks addendum start
+            // Top-level heading — check if it's an addendum
             NodeValue::Heading(h) if h.level == 1 => {
-                // Save previous addendum if any
-                if let Some(add) = in_addendum.take() {
-                    addenda.push(add);
-                }
+                drop(data);
                 let heading_text = collect_plain_text(child);
-                in_addendum = Some(Addendum {
-                    heading: heading_text,
-                    content: Vec::new(),
-                });
+
+                if let Some(caps) = ADDENDUM_RE.captures(&heading_text) {
+                    // Save previous addendum if any
+                    if let Some(add) = in_addendum.take() {
+                        addenda.push(add);
+                    }
+                    addendum_counter += 1;
+                    let title = caps.get(1)
+                        .map(|m| m.as_str().to_string())
+                        .unwrap_or_default();
+                    in_addendum = Some(Addendum {
+                        number: addendum_counter,
+                        title,
+                        content: Vec::new(),
+                    });
+                } else {
+                    diagnostics.push(Diagnostic {
+                        level: DiagLevel::Warning,
+                        message: format!(
+                            "Unrecognised top-level heading '# {}'. Top-level headings must begin with 'ADDENDUM'.",
+                            heading_text
+                        ),
+                        location: Some("document body".to_string()),
+                    });
+                }
             }
 
             // Ordered list at top level = clause structure (or simple numbered list in addenda)
@@ -89,7 +116,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendu
         addenda.push(add);
     }
 
-    (body, addenda)
+    (body, addenda, diagnostics)
 }
 
 /// Check if an ordered list contains clause structure (headings or nested sub-lists).

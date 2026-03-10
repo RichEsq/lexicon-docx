@@ -175,8 +175,20 @@ pub struct Table {
 
 #[derive(Debug)]
 pub struct Addendum {
-    pub heading: String,
+    pub number: u32,
+    pub title: String,
     pub content: Vec<AddendumContent>,
+}
+
+impl Addendum {
+    /// The full rendered heading, e.g. "ADDENDUM 1 - Details of Processing"
+    pub fn heading(&self) -> String {
+        if self.title.is_empty() {
+            format!("ADDENDUM {}", self.number)
+        } else {
+            format!("ADDENDUM {} - {}", self.number, self.title)
+        }
+    }
 }
 
 #[derive(Debug)]

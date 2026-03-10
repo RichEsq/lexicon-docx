@@ -11,7 +11,7 @@ pub fn parse(input: &str) -> Result<Document> {
     let FrontMatterResult {
         meta,
         body,
-        diagnostics,
+        mut diagnostics,
     } = frontmatter::parse_frontmatter(input)?;
 
     // Parse body with comrak
@@ -21,7 +21,8 @@ pub fn parse(input: &str) -> Result<Document> {
     let root = parse_document(&arena, &body, &opts);
 
     // Extract clause structure and addenda
-    let (body_elements, addenda) = clause::extract_body(root);
+    let (body_elements, addenda, parser_diags) = clause::extract_body(root);
+    diagnostics.extend(parser_diags);
 
     Ok(Document {
         meta,
