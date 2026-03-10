@@ -39,6 +39,11 @@ show_ref = true               # show reference number on cover
 show_author = true            # show author/firm on cover
 show_status = true            # show status and version on cover
 
+# Parties preamble (rendered when cover page is disabled)
+[preamble]
+enabled = true                # false: no parties block after inline title
+style = "simple"              # "simple" (block with BETWEEN/AND) or "prose" (single paragraph)
+
 # Footer
 [footer]
 show_ref = true               # show reference number in footer
