@@ -6,3 +6,4 @@
 4. Investigate whether annexures are cross-referenceable
 5. TOC doesn't work
 6. TOML config items: reference in footer boolean, page number in footer boolean, version number in footer boolean (appended to reference, e.g. Ref: OK:RP:20260115v3)
+7. TOML style config option for schedule position: end of document (current) or after the TOC
