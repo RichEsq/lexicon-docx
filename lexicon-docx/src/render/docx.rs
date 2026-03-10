@@ -807,22 +807,20 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
 
     match style.preamble.style {
         PreambleStyle::Simple => {
-            let term_bold = !matches!(style.defined_term_style, DefinedTermStyle::Quoted);
+            let term_style = &style.defined_term_style;
 
-            // Opening line: This [title] ("[short_title]") is dated [date] between
+            // Opening line: This [title] ([short_title]) is dated [date] between
             let between_word = if meta.parties.len() == 1 { "by" } else { "between" };
             let mut opening = Paragraph::new();
             opening = opening.add_run(
                 Run::new()
-                    .add_text(format!("This {} (\"", &meta.title))
+                    .add_text(format!("This {} (", &meta.title))
                     .size(body_half_pts),
             );
-            let mut st_run = Run::new().add_text(short_title).size(body_half_pts);
-            if term_bold { st_run = st_run.bold(); }
-            opening = opening.add_run(st_run);
+            opening = render_defined_term(opening, short_title, body_half_pts, None, term_style);
             opening = opening.add_run(
                 Run::new()
-                    .add_text(format!("\") is dated {} {}", &formatted_date, between_word))
+                    .add_text(format!(") is dated {} {}", &formatted_date, between_word))
                     .size(body_half_pts),
             );
             docx = docx.add_paragraph(opening);
@@ -848,15 +846,13 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                 }
                 para = para.add_run(
                     Run::new()
-                        .add_text(" (\"")
+                        .add_text(" (")
                         .size(body_half_pts),
                 );
-                let mut role_run = Run::new().add_text(&party.role).size(body_half_pts);
-                if term_bold { role_run = role_run.bold(); }
-                para = para.add_run(role_run);
+                para = render_defined_term(para, &party.role, body_half_pts, None, term_style);
                 para = para.add_run(
                     Run::new()
-                        .add_text("\")")
+                        .add_text(")")
                         .size(body_half_pts),
                 );
 
@@ -876,23 +872,21 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             docx = docx.add_paragraph(Paragraph::new());
         }
         PreambleStyle::Prose => {
-            let term_bold = !matches!(style.defined_term_style, DefinedTermStyle::Quoted);
+            let term_style = &style.defined_term_style;
 
-            // Single paragraph: This [title] ("[short_title]"), is entered into as of [date]
+            // Single paragraph: This [title] ([short_title]), is entered into as of [date]
             // between [party1] and [party2].
             let mut para = Paragraph::new();
             para = para.add_run(
                 Run::new()
-                    .add_text(format!("This {} (\"", &meta.title))
+                    .add_text(format!("This {} (", &meta.title))
                     .size(body_half_pts),
             );
-            let mut st_run = Run::new().add_text(short_title).size(body_half_pts);
-            if term_bold { st_run = st_run.bold(); }
-            para = para.add_run(st_run);
+            para = render_defined_term(para, short_title, body_half_pts, None, term_style);
             para = para.add_run(
                 Run::new()
                     .add_text(format!(
-                        "\"), is entered into as of {} {} ",
+                        "), is entered into as of {} {} ",
                         &formatted_date,
                         if meta.parties.len() == 1 { "by" } else { "between" }
                     ))
@@ -916,15 +910,13 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                 }
                 para = para.add_run(
                     Run::new()
-                        .add_text(" (\"")
+                        .add_text(" (")
                         .size(body_half_pts),
                 );
-                let mut role_run = Run::new().add_text(&party.role).size(body_half_pts);
-                if term_bold { role_run = role_run.bold(); }
-                para = para.add_run(role_run);
+                para = render_defined_term(para, &party.role, body_half_pts, None, term_style);
                 para = para.add_run(
                     Run::new()
-                        .add_text("\")")
+                        .add_text(")")
                         .size(body_half_pts),
                 );
 

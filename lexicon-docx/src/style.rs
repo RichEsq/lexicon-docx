@@ -146,8 +146,8 @@ impl Default for PreambleConfig {
         PreambleConfig {
             enabled: false,
             style: PreambleStyle::Simple,
-            template: "This {title} (\"**{short_title}**\") is dated {date} between".to_string(),
-            party_template: "{name} ({specifier}) (\"**{role}**\")".to_string(),
+            template: "This {title} (**{short_title}**) is dated {date} between".to_string(),
+            party_template: "{name} ({specifier}) (**{role}**)".to_string(),
             party_separator: "; and".to_string(),
         }
     }
