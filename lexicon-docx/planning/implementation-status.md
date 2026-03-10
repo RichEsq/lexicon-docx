@@ -52,7 +52,8 @@
 ### Recently completed
 - **Sub-heading numbering styling** — clause numbers on heading paragraphs now inherit bold + heading size via paragraph `rPr`, so `###` sub-heading numbers match the heading text.
 - **Simple numbered lists in annexures** — ordered lists without headings or nested sub-lists are now rendered as plain numbered lists (`1.`, `2.`, `3.`) rather than being fed through the clause numbering system.
-- **Cover page / TOC toggles** — `cover_page: bool` and `toc: bool` front-matter fields (default true). Without cover page, an inline title block is rendered. See `planning/cover-page-toc-toggles.md`.
+- **Cover page / TOC toggles** — `[cover] enabled` and `[toc] enabled` in style TOML (default true). Without cover page, an inline title block is rendered. See `planning/cover-page-toc-toggles.md`.
+- **Configurable cover page** — `[cover]` section in style TOML: title_size, date_format, between_label, party_format, show_ref, show_author, show_status. See `planning/configurable-cover-page.md`.
 - **Draft watermark** when `status: draft` — VML WordArt shape injected via ZIP post-processing of the .docx output. See `planning/draft-watermark.md` for details.
 - **Native Word numbering** — replaced text-prefix numbers with Word's native numbering engine (`AbstractNumbering` + `Numbering` via docx-rs). See `planning/native-word-numbering.md` for details.
 
@@ -85,7 +86,7 @@ Document
 ```
 
 ### Key Design Decisions
-- Clause numbers as text prefixes (not Word numbering engine) — simpler, more predictable
+- Clause numbers via Word's native numbering engine (`AbstractNumbering` + `Numbering`) — proper hanging indents, automatic counting, Word-native restyling
 - Single crate now, structured for workspace extraction later
 - comrak resolves reference links during parsing, so `[text][ref-id]` becomes `Link(url="#schedule", title="value")` — the ref-id is lost but title carries the value
 - Defined term matching uses multi-variant stemming, not a full NLP stemmer — pragmatic for legal text

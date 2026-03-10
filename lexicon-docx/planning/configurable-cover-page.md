@@ -1,47 +1,33 @@
 # Configurable Cover Page
 
-## Goal
+## Status: Implemented
 
-Make the cover page layout and content configurable via the style TOML file, so different firms/courts can customise the output.
+The cover page is now fully configurable via the `[cover]` section in the style TOML file.
 
-## What should be configurable
-
-### Layout
-- Element ordering (e.g., title, date, parties, ref — reorderable)
-- Spacing between elements
-- Alignment per element (currently all centered)
-- Whether to include a cover page at all (some contracts start directly with clauses)
-
-### Content
-- Title font size (currently 20pt, hardcoded)
-- "BETWEEN" label text (some jurisdictions use different wording)
-- Party block format (e.g., whether role appears as `(the "Employer")` or `("Employer")` or just `Employer`)
-- Date format (e.g., "15 January 2026" vs "15/01/2026" vs "January 15, 2026")
-- Whether to show ref, author, status, version on cover
-- Custom logo/image at top of cover page
-
-### Party specifier display
-- Whether specifier appears in parentheses, on a new line, or is hidden
-- Whether to include an ABN/ACN label prefix
-
-## Current implementation
-
-All cover page rendering is in `src/render/docx.rs` in the `render_cover_page` function. Styles are partially sourced from `StyleConfig` but most cover-specific formatting is hardcoded.
-
-## Approach
-
-Extend `StyleConfig` with a `[cover]` section in the TOML:
+## Configuration
 
 ```toml
 [cover]
-enabled = true
-title_size = 20.0
-date_format = "%e %B %Y"
-between_label = "BETWEEN"
-party_format = "name_spec_role"   # or "name_role", "name_only"
-show_ref = true
-show_author = true
-show_status = true
+enabled = true                # false: inline title block instead of full cover page
+title_size = 20.0             # cover page title font size in points
+date_format = "%e %B %Y"     # chrono format string
+between_label = "BETWEEN"    # heading above parties block
+party_format = "name_spec_role" # "name_spec_role", "name_role", or "name_only"
+show_ref = true               # show reference number on cover
+show_author = true            # show author/firm on cover
+show_status = true            # show status and version on cover
 ```
 
-All fields optional with sensible defaults matching the current hardcoded values.
+All fields are optional with sensible defaults matching the original hardcoded values.
+
+## Party format options
+
+| Value            | Renders as                                          |
+|------------------|-----------------------------------------------------|
+| `name_spec_role` | **Name** (specifier) + (the "Role") — default       |
+| `name_role`      | **Name** + (the "Role") — no specifier              |
+| `name_only`      | **Name** only — no specifier or role line            |
+
+## Design decision
+
+Cover page and TOC toggles live in the style TOML rather than the YAML front-matter, because they are rendering/output concerns — the front-matter contains contract identity (title, parties, date, status), while the TOML controls how that identity is presented in Word output. This allows the same contract to be rendered differently for different output contexts.

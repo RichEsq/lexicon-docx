@@ -21,6 +21,62 @@ pub struct StyleConfig {
     pub hanging_indent_cm: f32,
     pub align_first_level: bool,
     pub brand_color: Option<String>,
+    pub cover: CoverConfig,
+    pub toc: TocConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct CoverConfig {
+    pub enabled: bool,
+    pub title_size: f32,
+    pub date_format: String,
+    pub between_label: String,
+    pub party_format: PartyFormat,
+    pub show_ref: bool,
+    pub show_author: bool,
+    pub show_status: bool,
+}
+
+impl Default for CoverConfig {
+    fn default() -> Self {
+        CoverConfig {
+            enabled: true,
+            title_size: 20.0,
+            date_format: "%e %B %Y".to_string(),
+            between_label: "BETWEEN".to_string(),
+            party_format: PartyFormat::default(),
+            show_ref: true,
+            show_author: true,
+            show_status: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PartyFormat {
+    NameSpecRole,
+    NameRole,
+    NameOnly,
+}
+
+impl Default for PartyFormat {
+    fn default() -> Self {
+        PartyFormat::NameSpecRole
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct TocConfig {
+    pub enabled: bool,
+}
+
+impl Default for TocConfig {
+    fn default() -> Self {
+        TocConfig { enabled: true }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -54,6 +110,8 @@ impl Default for StyleConfig {
             hanging_indent_cm: 1.27,
             align_first_level: false,
             brand_color: None,
+            cover: CoverConfig::default(),
+            toc: TocConfig::default(),
         }
     }
 }

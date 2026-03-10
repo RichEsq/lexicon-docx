@@ -8,7 +8,7 @@ use docx_rs::{
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
-use crate::style::StyleConfig;
+use crate::style::{PartyFormat, StyleConfig};
 
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
 const ABSTRACT_NUM_ID: usize = 2;
@@ -72,7 +72,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     default_footer = default_footer.add_paragraph(footer_para);
     docx = docx.footer(default_footer);
 
-    if doc.meta.cover_page {
+    if style.cover.enabled {
         // Empty first-page header/footer so cover page is clean
         docx = docx.first_header(Header::new());
         docx = docx.first_footer(Footer::new());
@@ -89,7 +89,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         docx = render_inline_title(docx, doc, style);
     }
 
-    if doc.meta.toc {
+    if style.toc.enabled {
         // Table of contents
         let toc = TableOfContents::new()
             .heading_styles_range(1, 3)
@@ -724,6 +724,7 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
 
 fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
     let meta = &doc.meta;
+    let cover = &style.cover;
     let heading_half_pts = StyleConfig::pt_to_half_points(style.heading1_size);
     let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
 
@@ -740,7 +741,7 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
                     let mut run = Run::new()
                         .add_text(&meta.title)
                         .bold()
-                        .size(StyleConfig::pt_to_half_points(20.0))
+                        .size(StyleConfig::pt_to_half_points(cover.title_size))
                         .fonts(
                             RunFonts::new()
                                 .ascii(&style.heading_font_family)
@@ -758,7 +759,7 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
     docx = docx.add_paragraph(Paragraph::new());
 
     // Status + Version line
-    if meta.status.is_some() || meta.version.is_some() {
+    if cover.show_status && (meta.status.is_some() || meta.version.is_some()) {
         let mut parts = Vec::new();
         if let Some(ref status) = meta.status {
             parts.push(status.to_string());
@@ -766,19 +767,21 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
         if let Some(version) = meta.version {
             parts.push(format!("Version {}", version));
         }
-        docx = docx.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(parts.join(" — "))
-                        .size(body_half_pts),
-                ),
-        );
+        if !parts.is_empty() {
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .align(AlignmentType::Center)
+                    .add_run(
+                        Run::new()
+                            .add_text(parts.join(" — "))
+                            .size(body_half_pts),
+                    ),
+            );
+        }
     }
 
     // Date
-    let formatted_date = format_date(&meta.date);
+    let formatted_date = format_date_with_format(&meta.date, &cover.date_format);
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)
@@ -794,31 +797,35 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
     docx = docx.add_paragraph(Paragraph::new());
 
     // Ref
-    if let Some(ref ref_) = meta.ref_ {
-        docx = docx.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(format!("Ref: {}", ref_))
-                        .size(body_half_pts)
-                        .italic(),
-                ),
-        );
+    if cover.show_ref {
+        if let Some(ref ref_) = meta.ref_ {
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .align(AlignmentType::Center)
+                    .add_run(
+                        Run::new()
+                            .add_text(format!("Ref: {}", ref_))
+                            .size(body_half_pts)
+                            .italic(),
+                    ),
+            );
+        }
     }
 
     // Author
-    if let Some(ref author) = meta.author {
-        docx = docx.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(author.as_str())
-                        .size(body_half_pts)
-                        .italic(),
-                ),
-        );
+    if cover.show_author {
+        if let Some(ref author) = meta.author {
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .align(AlignmentType::Center)
+                    .add_run(
+                        Run::new()
+                            .add_text(author.as_str())
+                            .size(body_half_pts)
+                            .italic(),
+                    ),
+            );
+        }
     }
 
     // Spacer before parties
@@ -831,7 +838,7 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
             .align(AlignmentType::Center)
             .add_run(
                 Run::new()
-                    .add_text("BETWEEN")
+                    .add_text(&cover.between_label)
                     .bold()
                     .size(heading_half_pts),
             ),
@@ -850,26 +857,44 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
                 .size(body_half_pts),
         );
 
-        if let Some(ref spec) = party.specifier {
-            para = para.add_run(
-                Run::new()
-                    .add_text(format!(" ({})", spec))
-                    .size(body_half_pts),
-            );
+        match cover.party_format {
+            PartyFormat::NameSpecRole => {
+                if let Some(ref spec) = party.specifier {
+                    para = para.add_run(
+                        Run::new()
+                            .add_text(format!(" ({})", spec))
+                            .size(body_half_pts),
+                    );
+                }
+                docx = docx.add_paragraph(para);
+                docx = docx.add_paragraph(
+                    Paragraph::new()
+                        .align(AlignmentType::Center)
+                        .add_run(
+                            Run::new()
+                                .add_text(format!("(the \"{}\")", party.role))
+                                .italic()
+                                .size(body_half_pts),
+                        ),
+                );
+            }
+            PartyFormat::NameRole => {
+                docx = docx.add_paragraph(para);
+                docx = docx.add_paragraph(
+                    Paragraph::new()
+                        .align(AlignmentType::Center)
+                        .add_run(
+                            Run::new()
+                                .add_text(format!("(the \"{}\")", party.role))
+                                .italic()
+                                .size(body_half_pts),
+                        ),
+                );
+            }
+            PartyFormat::NameOnly => {
+                docx = docx.add_paragraph(para);
+            }
         }
-
-        docx = docx.add_paragraph(para);
-
-        docx = docx.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(format!("(the \"{}\")", party.role))
-                        .italic()
-                        .size(body_half_pts),
-                ),
-        );
 
         if i < meta.parties.len() - 1 {
             docx = docx.add_paragraph(Paragraph::new());
@@ -890,8 +915,12 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
 }
 
 fn format_date(date_str: &str) -> String {
+    format_date_with_format(date_str, "%e %B %Y")
+}
+
+fn format_date_with_format(date_str: &str, fmt: &str) -> String {
     match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-        Ok(date) => date.format("%e %B %Y").to_string().trim().to_string(),
+        Ok(date) => date.format(fmt).to_string().trim().to_string(),
         Err(_) => date_str.to_string(),
     }
 }
