@@ -68,12 +68,17 @@ pub fn render_signature_pages(
         docx = docx.add_paragraph(Paragraph::new());
 
         // Build the signature table
-        let total_columns = block.signatories.len() + if block.witness { 1 } else { 0 };
-        if total_columns == 0 {
+        // Content columns = signatories + optional witness
+        // Gap columns inserted between each content column
+        let content_cols = block.signatories.len() + if block.witness { 1 } else { 0 };
+        if content_cols == 0 {
             continue;
         }
 
-        let col_width = 5000 / total_columns; // percentage split
+        let gap_cols = if content_cols > 1 { content_cols - 1 } else { 0 };
+        let gap_width: usize = 200; // narrow gap column (~4% of table width)
+        let total_gap = gap_width * gap_cols;
+        let col_width = (5000 - total_gap) / content_cols;
 
         // Build rows — each field definition becomes a row
         let max_fields = block.fields.len().max(if block.witness {
@@ -87,8 +92,11 @@ pub fn render_signature_pages(
         for field_idx in 0..max_fields {
             let mut cells: Vec<TableCell> = Vec::new();
 
-            // Signatory columns
-            for signatory in &block.signatories {
+            // Signatory columns with gap columns between them
+            for (sig_idx, signatory) in block.signatories.iter().enumerate() {
+                if sig_idx > 0 {
+                    cells.push(empty_cell(gap_width));
+                }
                 let cell = if field_idx < block.fields.len() {
                     render_field_cell(
                         &block.fields[field_idx],
@@ -105,8 +113,9 @@ pub fn render_signature_pages(
                 cells.push(cell);
             }
 
-            // Witness column
+            // Witness column (with gap before it)
             if block.witness {
+                cells.push(empty_cell(gap_width));
                 let cell = if field_idx < block.witness_fields.len() {
                     render_field_cell(
                         &block.witness_fields[field_idx],
