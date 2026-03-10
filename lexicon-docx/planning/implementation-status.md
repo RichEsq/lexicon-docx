@@ -51,7 +51,11 @@
 
 ### Recently completed
 - **Configurable defined term style** — `defined_term_style` in style TOML: `bold` (default), `quoted` (curly quotes, no bold), or `bold_quoted`. Applies to all `**bold**` text in body, preamble party roles/short_title, and custom templates.
-- **Parties preamble** — when cover page is disabled, a parties preamble block renders after the inline title. Two styles: `simple` (block layout with BETWEEN/AND) and `prose` (single flowing paragraph). Configured via `[preamble]` section in style TOML. New `short_title` front-matter field (defaults to "Agreement") is auto-treated as a defined term.
+- **Parties preamble** — parties preamble block renders before the contract body (independent of cover page). Three styles: `simple` (block layout), `prose` (single flowing paragraph), and `custom` (user-defined templates with `{title}`, `{short_title}`, `{date}`, `{name}`, `{specifier}`, `{role}` placeholders, `**bold**` markers, `\n` for paragraph breaks). Configured via `[preamble]` section in style TOML. Default disabled.
+- **`short_title` front-matter field** — optional (defaults to "Agreement"), used in preamble text, automatically treated as a defined term.
+- **Promoted `title_size` to top-level** — single `title_size` (default 20pt) controls the document title font size for both cover page and inline title. Removed from `[cover]`.
+- **Promoted `date_format` to top-level** — single `date_format` (default `%e %B %Y`) used by cover page, preamble, and any future date rendering. Removed from `[cover]`.
+- **Centred inline title** — when cover page is disabled, the title is centre-aligned. Status/version and date lines removed (handled by preamble/watermark/footer).
 - **Sub-heading numbering styling** — clause numbers on heading paragraphs now inherit bold + heading size via paragraph `rPr`, so `###` sub-heading numbers match the heading text.
 - **Simple numbered lists in annexures** — ordered lists without headings or nested sub-lists are now rendered as plain numbered lists (`1.`, `2.`, `3.`) rather than being fed through the clause numbering system.
 - **Cover page / TOC toggles** — `[cover] enabled` and `[toc] enabled` in style TOML (default true). Without cover page, an inline title block is rendered. See `planning/cover-page-toc-toggles.md`.

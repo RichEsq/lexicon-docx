@@ -7,16 +7,20 @@ The cover page is now fully configurable via the `[cover]` section in the style 
 ## Configuration
 
 ```toml
+# Top-level settings (used by both cover page and preamble)
+title_size = 20.0             # document title font size in points
+date_format = "%e %B %Y"     # chrono format string
+
 [cover]
 enabled = true                # false: inline title block instead of full cover page
-title_size = 20.0             # cover page title font size in points
-date_format = "%e %B %Y"     # chrono format string
 between_label = "BETWEEN"    # heading above parties block
 party_format = "name_spec_role" # "name_spec_role", "name_role", or "name_only"
 show_ref = true               # show reference number on cover
 show_author = true            # show author/firm on cover
 show_status = true            # show status and version on cover
 ```
+
+**Note:** `title_size` and `date_format` were promoted from `[cover]` to top-level settings since they apply to both the cover page and the inline title/preamble.
 
 All fields are optional with sensible defaults matching the original hardcoded values.
 
