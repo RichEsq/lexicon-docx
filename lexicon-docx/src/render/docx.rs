@@ -915,7 +915,7 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
                         .align(AlignmentType::Center)
                         .add_run(
                             Run::new()
-                                .add_text(format!("(the \"{}\")", party.role))
+                                .add_text(format!("(\"{}\")", party.role))
                                 .italic()
                                 .size(body_half_pts),
                         ),
@@ -928,7 +928,7 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
                         .align(AlignmentType::Center)
                         .add_run(
                             Run::new()
-                                .add_text(format!("(the \"{}\")", party.role))
+                                .add_text(format!("(\"{}\")", party.role))
                                 .italic()
                                 .size(body_half_pts),
                         ),
