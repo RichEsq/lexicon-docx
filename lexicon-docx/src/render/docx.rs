@@ -51,42 +51,45 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
     let footer_size = StyleConfig::pt_to_half_points(style.font_size - 2.0);
     let mut default_footer = Footer::new();
     let has_ref = style.footer.show_ref && doc.meta.ref_.is_some();
+    let has_version = style.footer.show_version && doc.meta.version.is_some();
     let has_page = style.footer.show_page_number;
+    let has_left = has_ref || has_version;
 
     let right_tab_pos = (style.page_width_twips() as i32
         - StyleConfig::cm_to_twips(style.margin_left_cm)
         - StyleConfig::cm_to_twips(style.margin_right_cm)) as usize;
     let mut footer_para = Paragraph::new();
 
-    if has_ref && has_page {
+    // Right tab when we have content on both sides, or page number alone (right-aligned)
+    if (has_left && has_page) || (!has_left && has_page) {
         footer_para = footer_para
             .add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
     }
 
-    if has_ref {
-        if let Some(ref ref_) = doc.meta.ref_ {
-            let ref_text = if style.footer.show_version {
-                if let Some(version) = doc.meta.version {
-                    format!("Ref: {}v{}", ref_, version)
-                } else {
-                    format!("Ref: {}", ref_)
-                }
-            } else {
-                format!("Ref: {}", ref_)
-            };
-            footer_para = footer_para.add_run(
-                Run::new()
-                    .add_text(ref_text)
-                    .size(footer_size)
-                    .italic(),
-            );
+    // Left side: ref and/or version
+    if has_left {
+        let mut parts = Vec::new();
+        if has_ref {
+            if let Some(ref ref_) = doc.meta.ref_ {
+                parts.push(format!("Ref: {}", ref_));
+            }
         }
+        if has_version {
+            if let Some(version) = doc.meta.version {
+                parts.push(format!("v{}", version));
+            }
+        }
+        let left_text = parts.join(" ");
+        footer_para = footer_para.add_run(
+            Run::new()
+                .add_text(left_text)
+                .size(footer_size)
+                .italic(),
+        );
     }
 
     if has_page {
-        if has_ref {
-            footer_para = footer_para.add_run(Run::new().add_tab());
-        }
+        footer_para = footer_para.add_run(Run::new().add_tab());
         footer_para = footer_para
             .add_run(Run::new().add_text("Page ").size(footer_size))
             .add_page_num(PageNum::new())
@@ -114,6 +117,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
         docx = render_inline_title(docx, doc, style);
     }
 
+    let schedule_after_toc = matches!(style.schedule_position, SchedulePosition::AfterToc)
+        && !doc.schedule_items.is_empty();
+
     if style.toc.enabled {
         // Table of contents
         let toc = TableOfContents::new()
@@ -121,15 +127,22 @@ pub fn render_docx(doc: &Document, style: &StyleConfig) -> Result<Vec<u8>> {
             .auto();
         docx = docx.add_table_of_contents(toc);
 
-        // Page break after TOC
-        docx = docx.add_paragraph(
-            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-        );
+        // Page break after TOC (skip if schedule follows — it has its own leading page break)
+        if !schedule_after_toc {
+            docx = docx.add_paragraph(
+                Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
+            );
+        }
     }
 
     // Schedule before body (if configured)
-    if matches!(style.schedule_position, SchedulePosition::AfterToc) && !doc.schedule_items.is_empty() {
+    if schedule_after_toc {
         docx = render_schedule(docx, &doc.schedule_items, style);
+
+        // Page break before body
+        docx = docx.add_paragraph(
+            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
+        );
     }
 
     // Prose before first clause (e.g., recitals)
