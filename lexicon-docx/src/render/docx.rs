@@ -765,7 +765,9 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
         title_run = title_run.color(color);
     }
     docx = docx.add_paragraph(
-        Paragraph::new().add_run(title_run),
+        Paragraph::new()
+            .align(AlignmentType::Center)
+            .add_run(title_run),
     );
 
     // Status + Version line
@@ -779,6 +781,7 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
         }
         docx = docx.add_paragraph(
             Paragraph::new()
+                .align(AlignmentType::Center)
                 .add_run(
                     Run::new()
                         .add_text(parts.join(" — "))
@@ -791,6 +794,7 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
     let formatted_date = format_date(&meta.date);
     docx = docx.add_paragraph(
         Paragraph::new()
+            .align(AlignmentType::Center)
             .add_run(
                 Run::new()
                     .add_text(&formatted_date)
