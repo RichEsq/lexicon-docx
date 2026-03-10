@@ -109,7 +109,7 @@ short_title: Deed
 
 #### 2.2.7. `version` (optional)
 
-The version number of the document, expressed as a positive integer. This tracks iterations during negotiation and review. A processor may render the version number in the document header or footer.
+The version number of the document, expressed as a positive integer. This tracks iterations during negotiation and review. A processor may display the version number alongside the document metadata.
 
 ```yaml
 version: 2
@@ -143,7 +143,7 @@ A list of external documents to be exhibited (attached for reference) to the con
 
 | Sub-field | Required | Description |
 |-----------|----------|-------------|
-| `title`   | Yes      | The title of the exhibit, rendered as a heading on the exhibit page. |
+| `title`   | Yes      | The title of the exhibit, rendered as a heading for the exhibit section. |
 | `path`    | No       | Path or URL to an image (PNG, JPG) or PDF file to import into the output. Relative paths are resolved against the input document's directory. HTTP and HTTPS URLs are fetched at processing time. |
 
 ```yaml
@@ -157,11 +157,11 @@ exhibits:
   - title: Floor Plan
 ```
 
-When `path` is provided, a processor imports the file into the output document:
-- **Images** (PNG, JPG) are embedded on the exhibit page, scaled to fit within page margins while preserving aspect ratio.
-- **PDF** files are rendered page-by-page as images (requires `pdftoppm` from poppler-utils).
+When `path` is provided, a processor imports the file and embeds it in the output:
+- **Images** (PNG, JPG) are embedded in the exhibit section, scaled appropriately for the output format while preserving aspect ratio.
+- **PDF** files are embedded directly or converted to images, depending on the output format.
 
-When `path` is omitted, a processor generates a placeholder page with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Floor Plan").
+When `path` is omitted, a processor generates a placeholder exhibit section with the exhibit number and title (e.g., "EXHIBIT 1 - Floor Plan").
 
 #### 2.2.10. `schedule` (optional)
 
@@ -169,7 +169,7 @@ A list of schedules to be generated from defined terms in the contract body. Eac
 
 | Sub-field | Required | Description |
 |-----------|----------|-------------|
-| `title`   | Yes      | The title of the schedule, used as the page heading and matched in defined term phrases. |
+| `title`   | Yes      | The title of the schedule, used as the section heading and matched in defined term phrases. |
 
 ```yaml
 schedule:
@@ -452,7 +452,7 @@ A clause may reference itself:
 
 ### 6.1. Overview
 
-A schedule is a page (or pages) appended to the contract that lists variable terms to be completed at the time of execution. Schedule items are identified automatically from defined terms whose definitions reference the schedule by name.
+A schedule is a section appended to the contract that lists variable terms to be completed at the time of execution. Schedule items are identified automatically from defined terms whose definitions reference the schedule by name.
 
 This approach uses standard Markdown syntax (bold defined terms with ordinary prose), making schedules fully readable and cross-compilable without any special syntax.
 
@@ -473,7 +473,7 @@ schedule:
   - title: Payment Schedule
 ```
 
-If `schedule` is omitted or empty, no schedule page is generated.
+If `schedule` is omitted or empty, no schedule section is generated.
 
 ### 6.3. Schedule Items
 
@@ -518,15 +518,15 @@ A processor:
 1. parses the `schedule` field from the front-matter to identify declared schedules;
 2. scans all defined terms (bold text) in the document for phrases matching a declared schedule title;
 3. collects matching terms as schedule items, associated with the referenced schedule;
-4. generates a schedule page for each declared schedule, listing the collected terms with blank spaces for completion; and
+4. generates a schedule section for each declared schedule, listing the collected terms with blank spaces for completion; and
 5. warns if a declared schedule has no referencing terms, or if a term references a schedule title not declared in the front-matter.
 
 ### 6.5. Rendering
 
-Each schedule renders as a separate page with:
+Each schedule renders as a separate section with:
 
-- the schedule title as a centred heading; and
-- a two-column table listing each schedule item (the defined term name) with a blank column for completion at execution.
+- the schedule title as a heading; and
+- a table listing each schedule item (the defined term name) with a blank space for completion at execution.
 
 Items appear in document order by default. A processor may support alternative orderings (e.g., alphabetical) via configuration.
 
@@ -549,9 +549,9 @@ Lexicon distinguishes between three types of attachments to a contract:
 
 | Type | Purpose | Where declared | Content |
 |------|---------|----------------|---------|
-| **Schedule** | Variable terms for completion at execution (see section 6) | Front-matter `schedule` field + defined term phrases | Auto-generated schedule page with blanks |
+| **Schedule** | Variable terms for completion at execution (see section 6) | Front-matter `schedule` field + defined term phrases | Auto-generated schedule section with blanks |
 | **Addendum** | Substantive attached sections that supplement the body | `# ADDENDUM` headings in the document body | Free-form Markdown |
-| **Exhibit** | Pre-existing external documents included for reference | Front-matter `exhibits` field | Placeholder pages (future: file import) |
+| **Exhibit** | Pre-existing external documents included for reference | Front-matter `exhibits` field | Embedded files or placeholder sections |
 
 ### 8.1. Addenda
 
@@ -585,13 +585,13 @@ Exhibits are declared in the front-matter `exhibits` field (see section 2.2.9). 
 
 #### 8.2.2. Rendering
 
-When an exhibit has a `path`, a processor imports the referenced file and embeds it on the exhibit page(s):
-- **Images** (PNG, JPG) are embedded as a single page, scaled to fit within page margins while preserving the original aspect ratio.
-- **PDF** files are converted page-by-page to images and embedded one per page. The exhibit heading appears on the first page.
+When an exhibit has a `path`, a processor imports the referenced file and embeds it in the output:
+- **Images** (PNG, JPG) are embedded in the exhibit section, scaled appropriately for the output format while preserving the original aspect ratio.
+- **PDF** files are embedded directly or converted to images, depending on the output format.
 
-When `path` is omitted, a processor generates a placeholder page with the exhibit number and title centred on the page (e.g., "EXHIBIT 1 - Property Map"). The physical document can then be inserted manually when printing or assembling the final contract.
+When `path` is omitted, a processor generates a placeholder exhibit section with the exhibit number and title (e.g., "EXHIBIT 1 - Property Map"). In paginated output, the physical document can then be inserted manually when printing or assembling the final contract.
 
-Relative paths are resolved against the directory containing the input Markdown file. HTTP and HTTPS URLs are fetched at processing time. Supported formats are PNG, JPG/JPEG, and PDF. PDF rendering requires `pdftoppm` (from poppler-utils) to be available on the system.
+Relative paths are resolved against the directory containing the input Markdown file. HTTP and HTTPS URLs are fetched at processing time. Supported formats are PNG, JPG/JPEG, and PDF.
 
 ## 9. Complete Example
 
@@ -723,16 +723,17 @@ A Lexicon Markdown processor should implement the following capabilities:
 2. Transform numbering to legal convention (`1.1`, `(a)`, `(i)`).
 3. Strip anchor syntax from rendered output.
 4. Generate a definitions glossary / schedule.
-5. Generate schedule pages from defined terms that reference declared schedules.
-6. Render to `.docx` (via Pandoc with custom filters or templates) or `.pdf`.
+5. Generate schedule sections from defined terms that reference declared schedules.
+6. Render to the target output format (e.g., `.docx`, `.pdf`, `.html`).
 
 ### 10.4. Output Formats
 
-At minimum, a processor should support:
+A processor may target any output format. Common targets include:
 
 1. **Markdown** — a "resolved" Markdown file with cross-references updated and anchors stripped.
-2. **DOCX** — a Word document with legal numbering, formatted parties block, cover page, addendum pages, and exhibit pages.
-3. **PDF** — equivalent to the DOCX output.
+2. **DOCX** — a Word document with legal numbering, formatted parties block, cover page, addenda, and exhibits.
+3. **PDF** — a paginated document equivalent to the DOCX output.
+4. **HTML** — a web-renderable document with structured sections, embedded images, and interactive navigation.
 
 ## 11. Summary of Syntax
 
