@@ -882,14 +882,14 @@ fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
 fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
     let meta = &doc.meta;
     let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
-    let short_title = meta.short_title.as_deref().unwrap_or("Agreement");
+    let doc_type = meta.doc_type.as_deref().unwrap_or("Agreement");
     let formatted_date = format_date_with_format(&meta.date, &style.date_format);
 
     match style.preamble.style {
         PreambleStyle::Simple => {
             let term_style = &style.defined_term_style;
 
-            // Opening line: This [title] ([short_title]) is dated [date] between
+            // Opening line: This [title] ([type]) is dated [date] between
             let between_word = if meta.parties.len() == 1 { "by" } else { "between" };
             let mut opening = Paragraph::new();
             opening = opening.add_run(
@@ -897,7 +897,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                     .add_text(format!("This {} (", &meta.title))
                     .size(body_half_pts),
             );
-            opening = render_defined_term(opening, short_title, body_half_pts, None, term_style);
+            opening = render_defined_term(opening, doc_type, body_half_pts, None, term_style);
             opening = opening.add_run(
                 Run::new()
                     .add_text(format!(") is dated {} {}", &formatted_date, between_word))
@@ -954,7 +954,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
         PreambleStyle::Prose => {
             let term_style = &style.defined_term_style;
 
-            // Single paragraph: This [title] ([short_title]) is entered into as of [date]
+            // Single paragraph: This [title] ([type]) is entered into as of [date]
             // between [party1] and [party2].
             let mut para = Paragraph::new();
             para = para.add_run(
@@ -962,7 +962,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
                     .add_text(format!("This {} (", &meta.title))
                     .size(body_half_pts),
             );
-            para = render_defined_term(para, short_title, body_half_pts, None, term_style);
+            para = render_defined_term(para, doc_type, body_half_pts, None, term_style);
             para = para.add_run(
                 Run::new()
                     .add_text(format!(
@@ -1033,7 +1033,7 @@ fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx 
             // Expand the opening template
             let expanded_template = preamble.template
                 .replace("{title}", &meta.title)
-                .replace("{short_title}", short_title)
+                .replace("{type}", doc_type)
                 .replace("{date}", &formatted_date);
 
             // Render template lines as paragraphs

@@ -14,7 +14,8 @@ pub struct Document {
 #[derive(Debug, Clone, Deserialize)]
 pub struct DocumentMeta {
     pub title: String,
-    pub short_title: Option<String>,
+    #[serde(rename = "type")]
+    pub doc_type: Option<String>,
     pub date: String,
     #[serde(rename = "ref")]
     pub ref_: Option<String>,

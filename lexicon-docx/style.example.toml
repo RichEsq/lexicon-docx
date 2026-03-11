@@ -50,9 +50,9 @@ enabled = false               # true: render a parties preamble block before the
 style = "simple"              # "simple", "prose", or "custom"
 
 # Custom preamble templates (used when style = "custom")
-# Placeholders: {title}, {short_title}, {date}
+# Placeholders: {title}, {type}, {date}
 # Use **text** for bold, \n for new paragraphs
-# template = "This {title} (**{short_title}**) is dated {date} between"
+# template = "This {title} (**{type}**) is dated {date} between"
 #
 # Party template placeholders: {name}, {specifier}, {role}
 # Empty {specifier} automatically removes surrounding ()

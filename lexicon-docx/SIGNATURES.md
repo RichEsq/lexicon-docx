@@ -41,14 +41,14 @@ The processor automatically selects the right signature block template based on 
 
 ### Execution method detection
 
-The execution method is inferred from the `short_title` front-matter field:
+The execution method is inferred from the `type` front-matter field:
 
-| `short_title` | Execution method |
+| `type`        | Execution method |
 |---------------|-----------------|
 | `Deed`        | `deed`          |
 | Anything else | `agreement`     |
 
-The default `short_title` is `"Agreement"`, so documents without an explicit `short_title` use agreement-style execution wording.
+The default `type` is `"Agreement"`, so documents without an explicit `type` use agreement-style execution wording.
 
 ### Entity type
 
@@ -105,7 +105,7 @@ witness = false
 
 | Field | Description |
 |-------|-------------|
-| `intro` | Introductory paragraph. Supports `{name}`, `{specifier}`, `{role}`, `{short_title}` placeholders and `**bold**` markers. |
+| `intro` | Introductory paragraph. Supports `{name}`, `{specifier}`, `{role}`, `{type}` placeholders and `**bold**` markers. |
 | `signatories` | List of signatory objects. Each becomes a column in the rendered table. |
 | `fields` | List of field definitions, rendered as rows in each signatory column. |
 | `witness` | Whether to add a witness column alongside the signatories. |
@@ -207,7 +207,7 @@ parties:
     entity_type: au-company
 ```
 
-With `short_title: Deed`, this renders:
+With `type: Deed`, this renders:
 
 > **Executed as a deed by Acme Corp Pty Ltd** (ACN 123 456 789) in accordance with section 127 of the Corporations Act 2001 (Cth):
 >
@@ -229,7 +229,7 @@ parties:
 witness = true
 ```
 
-With default `short_title` (Agreement), this renders:
+With default `type` (Agreement), this renders:
 
 > **Signed by Jane Smith**:
 >

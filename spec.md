@@ -24,7 +24,7 @@ The front-matter block is enclosed by `---` delimiters and must appear at the ve
 ```yaml
 ---
 title: Deed of Release
-short_title: Deed
+type: Deed
 date: 2017-11-05
 ref: "VL:RP:20161021"
 author: Richard Prangell (Viridian Lawyers)
@@ -97,16 +97,16 @@ If omitted, no status is assumed. A processor may use this field to render a wat
 status: draft
 ```
 
-#### 2.2.6. `short_title` (optional)
+#### 2.2.6. `type` (optional)
 
-An abbreviated name for the document, used to refer to the document throughout the contract body (e.g., in a parties preamble or recitals). Defaults to `"Agreement"` if not specified.
+The type of legal document, used to refer to the document throughout the contract body (e.g., in a parties preamble or recitals). Defaults to `"Agreement"` if not specified.
 
-The `short_title` is automatically treated as a defined term. A processor should include it alongside party roles in the list of automatic definitions.
+The `type` is automatically treated as a defined term. A processor should include it alongside party roles in the list of automatic definitions.
 
 Common values: `"Agreement"`, `"Deed"`, `"NDA"`, `"Addendum"`, `"Contract"`.
 
 ```yaml
-short_title: Deed
+type: Deed
 ```
 
 #### 2.2.7. `version` (optional)
@@ -603,7 +603,7 @@ Relative paths are resolved against the directory containing the input Markdown 
 ```markdown
 ---
 title: Deed of Release
-short_title: Deed
+type: Deed
 date: 2017-11-05
 ref: "VL:RP:20161021"
 author: Richard Prangell (Viridian Lawyers)

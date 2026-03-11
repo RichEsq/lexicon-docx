@@ -40,7 +40,7 @@ Lexicon Markdown makes contracts a first-class input and output format for AI-as
 ```markdown
 ---
 title: Deed of Release
-short_title: Deed
+type: Deed
 date: 2026-01-15
 status: draft
 parties:
@@ -132,7 +132,7 @@ cargo run -- build ../example.md --strict
 ```yaml
 ---
 title: Contract Title          # required
-short_title: Agreement         # optional, defaults to "Agreement"
+type: Agreement                # optional, defaults to "Agreement"
 date: 2026-01-15               # required, YYYY-MM-DD
 ref: "ABC:123"                 # optional, drafter's reference
 author: Jane Doe (Law Firm)    # optional

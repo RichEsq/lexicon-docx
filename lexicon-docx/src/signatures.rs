@@ -119,9 +119,9 @@ fn split_entity_type(entity_type: &str) -> Option<(&str, &str)> {
     Some((&entity_type[..idx], &entity_type[idx + 1..]))
 }
 
-/// Determine the execution method from the document's short_title.
-pub fn execution_method(short_title: Option<&str>) -> &str {
-    match short_title {
+/// Determine the execution method from the document's doc_type.
+pub fn execution_method(doc_type: Option<&str>) -> &str {
+    match doc_type {
         Some(t) if t.eq_ignore_ascii_case("deed") => "deed",
         _ => "agreement",
     }
@@ -130,18 +130,18 @@ pub fn execution_method(short_title: Option<&str>) -> &str {
 /// Resolve signature blocks for all parties.
 pub fn resolve_signature_blocks(
     parties: &[Party],
-    short_title: Option<&str>,
+    doc_type: Option<&str>,
     style: &StyleConfig,
     definitions: &Option<DefinitionsFile>,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Vec<SignatureBlock> {
-    let execution = execution_method(short_title);
+    let execution = execution_method(doc_type);
     let config = &style.signatures;
 
     parties
         .iter()
         .map(|party| {
-            resolve_party_block(party, execution, short_title, config, definitions, diagnostics)
+            resolve_party_block(party, execution, doc_type, config, definitions, diagnostics)
         })
         .collect()
 }
@@ -149,7 +149,7 @@ pub fn resolve_signature_blocks(
 fn resolve_party_block(
     party: &Party,
     execution: &str,
-    short_title: Option<&str>,
+    doc_type: Option<&str>,
     config: &SignaturesConfig,
     definitions: &Option<DefinitionsFile>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -246,7 +246,7 @@ fn resolve_party_block(
     let intro = expand_placeholders(
         &base_intro,
         party,
-        short_title,
+        doc_type,
     );
 
     SignatureBlock {
@@ -320,17 +320,17 @@ fn default_witness_fields() -> Vec<SignatureField> {
     ]
 }
 
-/// Expand `{name}`, `{specifier}`, `{role}`, `{short_title}` in a template string.
+/// Expand `{name}`, `{specifier}`, `{role}`, `{type}` in a template string.
 fn expand_placeholders(
     template: &str,
     party: &Party,
-    short_title: Option<&str>,
+    doc_type: Option<&str>,
 ) -> String {
     let result = template
         .replace("{name}", &party.name)
         .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
         .replace("{role}", &party.role)
-        .replace("{short_title}", short_title.unwrap_or("Agreement"));
+        .replace("{type}", doc_type.unwrap_or("Agreement"));
 
     clean_empty_parens(&result)
 }

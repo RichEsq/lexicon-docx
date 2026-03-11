@@ -111,7 +111,7 @@ cargo test
 - **comrak for parsing** — produces a full AST. Headings inside list items work correctly. Reference links are resolved during parsing (schedule item values come from the link title attribute).
 - **Defined term matching** — multi-variant stemming for possessives/plurals/verb forms, not a full NLP stemmer.
 - **Draft watermark via ZIP post-processing** — docx-rs doesn't expose VML/watermark APIs, so `render/watermark.rs` post-processes the .docx ZIP to inject VML WordArt shapes into header XML parts. Triggered when `status: draft`.
-- **Signature pages via external template definitions** — templates defined in `signatures.toml` (loaded from disk), keyed by `{jurisdiction}.{entity_type}.{execution_method}`. Two-layer templates: prose intro with `{placeholder}` substitution + structured field layout. Rendered as borderless tables with cell-border signature lines. `entity_type` on parties is a compound `{jurisdiction}-{type}` string (e.g. `au-company`). Execution method inferred from `short_title`.
+- **Signature pages via external template definitions** — templates defined in `signatures.toml` (loaded from disk), keyed by `{jurisdiction}.{entity_type}.{execution_method}`. Two-layer templates: prose intro with `{placeholder}` substitution + structured field layout. Rendered as borderless tables with cell-border signature lines. `entity_type` on parties is a compound `{jurisdiction}-{type}` string (e.g. `au-company`). Execution method inferred from `type`.
 
 ### docx-rs Pitfalls
 
@@ -138,7 +138,7 @@ Future work and design notes are in `lexicon-docx/planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, short_title field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF), signature pages (template-based, external definitions file)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF), signature pages (template-based, external definitions file)).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 

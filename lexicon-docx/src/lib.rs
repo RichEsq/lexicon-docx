@@ -83,7 +83,7 @@ pub fn process(
 
         signatures::resolve_signature_blocks(
             &doc.meta.parties,
-            doc.meta.short_title.as_deref(),
+            doc.meta.doc_type.as_deref(),
             style,
             &definitions,
             &mut sig_diagnostics,

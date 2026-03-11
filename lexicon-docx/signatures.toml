@@ -6,7 +6,7 @@
 #   {name}        — party name
 #   {specifier}   — party specifier (e.g. ACN number)
 #   {role}        — party role
-#   {short_title} — document short title
+#   {type}        — document type
 #   {title}       — signatory title (in field values only)
 #
 # Field types:

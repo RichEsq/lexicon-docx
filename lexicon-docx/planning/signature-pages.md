@@ -11,14 +11,14 @@ Signature pages render execution blocks for each party at the end of the documen
 - **YAML = contract data** — only `entity_type` is added to parties (what kind of legal entity). No rendering information in front-matter.
 - **TOML = rendering overrides** — custom signatory titles, witness preferences, template selection. Only needed for non-standard cases.
 - **Definitions file = template library** — a standalone `signatures.toml` mapping `(jurisdiction, entity_type, execution_method)` to templates. Lives in the repo, not compiled into the binary. Crowd-sourceable.
-- **Convention-based defaults** — the processor infers the right template from `short_title` (deed vs agreement) and `entity_type` (company, individual, etc.) without any TOML config for common cases.
+- **Convention-based defaults** — the processor infers the right template from `type` (deed vs agreement) and `entity_type` (company, individual, etc.) without any TOML config for common cases.
 
 ## YAML Changes
 
 A single new optional field on parties — a compound `jurisdiction-type` string:
 
 ```yaml
-short_title: Deed
+type: Deed
 parties:
   - name: Google Pty Ltd
     specifier: ACN 001 002 987
@@ -43,8 +43,8 @@ If `entity_type` is omitted, the processor skips the signature block for that pa
 
 ## Execution Method Detection
 
-Inferred from `short_title`:
-- If `short_title` is `"Deed"` → execution method is `deed`
+Inferred from `type`:
+- If `type` is `"Deed"` → execution method is `deed`
 - Anything else (including the default `"Agreement"`) → execution method is `agreement`
 
 No new YAML field needed.
@@ -123,7 +123,7 @@ A text string with `{placeholder}` substitution, reusing the preamble template s
 - `{name}` — party name
 - `{specifier}` — party specifier (e.g. ACN)
 - `{role}` — party role
-- `{short_title}` — document short title
+- `{type}` — document type
 
 Supports `**bold**` markers for emphasis.
 

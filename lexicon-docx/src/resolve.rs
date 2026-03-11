@@ -330,9 +330,9 @@ fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, R
     }
 
     // Short title is an automatic definition
-    let short_title = doc.meta.short_title.as_deref().unwrap_or("Agreement");
+    let doc_type = doc.meta.doc_type.as_deref().unwrap_or("Agreement");
     definitions.push(TermDefinition {
-        term: short_title.to_string(),
+        term: doc_type.to_string(),
         location: Some("front-matter".to_string()),
     });
 
