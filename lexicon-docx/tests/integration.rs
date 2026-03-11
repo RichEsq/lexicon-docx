@@ -608,3 +608,118 @@ fn first_clause_paragraph_inlines(doc: &Document) -> &[InlineContent] {
     panic!("No paragraph found in first child clause");
 }
 
+// ===========================================================================
+// Recitals / Background
+// ===========================================================================
+
+#[test]
+fn recitals_basic_parsing() {
+    let input = format!(
+        "{}# Background\n\n1. First recital.\n\n2. Second recital.\n\n# Operative Provisions\n\n1. ## Obligations\n\n    1. The Buyer shall pay.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    // Recitals parsed
+    let recitals = doc.recitals.as_ref().expect("Expected recitals");
+    assert_eq!(recitals.heading, "Background");
+
+    // Two recital clauses with letters A, B
+    let clauses: Vec<_> = recitals.body.iter().filter_map(|e| {
+        if let BodyElement::Clause(c) = e { Some(c) } else { None }
+    }).collect();
+    assert_eq!(clauses.len(), 2);
+    assert!(matches!(clauses[0].number, Some(ClauseNumber::RecitalTopLevel('A'))));
+    assert!(matches!(clauses[1].number, Some(ClauseNumber::RecitalTopLevel('B'))));
+
+    // Body heading captured
+    assert_eq!(doc.body_heading.as_deref(), Some("Operative Provisions"));
+
+    // Body clause still parsed
+    assert!(!doc.body.is_empty());
+}
+
+#[test]
+fn recitals_heading_case_insensitive() {
+    let input = format!(
+        "{}# RECITALS\n\nSome prose.\n\n# Terms\n\n1. ## Clause One\n\n    1. Text.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let recitals = doc.recitals.as_ref().expect("Expected recitals");
+    assert_eq!(recitals.heading, "RECITALS");
+    assert_eq!(doc.body_heading.as_deref(), Some("Terms"));
+}
+
+#[test]
+fn recitals_prose_content() {
+    let input = format!(
+        "{}# Background\n\nWHEREAS the parties wish to agree.\n\n# Operative Provisions\n\n1. ## Clause\n\n    1. Text.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let recitals = doc.recitals.as_ref().unwrap();
+    let prose_count = recitals.body.iter().filter(|e| matches!(e, BodyElement::Prose(_))).count();
+    assert_eq!(prose_count, 1);
+}
+
+#[test]
+fn recitals_cross_reference() {
+    let input = format!(
+        "{}# Background\n\n1. The background to this agreement. {{#bg}}\n\n# Operative Provisions\n\n1. ## Clause\n\n    1. See [Recital A](#bg).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    // Check the cross-reference resolved
+    if let Some(BodyElement::Clause(clause)) = doc.body.first() {
+        let child = first_child_clause(clause).unwrap();
+        let has_resolved = child.body.iter().any(|e| {
+            if let ClauseBody::Content(ClauseContent::Paragraph(inlines)) = e {
+                inlines.iter().any(|i| matches!(i, InlineContent::CrossRef { resolved: Some(r), .. } if r == "Recital A"))
+            } else {
+                false
+            }
+        });
+        assert!(has_resolved, "Cross-reference to recital should resolve to 'Recital A'");
+    }
+}
+
+#[test]
+fn recitals_no_body_heading_warning() {
+    let input = format!(
+        "{}# Background\n\n1. A recital.\n\n1. ## Clause\n\n    1. Text.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(doc.body_heading.is_none());
+    let has_warning = doc.diagnostics.iter().any(|d| d.message.contains("no body heading"));
+    assert!(has_warning, "Should warn about missing body heading when recitals present");
+}
+
+#[test]
+fn no_recitals_backward_compatible() {
+    let input = format!(
+        "{}1. ## Clause One\n\n    1. Text here.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(doc.recitals.is_none());
+    assert!(doc.body_heading.is_none());
+    assert!(!doc.body.is_empty());
+}
+
+#[test]
+fn recitals_defined_terms_validated() {
+    let input = format!(
+        "{}# Background\n\n1. The **Principal Agreement** means the main contract.\n\n# Operative Provisions\n\n1. ## Clause\n\n    1. Under the Principal Agreement, the parties agree.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    // "Principal Agreement" should not produce an unused-term warning
+    let unused_warnings: Vec<_> = doc.diagnostics.iter()
+        .filter(|d| d.message.contains("Principal Agreement") && d.message.contains("never used"))
+        .collect();
+    assert!(unused_warnings.is_empty(), "Principal Agreement should be found in body text");
+}
+

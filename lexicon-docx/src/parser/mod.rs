@@ -21,12 +21,14 @@ pub fn parse(input: &str) -> Result<Document> {
     opts.extension.superscript = true;
     let root = parse_document(&arena, &body, &opts);
 
-    // Extract clause structure and addenda
-    let (body_elements, addenda, parser_diags) = clause::extract_body(root);
+    // Extract clause structure, recitals, and addenda
+    let (recitals, body_heading, body_elements, addenda, parser_diags) = clause::extract_body(root);
     diagnostics.extend(parser_diags);
 
     Ok(Document {
         meta,
+        recitals,
+        body_heading,
         body: body_elements,
         addenda,
         schedule_items: Vec::new(),

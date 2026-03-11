@@ -10,24 +10,46 @@ static ADDENDUM_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^addendum(?:\s+\d+)?(?:\s*[-–—]\s*(.*))?$").unwrap()
 });
 
+static RECITALS_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^(recitals|background)$").unwrap()
+});
+
 /// Walk a comrak AST and extract the document body as a list of BodyElements.
 /// `root` should be the Document node from comrak.
-pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendum>, Vec<Diagnostic>) {
+pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Option<Recitals>, Option<String>, Vec<BodyElement>, Vec<Addendum>, Vec<Diagnostic>) {
     let mut body = Vec::new();
     let mut addenda = Vec::new();
     let mut diagnostics = Vec::new();
     let mut in_addendum: Option<Addendum> = None;
     let mut addendum_counter = 0u32;
+    let mut recitals: Option<Recitals> = None;
+    let mut in_recitals = false;
+    let mut body_heading: Option<String> = None;
 
     for child in root.children() {
         let data = child.data.borrow();
         match &data.value {
-            // Top-level heading — check if it's an addendum
+            // Top-level heading — check for recitals, body heading, or addendum
             NodeValue::Heading(h) if h.level == 1 => {
                 drop(data);
                 let heading_text = collect_plain_text(child);
 
-                if let Some(caps) = ADDENDUM_RE.captures(&heading_text) {
+                if RECITALS_RE.is_match(&heading_text) {
+                    if recitals.is_some() {
+                        diagnostics.push(Diagnostic {
+                            level: DiagLevel::Warning,
+                            message: "Duplicate recitals/background heading. Only one recitals section is allowed.".to_string(),
+                            location: Some("document body".to_string()),
+                        });
+                    } else {
+                        in_recitals = true;
+                        recitals = Some(Recitals {
+                            heading: heading_text,
+                            body: Vec::new(),
+                        });
+                    }
+                } else if let Some(caps) = ADDENDUM_RE.captures(&heading_text) {
+                    in_recitals = false;
                     // Save previous addendum if any
                     if let Some(add) = in_addendum.take() {
                         addenda.push(add);
@@ -41,11 +63,26 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendu
                         title,
                         content: Vec::new(),
                     });
-                } else {
+                } else if in_recitals {
+                    // Non-recitals, non-addendum heading after recitals = body heading
+                    in_recitals = false;
+                    body_heading = Some(heading_text);
+                } else if recitals.is_none() {
+                    // No recitals in document — unrecognised heading (existing behaviour)
                     diagnostics.push(Diagnostic {
                         level: DiagLevel::Warning,
                         message: format!(
-                            "Unrecognised top-level heading '# {}'. Top-level headings must begin with 'ADDENDUM'.",
+                            "Unrecognised top-level heading '# {}'. Top-level headings must be 'RECITALS', 'BACKGROUND', or begin with 'ADDENDUM'.",
+                            heading_text
+                        ),
+                        location: Some("document body".to_string()),
+                    });
+                } else {
+                    // Recitals already ended, unexpected extra heading
+                    diagnostics.push(Diagnostic {
+                        level: DiagLevel::Warning,
+                        message: format!(
+                            "Unexpected top-level heading '# {}' after body section.",
                             heading_text
                         ),
                         location: Some("document body".to_string()),
@@ -63,6 +100,13 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendu
                         let items = extract_bullet_list(child);
                         add.content.push(AddendumContent::NumberedList(items));
                     }
+                } else if in_recitals {
+                    if let Some(ref mut rec) = recitals {
+                        let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
+                        for clause in clauses {
+                            rec.body.push(BodyElement::Clause(clause));
+                        }
+                    }
                 } else {
                     let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
                     for clause in clauses {
@@ -77,6 +121,10 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendu
                 if !inlines.is_empty() {
                     if let Some(ref mut add) = in_addendum {
                         add.content.push(AddendumContent::Paragraph(inlines));
+                    } else if in_recitals {
+                        if let Some(ref mut rec) = recitals {
+                            rec.body.push(BodyElement::Prose(inlines));
+                        }
                     } else {
                         body.push(BodyElement::Prose(inlines));
                     }
@@ -116,7 +164,16 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Vec<BodyElement>, Vec<Addendu
         addenda.push(add);
     }
 
-    (body, addenda, diagnostics)
+    // Warn if recitals present but no body heading
+    if recitals.is_some() && body_heading.is_none() {
+        diagnostics.push(Diagnostic {
+            level: DiagLevel::Warning,
+            message: "Recitals section present but no body heading found. Add a top-level heading (e.g. '# Operative Provisions') before the contract clauses.".to_string(),
+            location: Some("document body".to_string()),
+        });
+    }
+
+    (recitals, body_heading, body, addenda, diagnostics)
 }
 
 /// Check if an ordered list contains clause structure (headings or nested sub-lists).

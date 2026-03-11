@@ -19,6 +19,16 @@ exhibits: []
 schedule:
   - title: Schedule
 ---
+# Background
+
+1. The parties have entered into a principal agreement for the provision of advertising services (the **Principal Agreement**).
+
+2. The **Merchant** wishes to engage **Google** to process certain personal data on its behalf in connection with the **Principal Agreement**.
+
+3. The parties wish to record the terms on which **Google** will process personal data on behalf of the **Merchant**.
+
+# Operative Provisions
+
 1. ## Definitions {#definitions}
 
     1. In this Agreement, the following terms shall have the meanings set out below and cognate terms shall be construed accordingly:

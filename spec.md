@@ -296,7 +296,48 @@ This renders as superscript in the output document. Useful for footnote markers,
 
 ### 3.8. Prose Sections
 
-Some parts of a contract are not structured as numbered clauses (e.g., recitals, addendum content, signature blocks). These are written as standard Markdown paragraphs, headings, lists, and tables outside of the numbered outline structure.
+Some parts of a contract are not structured as numbered clauses (e.g., addendum content, signature blocks). These are written as standard Markdown paragraphs, headings, lists, and tables outside of the numbered outline structure.
+
+### 3.9. Recitals / Background
+
+Many contracts include a "recitals" or "background" section before the operative clauses, providing context for why the agreement exists.
+
+A recitals section is introduced with a level-1 heading of either `# Recitals` or `# Background` (case-insensitive). When a recitals section is present, the operative clauses must also be preceded by a level-1 heading (e.g. `# Operative Provisions`, `# Terms and Conditions`, or any other descriptive heading). This ensures the document remains readable in plain Markdown viewers without a processor.
+
+```markdown
+# Background
+
+1. The parties have entered into a principal agreement
+   for the provision of services (the **Principal Agreement**).
+
+2. Party A wishes to engage Party B to process certain
+   data on its behalf in connection with the **Principal Agreement**.
+
+# Operative Provisions
+
+1. ## Definitions
+
+    1. **Term** means ...
+```
+
+#### 3.9.1. Content
+
+The recitals section supports the same content types as the document body: ordered lists (which become lettered recital items), prose paragraphs, and tables.
+
+#### 3.9.2. Numbering
+
+Ordered list items in the recitals section are lettered (A), (B), (C) at the top level, rather than numbered. Sub-levels follow the same hierarchy as body clauses: A.1, A.1(a), A.1(a)(i).
+
+#### 3.9.3. Cross-References and Defined Terms
+
+Recitals support `{#id}` anchors and cross-references. A cross-reference to a recital resolves to "Recital A", "Recital A.1", etc. Bold terms in recitals are validated in the same way as the document body.
+
+#### 3.9.4. Rules
+
+- Only one recitals section per document.
+- The recitals heading must appear before any operative clauses.
+- When a recitals section is present, a body heading is required before the operative clauses. A processor should warn if this is missing.
+- Both the recitals heading and the body heading appear in the table of contents.
 
 ## 4. Defined Terms
 

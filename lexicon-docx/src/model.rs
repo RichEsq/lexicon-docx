@@ -24,10 +24,18 @@ fn deserialize_version<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Opt
 #[derive(Debug)]
 pub struct Document {
     pub meta: DocumentMeta,
+    pub recitals: Option<Recitals>,
+    pub body_heading: Option<String>,
     pub body: Vec<BodyElement>,
     pub addenda: Vec<Addendum>,
     pub schedule_items: Vec<ScheduleItem>,
     pub diagnostics: Vec<Diagnostic>,
+}
+
+#[derive(Debug)]
+pub struct Recitals {
+    pub heading: String,
+    pub body: Vec<BodyElement>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -130,6 +138,10 @@ pub enum ClauseNumber {
     Clause(u32, u32),
     SubClause(u32, u32, char),
     SubSubClause(u32, u32, char, String),
+    RecitalTopLevel(char),
+    RecitalClause(char, u32),
+    RecitalSubClause(char, u32, char),
+    RecitalSubSubClause(char, u32, char, String),
 }
 
 impl std::fmt::Display for ClauseNumber {
@@ -139,6 +151,10 @@ impl std::fmt::Display for ClauseNumber {
             ClauseNumber::Clause(a, b) => write!(f, "{}.{}", a, b),
             ClauseNumber::SubClause(_, _, c) => write!(f, "({})", c),
             ClauseNumber::SubSubClause(_, _, _, r) => write!(f, "({})", r),
+            ClauseNumber::RecitalTopLevel(a) => write!(f, "({})", a),
+            ClauseNumber::RecitalClause(a, b) => write!(f, "{}.{}", a, b),
+            ClauseNumber::RecitalSubClause(_, _, c) => write!(f, "({})", c),
+            ClauseNumber::RecitalSubSubClause(_, _, _, r) => write!(f, "({})", r),
         }
     }
 }
@@ -151,6 +167,12 @@ impl ClauseNumber {
             ClauseNumber::SubClause(a, b, c) => format!("clause {}.{}({})", a, b, c),
             ClauseNumber::SubSubClause(a, b, c, r) => {
                 format!("clause {}.{}({})({})", a, b, c, r)
+            }
+            ClauseNumber::RecitalTopLevel(a) => format!("Recital {}", a),
+            ClauseNumber::RecitalClause(a, b) => format!("Recital {}.{}", a, b),
+            ClauseNumber::RecitalSubClause(a, b, c) => format!("Recital {}.{}({})", a, b, c),
+            ClauseNumber::RecitalSubSubClause(a, b, c, r) => {
+                format!("Recital {}.{}({})({})", a, b, c, r)
             }
         }
     }

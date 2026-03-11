@@ -15,12 +15,24 @@ static FORMAL_DEF_ALT_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 pub fn resolve(doc: &mut Document) {
+    // Number recitals (A, B, C at top level)
+    if let Some(ref mut recitals) = doc.recitals {
+        assign_recital_numbers(&mut recitals.body);
+    }
+
     assign_clause_numbers(&mut doc.body);
 
-    // Build anchor → clause number map
-    let anchor_map = build_anchor_map(&doc.body);
+    // Build anchor → clause number map (from both recitals and body)
+    let mut anchor_map = HashMap::new();
+    if let Some(ref recitals) = doc.recitals {
+        collect_body_anchors(&recitals.body, &mut anchor_map);
+    }
+    collect_body_anchors(&doc.body, &mut anchor_map);
 
     // Resolve cross-references and validate
+    if let Some(ref mut recitals) = doc.recitals {
+        resolve_cross_refs(&mut recitals.body, &anchor_map, &mut doc.diagnostics);
+    }
     resolve_cross_refs(&mut doc.body, &anchor_map, &mut doc.diagnostics);
     for addendum in &mut doc.addenda {
         resolve_addendum_cross_refs(addendum, &anchor_map, &mut doc.diagnostics);
@@ -81,16 +93,68 @@ fn assign_children_numbers(parent: &mut Clause, top: u32) {
     }
 }
 
-// --- Anchor map ---
+// --- Recital numbering ---
 
-fn build_anchor_map(body: &[BodyElement]) -> HashMap<String, ClauseNumber> {
-    let mut map = HashMap::new();
-    for element in body {
+fn assign_recital_numbers(body: &mut [BodyElement]) {
+    let mut top_counter = 0u8;
+    for element in body.iter_mut() {
         if let BodyElement::Clause(clause) = element {
-            collect_anchors(clause, &mut map);
+            top_counter += 1;
+            let letter = (b'A' + top_counter - 1) as char;
+            clause.number = Some(ClauseNumber::RecitalTopLevel(letter));
+            assign_recital_children_numbers(clause, letter);
         }
     }
-    map
+}
+
+fn assign_recital_children_numbers(parent: &mut Clause, top_letter: char) {
+    let parent_number = parent.number.clone();
+    let mut i = 0usize;
+
+    for element in &mut parent.body {
+        if let ClauseBody::Children(kids) = element {
+            for child in kids.iter_mut() {
+                let number = match child.level {
+                    ClauseLevel::TopLevel => {
+                        let letter = (b'A' + i as u8) as char;
+                        ClauseNumber::RecitalTopLevel(letter)
+                    }
+                    ClauseLevel::Clause => {
+                        ClauseNumber::RecitalClause(top_letter, i as u32 + 1)
+                    }
+                    ClauseLevel::SubClause => {
+                        let clause_num = match &parent_number {
+                            Some(ClauseNumber::RecitalClause(_, c)) => *c,
+                            _ => 0,
+                        };
+                        let letter = (b'a' + i as u8) as char;
+                        ClauseNumber::RecitalSubClause(top_letter, clause_num, letter)
+                    }
+                    ClauseLevel::SubSubClause => {
+                        let (clause_num, letter) = match &parent_number {
+                            Some(ClauseNumber::RecitalSubClause(_, c, l)) => (*c, *l),
+                            _ => (0, 'a'),
+                        };
+                        let roman = to_roman(i as u32 + 1);
+                        ClauseNumber::RecitalSubSubClause(top_letter, clause_num, letter, roman)
+                    }
+                };
+                child.number = Some(number);
+                assign_recital_children_numbers(child, top_letter);
+                i += 1;
+            }
+        }
+    }
+}
+
+// --- Anchor map ---
+
+fn collect_body_anchors(body: &[BodyElement], map: &mut HashMap<String, ClauseNumber>) {
+    for element in body {
+        if let BodyElement::Clause(clause) = element {
+            collect_anchors(clause, map);
+        }
+    }
 }
 
 fn collect_anchors(clause: &Clause, map: &mut HashMap<String, ClauseNumber>) {
@@ -337,6 +401,18 @@ fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, R
     });
 
     // Collect all bold terms — definitions and schedule items in one pass
+    if let Some(ref recitals) = doc.recitals {
+        for element in &recitals.body {
+            match element {
+                BodyElement::Clause(clause) => {
+                    collect_clause_terms(clause, &mut definitions, &mut schedule_items, schedule_patterns);
+                }
+                BodyElement::Prose(inlines) => {
+                    collect_inline_terms(inlines, &mut definitions, &mut schedule_items, schedule_patterns, Some("recitals"));
+                }
+            }
+        }
+    }
     for element in &doc.body {
         match element {
             BodyElement::Clause(clause) => {
@@ -380,6 +456,11 @@ fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, R
 
     // Collect all plain text from the document for usage scanning
     let mut all_text = String::new();
+    if let Some(ref recitals) = doc.recitals {
+        for element in &recitals.body {
+            collect_element_text(element, &mut all_text);
+        }
+    }
     for element in &doc.body {
         collect_element_text(element, &mut all_text);
     }

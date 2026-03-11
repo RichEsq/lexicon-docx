@@ -13,8 +13,9 @@ use crate::render::common::{add_inline_run, render_inlines_paragraph, render_tab
 use crate::render::cover::{render_cover_page, render_inline_title};
 use crate::render::exhibit::{self as exhibit_loader, PdfRenderer};
 use crate::render::numbering::{
-    create_clause_numbering, create_simple_list_numbering, indent_for_level, numbering_level_for,
-    outline_level_for, ABSTRACT_NUM_ID, BODY_NUMBERING_ID, SIMPLE_LIST_ABSTRACT_NUM_ID,
+    create_clause_numbering, create_recital_numbering, create_simple_list_numbering,
+    indent_for_level, numbering_level_for, outline_level_for, ABSTRACT_NUM_ID,
+    BODY_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID, RECITAL_NUMBERING_ID,
 };
 use crate::render::preamble::render_preamble;
 use crate::render::schedule::render_schedules;
@@ -51,7 +52,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     docx = docx
         .add_abstract_numbering(create_clause_numbering(style))
         .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID))
-        .add_abstract_numbering(create_simple_list_numbering(style));
+        .add_abstract_numbering(create_simple_list_numbering(style))
+        .add_abstract_numbering(create_recital_numbering(style))
+        .add_numbering(Numbering::new(RECITAL_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID));
 
     // Register heading styles so the TOC field can find them
     for i in 1..=3 {
@@ -136,8 +139,27 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         docx = render_preamble(docx, doc, style);
     }
 
-    // Prose before first clause (e.g., recitals)
-    // Then clauses
+    // Recitals section (after preamble, before body clauses)
+    if let Some(ref recitals) = doc.recitals {
+        docx = render_section_heading(docx, &recitals.heading, style);
+        for element in &recitals.body {
+            match element {
+                BodyElement::Prose(inlines) => {
+                    docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
+                }
+                BodyElement::Clause(clause) => {
+                    docx = render_clause(docx, clause, style, RECITAL_NUMBERING_ID);
+                }
+            }
+        }
+    }
+
+    // Body heading (rendered when recitals are present)
+    if let Some(ref heading) = doc.body_heading {
+        docx = render_section_heading(docx, heading, style);
+    }
+
+    // Body clauses
     for element in &doc.body {
         match element {
             BodyElement::Prose(inlines) => {
@@ -156,7 +178,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
 
     // Addenda — each ClauseList/NumberedList gets its own numbering instance
     // Start after the abstract numbering IDs we've registered
-    let mut next_num_id: usize = SIMPLE_LIST_ABSTRACT_NUM_ID + 1;
+    let mut next_num_id: usize = RECITAL_ABSTRACT_NUM_ID + 1;
     for addendum in &doc.addenda {
         docx = render_addendum(docx, addendum, style, &mut next_num_id);
     }
@@ -236,6 +258,30 @@ fn render_footer(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
 
     default_footer = default_footer.add_paragraph(footer_para);
     docx = docx.footer(default_footer);
+    docx
+}
+
+fn render_section_heading(mut docx: Docx, text: &str, style: &StyleConfig) -> Docx {
+    let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
+    let mut heading_run = Run::new()
+        .add_text(text.to_uppercase())
+        .bold()
+        .size(heading_size)
+        .fonts(
+            RunFonts::new()
+                .ascii(&style.heading_font_family)
+                .hi_ansi(&style.heading_font_family),
+        );
+    if let Some(ref color) = style.brand_color_hex() {
+        heading_run = heading_run.color(color);
+    }
+    docx = docx.add_paragraph(Paragraph::new());
+    docx = docx.add_paragraph(
+        Paragraph::new()
+            .style("Heading1")
+            .add_run(heading_run),
+    );
+    docx = docx.add_paragraph(Paragraph::new());
     docx
 }
 

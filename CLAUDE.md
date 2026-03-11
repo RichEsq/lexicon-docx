@@ -60,7 +60,7 @@ cargo test
 .md input
   → frontmatter.rs: YAML front-matter parsing + validation
   → parser/mod.rs: comrak Markdown AST parsing
-  → parser/clause.rs: AST walk → Document IR (clauses, inlines, addenda)
+  → parser/clause.rs: AST walk → Document IR (recitals, clauses, inlines, addenda)
   → parser/anchors.rs: {#id} anchor extraction
   → resolve.rs: clause numbering, cross-ref resolution, term validation, schedule phrase detection
   → signatures.rs: signature template loading, resolution, placeholder expansion
@@ -139,7 +139,7 @@ Future work and design notes are in `lexicon-docx/planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes), recitals/background section (lettered (A)/(B)/(C), body heading requirement)).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 
