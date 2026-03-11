@@ -135,8 +135,10 @@ pub fn render_signature_pages(
             rows.push(TableRow::new(cells));
         }
 
+        // Single-column layouts use half width; multi-column use full width
+        let table_width = if content_cols == 1 { 2500 } else { 5000 };
         let table = DocxTable::without_borders(rows)
-            .width(5000, WidthType::Pct)
+            .width(table_width, WidthType::Pct)
             .margins(TableCellMargins::new().margin(60, 120, 60, 0));
         docx = docx.add_table(table);
     }
