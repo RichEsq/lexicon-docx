@@ -10,14 +10,22 @@ pub const ABSTRACT_NUM_ID: usize = 2;
 pub const BODY_NUMBERING_ID: usize = 2;
 // Simple numbered list (for addendum prose lists)
 pub const SIMPLE_LIST_ABSTRACT_NUM_ID: usize = 3;
-// Recitals use a separate numbering instance (same abstract definition, restarts at 1)
+// Recitals use a separate abstract numbering (may have different align_first_level)
+pub const RECITAL_ABSTRACT_NUM_ID: usize = 4;
 pub const RECITAL_NUMBERING_ID: usize = 4;
 
 pub fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
+    create_clause_numbering_with(style, ABSTRACT_NUM_ID, style.body_align_first_level)
+}
+
+pub fn create_recital_numbering(style: &StyleConfig) -> AbstractNumbering {
+    create_clause_numbering_with(style, RECITAL_ABSTRACT_NUM_ID, style.recitals_align_first_level)
+}
+
+fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> AbstractNumbering {
     let h1_size = StyleConfig::pt_to_half_points(style.heading1_size);
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
     let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
-    let align = style.align_first_level;
 
     let level_indent = |level: usize| -> i32 {
         let num_steps = if align {
@@ -28,7 +36,7 @@ pub fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
         num_steps as i32 * step + hanging
     };
 
-    let mut numbering = AbstractNumbering::new(ABSTRACT_NUM_ID);
+    let mut numbering = AbstractNumbering::new(id);
     numbering.multi_level_type = Some("multilevel".to_string());
     let mut level0 = Level::new(
         0,
@@ -158,9 +166,9 @@ pub fn numbering_level_for(level: ClauseLevel) -> usize {
     }
 }
 
-pub fn indent_for_level(level: ClauseLevel, style: &StyleConfig) -> i32 {
+pub fn indent_for_level(level: ClauseLevel, style: &StyleConfig, align_first_level: bool) -> i32 {
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
-    if style.align_first_level {
+    if align_first_level {
         match level {
             ClauseLevel::TopLevel => 0,
             ClauseLevel::Clause => 0,

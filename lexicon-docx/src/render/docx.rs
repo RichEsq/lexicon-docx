@@ -13,9 +13,9 @@ use crate::render::common::{add_inline_run, render_inlines_paragraph, render_tab
 use crate::render::cover::{render_cover_page, render_inline_title};
 use crate::render::exhibit::{self as exhibit_loader, PdfRenderer};
 use crate::render::numbering::{
-    create_clause_numbering, create_simple_list_numbering, indent_for_level,
-    numbering_level_for, outline_level_for, ABSTRACT_NUM_ID, BODY_NUMBERING_ID,
-    RECITAL_NUMBERING_ID, SIMPLE_LIST_ABSTRACT_NUM_ID,
+    create_clause_numbering, create_recital_numbering, create_simple_list_numbering,
+    indent_for_level, numbering_level_for, outline_level_for, ABSTRACT_NUM_ID,
+    BODY_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID, RECITAL_NUMBERING_ID,
 };
 use crate::render::preamble::render_preamble;
 use crate::render::schedule::render_schedules;
@@ -49,11 +49,12 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         );
 
     // Register clause numbering definitions
-    // Recitals use a separate numbering instance (same abstract def, restarts at 1)
+    // Recitals get a separate abstract numbering (may have different align_first_level)
     docx = docx
         .add_abstract_numbering(create_clause_numbering(style))
         .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID))
-        .add_numbering(Numbering::new(RECITAL_NUMBERING_ID, ABSTRACT_NUM_ID))
+        .add_abstract_numbering(create_recital_numbering(style))
+        .add_numbering(Numbering::new(RECITAL_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID))
         .add_abstract_numbering(create_simple_list_numbering(style));
 
     // Register heading styles so the TOC field can find them
@@ -148,7 +149,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                     docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
                 }
                 BodyElement::Clause(clause) => {
-                    docx = render_clause(docx, clause, style, RECITAL_NUMBERING_ID);
+                    docx = render_clause(docx, clause, style, RECITAL_NUMBERING_ID, style.recitals_align_first_level);
                 }
             }
         }
@@ -166,7 +167,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                 docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
             }
             BodyElement::Clause(clause) => {
-                docx = render_clause(docx, clause, style, BODY_NUMBERING_ID);
+                docx = render_clause(docx, clause, style, BODY_NUMBERING_ID, style.body_align_first_level);
             }
         }
     }
@@ -178,7 +179,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
 
     // Addenda — each ClauseList/NumberedList gets its own numbering instance
     // Start after the abstract numbering IDs we've registered
-    let mut next_num_id: usize = SIMPLE_LIST_ABSTRACT_NUM_ID + 1;
+    let mut next_num_id: usize = RECITAL_ABSTRACT_NUM_ID + 1;
     for addendum in &doc.addenda {
         docx = render_addendum(docx, addendum, style, &mut next_num_id);
     }
@@ -285,8 +286,8 @@ fn render_section_heading(mut docx: Docx, text: &str, style: &StyleConfig) -> Do
     docx
 }
 
-pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize) -> Docx {
-    let indent = indent_for_level(clause.level, style);
+pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize, align_first_level: bool) -> Docx {
+    let indent = indent_for_level(clause.level, style, align_first_level);
     let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
     let level_idx = numbering_level_for(clause.level);
@@ -369,7 +370,7 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
             }
             ClauseBody::Children(children) => {
                 for child in children {
-                    docx = render_clause(docx, child, style, numbering_id);
+                    docx = render_clause(docx, child, style, numbering_id, align_first_level);
                 }
             }
         }

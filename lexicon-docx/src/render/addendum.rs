@@ -67,7 +67,7 @@ pub fn render_addendum(
                         .add_override(LevelOverride::new(3).start(1)),
                 );
                 for clause in clauses {
-                    docx = super::docx::render_clause(docx, clause, style, num_id);
+                    docx = super::docx::render_clause(docx, clause, style, num_id, style.body_align_first_level);
                 }
             }
             AddendumContent::Table(table) => {
