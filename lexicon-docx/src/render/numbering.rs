@@ -113,6 +113,21 @@ pub fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
                 None, None,
             )
         )
+        // Level 5: SubParagraph — "(I)"
+        .add_level(
+            Level::new(
+                5,
+                Start::new(1),
+                NumberFormat::new("upperRoman"),
+                LevelText::new("(%6)"),
+                LevelJc::new("left"),
+            )
+            .indent(
+                Some(level_indent(5)),
+                Some(SpecialIndentType::Hanging(hanging)),
+                None, None,
+            )
+        )
 }
 
 pub fn create_recital_numbering(style: &StyleConfig) -> AbstractNumbering {
@@ -203,6 +218,21 @@ pub fn create_recital_numbering(style: &StyleConfig) -> AbstractNumbering {
                 None, None,
             )
         )
+        // Level 5: RecitalSubParagraph — "(I)"
+        .add_level(
+            Level::new(
+                5,
+                Start::new(1),
+                NumberFormat::new("upperRoman"),
+                LevelText::new("(%6)"),
+                LevelJc::new("left"),
+            )
+            .indent(
+                Some(level_indent(5)),
+                Some(SpecialIndentType::Hanging(hanging)),
+                None, None,
+            )
+        )
 }
 
 pub fn create_simple_list_numbering(style: &StyleConfig) -> AbstractNumbering {
@@ -230,6 +260,7 @@ pub fn numbering_level_for(level: ClauseLevel) -> usize {
         ClauseLevel::SubClause => 2,
         ClauseLevel::SubSubClause => 3,
         ClauseLevel::Paragraph => 4,
+        ClauseLevel::SubParagraph => 5,
     }
 }
 
@@ -242,6 +273,7 @@ pub fn indent_for_level(level: ClauseLevel, style: &StyleConfig) -> i32 {
             ClauseLevel::SubClause => step,
             ClauseLevel::SubSubClause => step * 2,
             ClauseLevel::Paragraph => step * 3,
+            ClauseLevel::SubParagraph => step * 4,
         }
     } else {
         match level {
@@ -250,6 +282,7 @@ pub fn indent_for_level(level: ClauseLevel, style: &StyleConfig) -> i32 {
             ClauseLevel::SubClause => step * 2,
             ClauseLevel::SubSubClause => step * 3,
             ClauseLevel::Paragraph => step * 4,
+            ClauseLevel::SubParagraph => step * 5,
         }
     }
 }
@@ -261,5 +294,6 @@ pub fn outline_level_for(level: ClauseLevel) -> usize {
         ClauseLevel::SubClause => 2,
         ClauseLevel::SubSubClause => 3,
         ClauseLevel::Paragraph => 4,
+        ClauseLevel::SubParagraph => 5,
     }
 }

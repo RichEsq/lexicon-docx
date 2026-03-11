@@ -326,7 +326,8 @@ fn next_level(level: ClauseLevel) -> ClauseLevel {
         ClauseLevel::Clause => ClauseLevel::SubClause,
         ClauseLevel::SubClause => ClauseLevel::SubSubClause,
         ClauseLevel::SubSubClause => ClauseLevel::Paragraph,
-        ClauseLevel::Paragraph => ClauseLevel::Paragraph, // cap at this level
+        ClauseLevel::Paragraph => ClauseLevel::SubParagraph,
+        ClauseLevel::SubParagraph => ClauseLevel::SubParagraph, // cap at this level
     }
 }
 
