@@ -135,8 +135,8 @@ pub fn render_signature_pages(
             rows.push(TableRow::new(cells));
         }
 
-        // Single-column layouts use half width; multi-column use full width
-        let table_width = if content_cols == 1 { 2500 } else { 5000 };
+        // Single-column layouts match the width of one column in a two-column layout
+        let table_width = if content_cols == 1 { 2400 } else { 5000 };
         let table = DocxTable::without_borders(rows)
             .width(table_width, WidthType::Pct)
             .margins(TableCellMargins::new().margin(60, 120, 60, 0));
