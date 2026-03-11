@@ -342,6 +342,27 @@ fn render_inlines_paragraph(
     para
 }
 
+/// Replace straight apostrophes with typographic right single quotation marks.
+///
+/// WORKAROUND for docx-rs 0.4 bug: docx-rs's `escape()` function (in `src/escape/mod.rs`)
+/// converts `'` to `&apos;` in all XML text content. While `&apos;` is valid XML, Word's
+/// TOC field code reads heading text from the raw XML and does NOT unescape `&apos;`,
+/// resulting in literal `&apos;` appearing in the Table of Contents (e.g.
+/// "EatClub&apos;s Obligations" instead of "EatClub's Obligations").
+///
+/// By replacing `'` with the Unicode right single quotation mark (U+2019) before text
+/// reaches docx-rs, we avoid the escaping entirely. This is also standard typographic
+/// practice for legal documents.
+///
+/// If docx-rs fixes this bug (by removing `'` from its escape function, since apostrophes
+/// do not need escaping in XML element text content), this function can be removed and all
+/// call sites reverted to pass text directly to `add_text()`.
+///
+/// See: docx-rs 0.4.19, `src/escape/mod.rs` line 6: `.replace('\'', "&apos;")`
+fn smart_quotes(text: &str) -> String {
+    text.replace('\'', "\u{2019}")
+}
+
 fn add_inline_run(
     para: Paragraph,
     inline: &InlineContent,
@@ -359,17 +380,17 @@ fn add_inline_run(
 
     match inline {
         InlineContent::Text(t) => {
-            let run = apply_heading(Run::new().add_text(t).size(size));
+            let run = apply_heading(Run::new().add_text(smart_quotes(t)).size(size));
             para.add_run(run)
         }
         InlineContent::Bold(t) => {
             render_defined_term(para, t, size, color, &style.defined_term_style)
         }
         InlineContent::Italic(t) => {
-            para.add_run(Run::new().add_text(t).italic().size(size))
+            para.add_run(Run::new().add_text(smart_quotes(t)).italic().size(size))
         }
         InlineContent::Superscript(t) => {
-            let mut run = Run::new().add_text(t).size(size);
+            let mut run = Run::new().add_text(smart_quotes(t)).size(size);
             run.run_property = run.run_property.vert_align(VertAlignType::SuperScript);
             let run = apply_heading(run);
             para.add_run(run)
@@ -380,11 +401,11 @@ fn add_inline_run(
             ..
         } => {
             let text = resolved.as_ref().unwrap_or(display);
-            let run = apply_heading(Run::new().add_text(text).size(size));
+            let run = apply_heading(Run::new().add_text(smart_quotes(text)).size(size));
             para.add_run(run)
         }
         InlineContent::Link { text, .. } => {
-            let run = apply_heading(Run::new().add_text(text).size(size));
+            let run = apply_heading(Run::new().add_text(smart_quotes(text)).size(size));
             para.add_run(run)
         }
         InlineContent::SoftBreak => {
@@ -407,17 +428,17 @@ fn render_defined_term(
 ) -> Paragraph {
     match term_style {
         DefinedTermStyle::Bold => {
-            let mut run = Run::new().add_text(text).bold().size(size);
+            let mut run = Run::new().add_text(smart_quotes(text)).bold().size(size);
             if let Some(c) = color { run = run.color(c); }
             para.add_run(run)
         }
         DefinedTermStyle::Quoted => {
-            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", text)).size(size);
+            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", smart_quotes(text))).size(size);
             if let Some(c) = color { run = run.color(c); }
             para.add_run(run)
         }
         DefinedTermStyle::BoldQuoted => {
-            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", text)).bold().size(size);
+            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", smart_quotes(text))).bold().size(size);
             if let Some(c) = color { run = run.color(c); }
             para.add_run(run)
         }
@@ -476,7 +497,7 @@ fn render_addendum(
     );
 
     // Addendum heading (auto-numbered)
-    let heading_text = addendum.heading();
+    let heading_text = smart_quotes(&addendum.heading());
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)
@@ -577,7 +598,7 @@ fn render_exhibit(
     );
 
     // Exhibit heading — centred title
-    let heading_text = format!("EXHIBIT {} - {}", number, exhibit.title);
+    let heading_text = smart_quotes(&format!("EXHIBIT {} - {}", number, exhibit.title));
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)
