@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use docx_rs::{
     AlignmentType, BreakType, Docx, IndentLevel, LevelOverride, NumberingId, Numbering, Paragraph,
     Run,
 };
 
 use crate::model::*;
-use crate::render::common::{add_inline_run, render_inlines_paragraph, render_table};
+use crate::render::common::{add_inline_run, bookmark_name, render_inlines_paragraph, render_table};
 use crate::render::numbering::{ABSTRACT_NUM_ID, SIMPLE_LIST_ABSTRACT_NUM_ID};
 use crate::style::StyleConfig;
 
@@ -13,6 +15,7 @@ pub fn render_addendum(
     addendum: &Addendum,
     style: &StyleConfig,
     next_num_id: &mut usize,
+    bookmark_ids: &HashMap<String, usize>,
 ) -> Docx {
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
     let body_size = StyleConfig::pt_to_half_points(style.font_size);
@@ -24,16 +27,25 @@ pub fn render_addendum(
 
     // Addendum heading (auto-numbered)
     let heading_text = addendum.heading();
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text(&heading_text)
-                    .bold()
-                    .size(heading_size),
-            ),
-    );
+    let mut heading_para = Paragraph::new()
+        .align(AlignmentType::Center)
+        .add_run(
+            Run::new()
+                .add_text(&heading_text)
+                .bold()
+                .size(heading_size),
+        );
+
+    // Place bookmark on addendum heading
+    if let Some(ref anchor_id) = addendum.anchor {
+        if let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
+            heading_para = heading_para
+                .add_bookmark_start(bm_id, bookmark_name(anchor_id))
+                .add_bookmark_end(bm_id);
+        }
+    }
+
+    docx = docx.add_paragraph(heading_para);
 
     docx = docx.add_paragraph(Paragraph::new());
 
@@ -67,7 +79,7 @@ pub fn render_addendum(
                         .add_override(LevelOverride::new(3).start(1)),
                 );
                 for clause in clauses {
-                    docx = super::docx::render_clause(docx, clause, style, num_id, style.body_align_first_level);
+                    docx = super::docx::render_clause(docx, clause, style, num_id, style.body_align_first_level, bookmark_ids);
                 }
             }
             AddendumContent::Table(table) => {

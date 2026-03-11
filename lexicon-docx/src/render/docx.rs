@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use docx_rs::{
@@ -9,7 +10,7 @@ use docx_rs::{
 use crate::error::{LexiconError, Result};
 use crate::model::*;
 use crate::render::addendum::render_addendum;
-use crate::render::common::{add_inline_run, render_inlines_paragraph, render_table};
+use crate::render::common::{add_inline_run, bookmark_name, render_inlines_paragraph, render_table};
 use crate::render::cover::{render_cover_page, render_inline_title};
 use crate::render::exhibit::{self as exhibit_loader, PdfRenderer};
 use crate::render::numbering::{
@@ -56,6 +57,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         .add_abstract_numbering(create_recital_numbering(style))
         .add_numbering(Numbering::new(RECITAL_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID))
         .add_abstract_numbering(create_simple_list_numbering(style));
+
+    // Build bookmark ID map: anchor_id → unique integer ID for Word bookmarks
+    let bookmark_ids = build_bookmark_map(doc);
 
     // Register heading styles so the TOC field can find them
     for i in 1..=3 {
@@ -149,7 +153,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                     docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
                 }
                 BodyElement::Clause(clause) => {
-                    docx = render_clause(docx, clause, style, RECITAL_NUMBERING_ID, style.recitals_align_first_level);
+                    docx = render_clause(docx, clause, style, RECITAL_NUMBERING_ID, style.recitals_align_first_level, &bookmark_ids);
                 }
             }
         }
@@ -167,7 +171,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                 docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
             }
             BodyElement::Clause(clause) => {
-                docx = render_clause(docx, clause, style, BODY_NUMBERING_ID, style.body_align_first_level);
+                docx = render_clause(docx, clause, style, BODY_NUMBERING_ID, style.body_align_first_level, &bookmark_ids);
             }
         }
     }
@@ -181,7 +185,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     // Start after the abstract numbering IDs we've registered
     let mut next_num_id: usize = RECITAL_ABSTRACT_NUM_ID + 1;
     for addendum in &doc.addenda {
-        docx = render_addendum(docx, addendum, style, &mut next_num_id);
+        docx = render_addendum(docx, addendum, style, &mut next_num_id, &bookmark_ids);
     }
 
     // Exhibits — placeholder pages or imported images/PDFs
@@ -286,11 +290,14 @@ fn render_section_heading(mut docx: Docx, text: &str, style: &StyleConfig) -> Do
     docx
 }
 
-pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize, align_first_level: bool) -> Docx {
+pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize, align_first_level: bool, bookmark_ids: &HashMap<String, usize>) -> Docx {
     let indent = indent_for_level(clause.level, style, align_first_level);
     let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
     let level_idx = numbering_level_for(clause.level);
+
+    // Track whether a bookmark has been placed for this clause's anchor
+    let mut bookmark_placed = false;
 
     // If this clause has a heading, render it as a heading paragraph with native numbering
     if let Some(ref heading) = clause.heading {
@@ -316,6 +323,16 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
                 }
                 rp
             });
+
+        // Place bookmark on the heading paragraph
+        if let Some(ref anchor_id) = clause.anchor {
+            if let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
+                para = para
+                    .add_bookmark_start(bm_id, bookmark_name(anchor_id))
+                    .add_bookmark_end(bm_id);
+                bookmark_placed = true;
+            }
+        }
 
         // Heading inline content — Word generates the number
         let heading_color = if heading.level == 2 { style.brand_color_hex() } else { None };
@@ -345,6 +362,18 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
                             Paragraph::new().indent(Some(indent + hanging), None, None, None)
                         };
 
+                        // Place bookmark on first content paragraph if not already on heading
+                        if !bookmark_placed {
+                            if let Some(ref anchor_id) = clause.anchor {
+                                if let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
+                                    para = para
+                                        .add_bookmark_start(bm_id, bookmark_name(anchor_id))
+                                        .add_bookmark_end(bm_id);
+                                    bookmark_placed = true;
+                                }
+                            }
+                        }
+
                         for inline in inlines {
                             para = add_inline_run(para, inline, false, body_size, style, None);
                         }
@@ -370,13 +399,66 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
             }
             ClauseBody::Children(children) => {
                 for child in children {
-                    docx = render_clause(docx, child, style, numbering_id, align_first_level);
+                    docx = render_clause(docx, child, style, numbering_id, align_first_level, bookmark_ids);
                 }
             }
         }
     }
 
     docx
+}
+
+/// Build a map from anchor IDs to unique bookmark integer IDs.
+fn build_bookmark_map(doc: &Document) -> HashMap<String, usize> {
+    let mut map = HashMap::new();
+    let mut next_id: usize = 1;
+
+    // Collect anchors from recitals
+    if let Some(ref recitals) = doc.recitals {
+        collect_clause_anchors_from_body(&recitals.body, &mut map, &mut next_id);
+    }
+
+    // Collect anchors from body clauses
+    collect_clause_anchors_from_body(&doc.body, &mut map, &mut next_id);
+
+    // Collect anchors from addenda
+    for addendum in &doc.addenda {
+        if let Some(ref anchor_id) = addendum.anchor {
+            map.insert(anchor_id.clone(), next_id);
+            next_id += 1;
+        }
+        for content in &addendum.content {
+            if let AddendumContent::ClauseList(clauses) = content {
+                for clause in clauses {
+                    collect_clause_anchors(clause, &mut map, &mut next_id);
+                }
+            }
+        }
+    }
+
+    map
+}
+
+fn collect_clause_anchors_from_body(body: &[BodyElement], map: &mut HashMap<String, usize>, next_id: &mut usize) {
+    for element in body {
+        if let BodyElement::Clause(clause) = element {
+            collect_clause_anchors(clause, map, next_id);
+        }
+    }
+}
+
+fn collect_clause_anchors(clause: &Clause, map: &mut HashMap<String, usize>, next_id: &mut usize) {
+    if let Some(ref anchor_id) = clause.anchor {
+        map.insert(anchor_id.clone(), *next_id);
+        *next_id += 1;
+    }
+    for element in &clause.body {
+        if let ClauseBody::Children(children) = element {
+            for child in children {
+                collect_clause_anchors(child, map, next_id);
+            }
+        }
+    }
 }
 
 fn render_exhibit(

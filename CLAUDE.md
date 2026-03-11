@@ -139,7 +139,7 @@ Future work and design notes are in `lexicon-docx/planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes), recitals/background section (lettered (A)/(B)/(C), body heading requirement)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes), recitals/background section (lettered (A)/(B)/(C), body heading requirement), native Word cross-references (bookmarks + internal hyperlinks, Ctrl+click navigation)).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 

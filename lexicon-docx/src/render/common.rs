@@ -1,6 +1,6 @@
 use docx_rs::{
-    BreakType, Docx, Paragraph, Run, Table as DocxTable, TableCell, TableRow, VertAlignType,
-    WidthType,
+    BreakType, Docx, Hyperlink, HyperlinkType, Paragraph, Run, Table as DocxTable, TableCell,
+    TableRow, VertAlignType, WidthType,
 };
 
 use crate::model::*;
@@ -56,12 +56,14 @@ pub fn add_inline_run(
         }
         InlineContent::CrossRef {
             display,
+            anchor_id,
             resolved,
-            ..
         } => {
             let text = resolved.as_ref().unwrap_or(display);
             let run = apply_heading(Run::new().add_text(text).size(size));
-            para.add_run(run)
+            let link = Hyperlink::new(bookmark_name(anchor_id), HyperlinkType::Anchor)
+                .add_run(run);
+            para.add_hyperlink(link)
         }
         InlineContent::Link { text, .. } => {
             let run = apply_heading(Run::new().add_text(text).size(size));
@@ -194,6 +196,23 @@ pub fn clean_empty_parens(text: &str) -> String {
         current = current.replace("  ", " ");
     }
     current.trim().to_string()
+}
+
+/// Convert a Lexicon anchor ID to a valid Word bookmark name.
+/// Word bookmarks: must start with a letter, only `[A-Za-z0-9_]`, max 40 chars.
+/// Prefix with `lx_` to avoid collision with Word's reserved `_`-prefixed bookmarks.
+pub fn bookmark_name(anchor_id: &str) -> String {
+    let mut name = String::with_capacity(anchor_id.len() + 3);
+    name.push_str("lx_");
+    for c in anchor_id.chars() {
+        if c.is_ascii_alphanumeric() || c == '_' {
+            name.push(c);
+        } else {
+            name.push('_');
+        }
+    }
+    name.truncate(40);
+    name
 }
 
 pub fn format_date_with_format(date_str: &str, fmt: &str) -> String {
