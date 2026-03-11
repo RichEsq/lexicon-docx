@@ -41,3 +41,18 @@ DOCX merging is out of scope (too complex — style/numbering conflicts).
 1. **Phase 1**: Image files (PNG, JPG) — embed with `docx-rs` image support
 2. **Phase 2**: PDF files — convert each page to an image and insert one per page
 3. **Phase 3**: URL paths — HTTP fetch before import
+
+## PDF Rendering Dependency
+
+Phase 2 currently shells out to `pdftoppm` (from poppler-utils) to rasterise PDF pages to PNG. This is an external system dependency: `brew install poppler` on macOS, `apt install poppler-utils` on Debian/Ubuntu. It is only required when an exhibit has a `.pdf` path — PNG/JPEG exhibits are handled natively via the `image` crate.
+
+### Alternatives evaluated (March 2025)
+
+| Crate | Approach | License | Verdict |
+|-------|----------|---------|---------|
+| **pdfium-render** | Rust wrapper around Google's Pdfium; loads `.so`/`.dylib` at runtime | Apache-2.0/MIT (wrapper) + BSD-3 (Pdfium) | Best quality and API, but still requires an external binary (~25MB Pdfium shared library) |
+| **mupdf** | Rust bindings; compiles MuPDF C source at build time, no runtime dep | **AGPL-3.0** | Excellent rendering, but AGPL infects the entire project unless commercially licensed |
+| **hayro** | Pure Rust PDF renderer, no C dependencies, forbids unsafe | MIT/Apache-2.0 | Only truly zero-dependency option with a permissive license, but still early-stage (self-described). Worth revisiting as it matures |
+| **poppler-rs** | Rust bindings to libpoppler-glib + cairo | **GPL** | Same underlying library as `pdftoppm`, same system deps, worse license — no advantage |
+
+**Update (March 2025)**: Switched to **hayro** as the primary PDF renderer with `pdftoppm` as a fallback. The `--pdf-renderer` CLI flag controls backend selection: `auto` (default, tries hayro first then pdftoppm) or `pdftoppm` (forces the external tool). This eliminates the external dependency for most users while preserving a fallback for edge cases where hayro's rendering is insufficient.

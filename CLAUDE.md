@@ -102,7 +102,8 @@ cargo test
 | `thiserror` | Error type derivation |
 | `zip` 2 | ZIP read/write for .docx post-processing (watermark) |
 | `image` 0.25 | PNG/JPEG decoding + JPEG→PNG conversion for exhibit import |
-| `tempfile` 3 | Temporary directories for PDF-to-image rendering |
+| `tempfile` 3 | Temporary directories for PDF-to-image rendering (pdftoppm fallback) |
+| `hayro` 0.5 | Native Rust PDF rendering for exhibit import (primary backend) |
 
 ### Design Decisions
 
@@ -138,7 +139,7 @@ Future work and design notes are in `lexicon-docx/planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF), signature pages (template-based, external definitions file, short/long layout modes)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes)).
 
 See `lexicon-docx/planning/implementation-status.md` for detailed status.
 

@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 use error::{Diagnostic, Result};
 use model::{Document, Status};
+pub use render::exhibit::PdfRenderer;
 use signatures::SignatureBlock;
 use style::StyleConfig;
 
@@ -22,8 +23,8 @@ pub fn resolve(doc: &mut Document) {
     resolve::resolve(doc);
 }
 
-pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock]) -> Result<Vec<u8>> {
-    render::docx::render_docx(doc, style, input_dir, signature_blocks)
+pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock], pdf_renderer: PdfRenderer) -> Result<Vec<u8>> {
+    render::docx::render_docx(doc, style, input_dir, signature_blocks, pdf_renderer)
 }
 
 /// Resolve a config file path by searching:
@@ -62,6 +63,7 @@ pub fn process(
     style: &StyleConfig,
     input_dir: Option<&Path>,
     signatures_path: Option<&Path>,
+    pdf_renderer: PdfRenderer,
 ) -> Result<(Vec<u8>, Vec<Diagnostic>)> {
     let mut doc = parse(input)?;
     resolve(&mut doc);
@@ -94,7 +96,7 @@ pub fn process(
 
     doc.diagnostics.extend(sig_diagnostics);
 
-    let mut bytes = render_docx(&doc, style, input_dir, &signature_blocks)?;
+    let mut bytes = render_docx(&doc, style, input_dir, &signature_blocks, pdf_renderer)?;
     if doc.meta.status == Some(Status::Draft) {
         bytes = render::watermark::inject_watermark(bytes, "DRAFT")?;
     }

@@ -13,6 +13,7 @@ Lexicon Markdown extends standard Markdown with conventions for legal documents.
 - **Defined term validation** — `**Confidential Information** means ...` defines a term; the processor warns if it's never used
 - **Cover pages, TOC, headers/footers** — generated from YAML front-matter metadata
 - **Schedule generation** — defined terms referencing a schedule are auto-collected into a schedule page
+- **Signature pages** — jurisdiction-aware execution blocks with configurable templates
 - **Draft watermarks** — automatic "DRAFT" watermark when `status: draft`
 
 Without a processor, Lexicon Markdown reads as a clean, well-structured document. With a processor, it becomes a production-ready legal contract.
@@ -73,59 +74,35 @@ schedule:
 
 ## Repository Structure
 
-```
-spec.md           # The Lexicon Markdown specification (v1.0-draft)
-example.md        # A real-world Data Processing Addendum in Lexicon format
-lexicon-docx/     # Rust CLI — converts Lexicon Markdown to .docx
-```
+| Path | Description |
+|------|-------------|
+| [`spec.md`](spec.md) | The Lexicon Markdown specification (v1.0-draft) |
+| [`example.md`](example.md) | A real-world Data Processing Addendum in Lexicon format |
+| [`lexicon-docx/`](lexicon-docx/) | Rust CLI processor — converts Lexicon Markdown to `.docx` |
 
-## Lexicon DOCX Processor
+## Tooling
 
-The `lexicon-docx` CLI converts Lexicon Markdown files into formatted Word documents with legal numbering, cover pages, tables of contents, and more.
+### lexicon-docx
 
-### Requirements
-
-- [Rust](https://rustup.rs/) (2024 edition)
-
-### Build
+The [`lexicon-docx`](lexicon-docx/) CLI converts Lexicon Markdown files into formatted Word documents with legal numbering, cover pages, tables of contents, signature blocks, and more. See the [lexicon-docx README](lexicon-docx/README.md) for installation and usage.
 
 ```bash
 cd lexicon-docx
-cargo build
-```
-
-### Usage
-
-```bash
-# Build a .docx from a Lexicon contract
+cargo build --release
 cargo run -- build ../example.md -o output.docx
-
-# Validate without generating output
-cargo run -- validate ../example.md
-
-# Use a custom style configuration
-cargo run -- build ../example.md -o output.docx --style style.toml
-
-# Fail on warnings
-cargo run -- build ../example.md --strict
 ```
 
-### Features
+## Specification
 
-| Feature | Description |
-|---------|-------------|
-| Cover page | Title, parties, date, status, version, author, ref |
-| Table of contents | Auto-generated from clause headings |
-| Legal numbering | Native Word numbering: `1.`, `1.1`, `(a)`, `(i)` |
-| Cross-references | `{#id}` anchors resolved to clause numbers |
-| Defined terms | Bold terms validated for usage; warnings for unused terms |
-| Schedule page | Defined terms referencing a schedule auto-collected into a completion table |
-| Draft watermark | Diagonal "DRAFT" watermark when `status: draft` |
-| Headers/footers | Document ref and page numbering on all pages |
-| Parties preamble | Configurable intro block with party details before the body |
-| Exhibit pages | Placeholder pages or imported images/PDFs for exhibited documents |
-| Signature pages | Template-based execution blocks with jurisdiction-aware defaults |
-| Configurable layout | TOML style overrides for cover page, TOC, footer, numbering, and more |
+The full Lexicon Markdown specification is in [`spec.md`](spec.md). It covers:
+
+- Document structure and clause hierarchy
+- YAML front-matter fields and validation rules
+- Defined terms and term validation
+- Cross-reference anchors and resolution
+- Schedule declaration and phrase-based item detection
+- Addenda and exhibit declarations
+- Processor capabilities and requirements
 
 ## Front-Matter Fields
 
@@ -137,30 +114,19 @@ date: 2026-01-15               # required, YYYY-MM-DD
 ref: "ABC:123"                 # optional, drafter's reference
 author: Jane Doe (Law Firm)    # optional
 status: draft                  # optional: draft | final | executed
-version: 2                     # optional, positive integer
+version: 2                     # optional
 parties:                       # required
   - name: Party Name
     specifier: ACN 123 456 789 # optional
     role: Buyer                # used as a defined term
-    entity_type: au-company    # optional: jurisdiction-type for signature blocks
+    entity_type: au-company    # optional, for signature block templates
 exhibits:                      # optional
   - title: Exhibit Title
-    path: ./diagram.png        # optional: local path or URL to PNG/JPG/PDF
+    path: ./diagram.png        # optional: local path to PNG/JPG/PDF
 schedule:                      # optional
   - title: Schedule            # generates a schedule page from defined terms
 ---
 ```
-
-## Specification
-
-The full Lexicon Markdown specification is in [`spec.md`](spec.md). It covers:
-
-- Document structure and clause hierarchy
-- Defined terms and term validation rules
-- Cross-reference anchors and resolution
-- Schedule declaration and phrase-based item detection
-- Addenda and exhibit declarations
-- Processor capabilities and validation requirements
 
 ## License
 

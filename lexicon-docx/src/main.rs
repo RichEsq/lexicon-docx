@@ -30,6 +30,11 @@ enum Commands {
         #[arg(long)]
         signatures: Option<PathBuf>,
 
+        /// PDF rendering backend for exhibit imports: "auto" (default, tries native
+        /// renderer first then falls back to pdftoppm) or "pdftoppm" (force pdftoppm).
+        #[arg(long, default_value = "auto")]
+        pdf_renderer: String,
+
         /// Fail on warnings (exit code 1)
         #[arg(long)]
         strict: bool,
@@ -51,8 +56,17 @@ fn main() {
             output,
             style,
             signatures,
+            pdf_renderer,
             strict,
         } => {
+            let pdf_renderer = match pdf_renderer.as_str() {
+                "auto" => lexicon_docx::PdfRenderer::Auto,
+                "pdftoppm" => lexicon_docx::PdfRenderer::Pdftoppm,
+                other => {
+                    eprintln!("Unknown --pdf-renderer value '{}'. Use 'auto' or 'pdftoppm'.", other);
+                    std::process::exit(1);
+                }
+            };
             let output_path = output.unwrap_or_else(|| input.with_extension("docx"));
             let input_dir = input.parent();
 
@@ -94,7 +108,7 @@ fn main() {
                 }
             };
 
-            match lexicon_docx::process(&input_text, &style_config, input_dir, signatures_path.as_deref()) {
+            match lexicon_docx::process(&input_text, &style_config, input_dir, signatures_path.as_deref(), pdf_renderer) {
                 Ok((bytes, diagnostics)) => {
                     let has_errors = print_diagnostics(&diagnostics);
 

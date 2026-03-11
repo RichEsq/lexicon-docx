@@ -10,7 +10,7 @@ use docx_rs::{
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
-use crate::render::exhibit as exhibit_loader;
+use crate::render::exhibit::{self as exhibit_loader, PdfRenderer};
 use crate::render::signatures as sig_renderer;
 use crate::signatures::SignatureBlock;
 use crate::style::{DefinedTermStyle, PartyFormat, PreambleStyle, SchedulePosition, StyleConfig};
@@ -21,7 +21,7 @@ const BODY_NUMBERING_ID: usize = 2;
 // Simple numbered list (for addendum prose lists)
 const SIMPLE_LIST_ABSTRACT_NUM_ID: usize = 3;
 
-pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock]) -> Result<Vec<u8>> {
+pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock], pdf_renderer: PdfRenderer) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
 
     // Page setup
@@ -215,7 +215,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
 
     // Exhibits — placeholder pages or imported images/PDFs
     for (i, exhibit) in doc.meta.exhibits.iter().enumerate() {
-        docx = render_exhibit(docx, exhibit, i + 1, style, input_dir)?;
+        docx = render_exhibit(docx, exhibit, i + 1, style, input_dir, pdf_renderer)?;
     }
 
     // Schedule at end (if configured, this is the default)
@@ -567,6 +567,7 @@ fn render_exhibit(
     number: usize,
     style: &StyleConfig,
     input_dir: Option<&Path>,
+    pdf_renderer: PdfRenderer,
 ) -> Result<Docx> {
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
 
@@ -590,7 +591,7 @@ fn render_exhibit(
 
     // If path is set, load and embed the file; otherwise leave as placeholder
     if let Some(ref path) = exhibit.path {
-        let images = exhibit_loader::load_exhibit(path, input_dir)?;
+        let images = exhibit_loader::load_exhibit(path, input_dir, pdf_renderer)?;
 
         // Calculate content area in EMU (1 twip = 635 EMU)
         let margin_left = StyleConfig::cm_to_twips(style.margin_left_cm) as u32;
