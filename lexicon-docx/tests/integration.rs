@@ -222,11 +222,11 @@ fn multiple_top_level_clauses_numbered_sequentially() {
 
 #[test]
 fn clause_number_full_reference() {
-    assert_eq!(ClauseNumber::TopLevel(3).full_reference(), "clause 3");
-    assert_eq!(ClauseNumber::Clause(2, 5).full_reference(), "clause 2.5");
-    assert_eq!(ClauseNumber::SubClause(1, 2, 'c').full_reference(), "clause 1.2(c)");
+    assert_eq!(ClauseNumber::TopLevel(3).full_reference("clause"), "clause 3");
+    assert_eq!(ClauseNumber::Clause(2, 5).full_reference("clause"), "clause 2.5");
+    assert_eq!(ClauseNumber::SubClause(1, 2, 'c').full_reference("clause"), "clause 1.2(c)");
     assert_eq!(
-        ClauseNumber::SubSubClause(1, 2, 'a', "ii".to_string()).full_reference(),
+        ClauseNumber::SubSubClause(1, 2, 'a', "ii".to_string()).full_reference("clause"),
         "clause 1.2(a)(ii)"
     );
 }
@@ -629,8 +629,8 @@ fn recitals_basic_parsing() {
         if let BodyElement::Clause(c) = e { Some(c) } else { None }
     }).collect();
     assert_eq!(clauses.len(), 2);
-    assert!(matches!(clauses[0].number, Some(ClauseNumber::RecitalTopLevel('A'))));
-    assert!(matches!(clauses[1].number, Some(ClauseNumber::RecitalTopLevel('B'))));
+    assert!(matches!(clauses[0].number, Some(ClauseNumber::TopLevel(1))));
+    assert!(matches!(clauses[1].number, Some(ClauseNumber::TopLevel(2))));
 
     // Body heading captured
     assert_eq!(doc.body_heading.as_deref(), Some("Operative Provisions"));
@@ -666,7 +666,7 @@ fn recitals_prose_content() {
 #[test]
 fn recitals_cross_reference() {
     let input = format!(
-        "{}# Background\n\n1. The background to this agreement. {{#bg}}\n\n# Operative Provisions\n\n1. ## Clause\n\n    1. See [Recital A](#bg).\n",
+        "{}# Background\n\n1. The background to this agreement. {{#bg}}\n\n# Operative Provisions\n\n1. ## Clause\n\n    1. See [Recital 1](#bg).\n",
         MINIMAL
     );
     let doc = parse_and_resolve(&input);
@@ -676,12 +676,12 @@ fn recitals_cross_reference() {
         let child = first_child_clause(clause).unwrap();
         let has_resolved = child.body.iter().any(|e| {
             if let ClauseBody::Content(ClauseContent::Paragraph(inlines)) = e {
-                inlines.iter().any(|i| matches!(i, InlineContent::CrossRef { resolved: Some(r), .. } if r == "Recital A"))
+                inlines.iter().any(|i| matches!(i, InlineContent::CrossRef { resolved: Some(r), .. } if r == "Recital 1"))
             } else {
                 false
             }
         });
-        assert!(has_resolved, "Cross-reference to recital should resolve to 'Recital A'");
+        assert!(has_resolved, "Cross-reference to recital should resolve to 'Recital 1'");
     }
 }
 

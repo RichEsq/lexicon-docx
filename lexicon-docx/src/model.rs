@@ -142,12 +142,6 @@ pub enum ClauseNumber {
     SubSubClause(u32, u32, char, String),
     Paragraph(u32, u32, char, String, char),
     SubParagraph(u32, u32, char, String, char, String),
-    RecitalTopLevel(char),
-    RecitalClause(char, u32),
-    RecitalSubClause(char, u32, char),
-    RecitalSubSubClause(char, u32, char, String),
-    RecitalParagraph(char, u32, char, String, char),
-    RecitalSubParagraph(char, u32, char, String, char, String),
 }
 
 impl std::fmt::Display for ClauseNumber {
@@ -159,44 +153,27 @@ impl std::fmt::Display for ClauseNumber {
             ClauseNumber::SubSubClause(_, _, _, r) => write!(f, "({})", r),
             ClauseNumber::Paragraph(_, _, _, _, p) => write!(f, "({})", p),
             ClauseNumber::SubParagraph(_, _, _, _, _, r) => write!(f, "({})", r),
-            ClauseNumber::RecitalTopLevel(a) => write!(f, "({})", a),
-            ClauseNumber::RecitalClause(a, b) => write!(f, "{}.{}", a, b),
-            ClauseNumber::RecitalSubClause(_, _, c) => write!(f, "({})", c),
-            ClauseNumber::RecitalSubSubClause(_, _, _, r) => write!(f, "({})", r),
-            ClauseNumber::RecitalParagraph(_, _, _, _, p) => write!(f, "({})", p),
-            ClauseNumber::RecitalSubParagraph(_, _, _, _, _, r) => write!(f, "({})", r),
         }
     }
 }
 
 impl ClauseNumber {
-    pub fn full_reference(&self) -> String {
-        match self {
-            ClauseNumber::TopLevel(a) => format!("clause {}", a),
-            ClauseNumber::Clause(a, b) => format!("clause {}.{}", a, b),
-            ClauseNumber::SubClause(a, b, c) => format!("clause {}.{}({})", a, b, c),
+    pub fn full_reference(&self, prefix: &str) -> String {
+        let num = match self {
+            ClauseNumber::TopLevel(a) => format!("{}", a),
+            ClauseNumber::Clause(a, b) => format!("{}.{}", a, b),
+            ClauseNumber::SubClause(a, b, c) => format!("{}.{}({})", a, b, c),
             ClauseNumber::SubSubClause(a, b, c, r) => {
-                format!("clause {}.{}({})({})", a, b, c, r)
+                format!("{}.{}({})({})", a, b, c, r)
             }
             ClauseNumber::Paragraph(a, b, c, r, p) => {
-                format!("clause {}.{}({})({})({})", a, b, c, r, p)
+                format!("{}.{}({})({})({})", a, b, c, r, p)
             }
             ClauseNumber::SubParagraph(a, b, c, r, p, sr) => {
-                format!("clause {}.{}({})({})({})({})", a, b, c, r, p, sr)
+                format!("{}.{}({})({})({})({})", a, b, c, r, p, sr)
             }
-            ClauseNumber::RecitalTopLevel(a) => format!("Recital {}", a),
-            ClauseNumber::RecitalClause(a, b) => format!("Recital {}.{}", a, b),
-            ClauseNumber::RecitalSubClause(a, b, c) => format!("Recital {}.{}({})", a, b, c),
-            ClauseNumber::RecitalSubSubClause(a, b, c, r) => {
-                format!("Recital {}.{}({})({})", a, b, c, r)
-            }
-            ClauseNumber::RecitalParagraph(a, b, c, r, p) => {
-                format!("Recital {}.{}({})({})({})", a, b, c, r, p)
-            }
-            ClauseNumber::RecitalSubParagraph(a, b, c, r, p, sr) => {
-                format!("Recital {}.{}({})({})({})({})", a, b, c, r, p, sr)
-            }
-        }
+        };
+        format!("{} {}", prefix, num)
     }
 }
 

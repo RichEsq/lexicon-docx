@@ -13,9 +13,9 @@ use crate::render::common::{add_inline_run, render_inlines_paragraph, render_tab
 use crate::render::cover::{render_cover_page, render_inline_title};
 use crate::render::exhibit::{self as exhibit_loader, PdfRenderer};
 use crate::render::numbering::{
-    create_clause_numbering, create_recital_numbering, create_simple_list_numbering,
-    indent_for_level, numbering_level_for, outline_level_for, ABSTRACT_NUM_ID,
-    BODY_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID, RECITAL_NUMBERING_ID,
+    create_clause_numbering, create_simple_list_numbering, indent_for_level,
+    numbering_level_for, outline_level_for, ABSTRACT_NUM_ID, BODY_NUMBERING_ID,
+    RECITAL_NUMBERING_ID, SIMPLE_LIST_ABSTRACT_NUM_ID,
 };
 use crate::render::preamble::render_preamble;
 use crate::render::schedule::render_schedules;
@@ -49,12 +49,12 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         );
 
     // Register clause numbering definitions
+    // Recitals use a separate numbering instance (same abstract def, restarts at 1)
     docx = docx
         .add_abstract_numbering(create_clause_numbering(style))
         .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID))
-        .add_abstract_numbering(create_simple_list_numbering(style))
-        .add_abstract_numbering(create_recital_numbering(style))
-        .add_numbering(Numbering::new(RECITAL_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID));
+        .add_numbering(Numbering::new(RECITAL_NUMBERING_ID, ABSTRACT_NUM_ID))
+        .add_abstract_numbering(create_simple_list_numbering(style));
 
     // Register heading styles so the TOC field can find them
     for i in 1..=3 {
@@ -178,7 +178,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
 
     // Addenda — each ClauseList/NumberedList gets its own numbering instance
     // Start after the abstract numbering IDs we've registered
-    let mut next_num_id: usize = RECITAL_ABSTRACT_NUM_ID + 1;
+    let mut next_num_id: usize = SIMPLE_LIST_ABSTRACT_NUM_ID + 1;
     for addendum in &doc.addenda {
         docx = render_addendum(docx, addendum, style, &mut next_num_id);
     }

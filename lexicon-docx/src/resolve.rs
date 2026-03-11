@@ -15,19 +15,18 @@ static FORMAL_DEF_ALT_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 pub fn resolve(doc: &mut Document) {
-    // Number recitals (A, B, C at top level)
+    // Number recitals and body clauses (both use the same scheme: 1., 1.1, (a), etc.)
     if let Some(ref mut recitals) = doc.recitals {
-        assign_recital_numbers(&mut recitals.body);
+        assign_clause_numbers(&mut recitals.body);
     }
-
     assign_clause_numbers(&mut doc.body);
 
-    // Build anchor → clause number map (from both recitals and body)
-    let mut anchor_map = HashMap::new();
+    // Build anchor → reference text map (from both recitals and body)
+    let mut anchor_map: HashMap<String, String> = HashMap::new();
     if let Some(ref recitals) = doc.recitals {
-        collect_body_anchors(&recitals.body, &mut anchor_map);
+        collect_body_anchors(&recitals.body, &mut anchor_map, "Recital");
     }
-    collect_body_anchors(&doc.body, &mut anchor_map);
+    collect_body_anchors(&doc.body, &mut anchor_map, "clause");
 
     // Resolve cross-references and validate
     if let Some(ref mut recitals) = doc.recitals {
@@ -109,94 +108,24 @@ fn assign_children_numbers(parent: &mut Clause, top: u32) {
     }
 }
 
-// --- Recital numbering ---
-
-fn assign_recital_numbers(body: &mut [BodyElement]) {
-    let mut top_counter = 0u8;
-    for element in body.iter_mut() {
-        if let BodyElement::Clause(clause) = element {
-            top_counter += 1;
-            let letter = (b'A' + top_counter - 1) as char;
-            clause.number = Some(ClauseNumber::RecitalTopLevel(letter));
-            assign_recital_children_numbers(clause, letter);
-        }
-    }
-}
-
-fn assign_recital_children_numbers(parent: &mut Clause, top_letter: char) {
-    let parent_number = parent.number.clone();
-    let mut i = 0usize;
-
-    for element in &mut parent.body {
-        if let ClauseBody::Children(kids) = element {
-            for child in kids.iter_mut() {
-                let number = match child.level {
-                    ClauseLevel::TopLevel => {
-                        let letter = (b'A' + i as u8) as char;
-                        ClauseNumber::RecitalTopLevel(letter)
-                    }
-                    ClauseLevel::Clause => {
-                        ClauseNumber::RecitalClause(top_letter, i as u32 + 1)
-                    }
-                    ClauseLevel::SubClause => {
-                        let clause_num = match &parent_number {
-                            Some(ClauseNumber::RecitalClause(_, c)) => *c,
-                            _ => 0,
-                        };
-                        let letter = (b'a' + i as u8) as char;
-                        ClauseNumber::RecitalSubClause(top_letter, clause_num, letter)
-                    }
-                    ClauseLevel::SubSubClause => {
-                        let (clause_num, letter) = match &parent_number {
-                            Some(ClauseNumber::RecitalSubClause(_, c, l)) => (*c, *l),
-                            _ => (0, 'a'),
-                        };
-                        let roman = to_roman(i as u32 + 1);
-                        ClauseNumber::RecitalSubSubClause(top_letter, clause_num, letter, roman)
-                    }
-                    ClauseLevel::Paragraph => {
-                        let (clause_num, letter, roman) = match &parent_number {
-                            Some(ClauseNumber::RecitalSubSubClause(_, c, l, r)) => (*c, *l, r.clone()),
-                            _ => (0, 'a', "i".to_string()),
-                        };
-                        let upper = (b'A' + i as u8) as char;
-                        ClauseNumber::RecitalParagraph(top_letter, clause_num, letter, roman, upper)
-                    }
-                    ClauseLevel::SubParagraph => {
-                        let (clause_num, letter, roman, upper) = match &parent_number {
-                            Some(ClauseNumber::RecitalParagraph(_, c, l, r, u)) => (*c, *l, r.clone(), *u),
-                            _ => (0, 'a', "i".to_string(), 'A'),
-                        };
-                        let upper_roman = to_roman(i as u32 + 1).to_uppercase();
-                        ClauseNumber::RecitalSubParagraph(top_letter, clause_num, letter, roman, upper, upper_roman)
-                    }
-                };
-                child.number = Some(number);
-                assign_recital_children_numbers(child, top_letter);
-                i += 1;
-            }
-        }
-    }
-}
-
 // --- Anchor map ---
 
-fn collect_body_anchors(body: &[BodyElement], map: &mut HashMap<String, ClauseNumber>) {
+fn collect_body_anchors(body: &[BodyElement], map: &mut HashMap<String, String>, prefix: &str) {
     for element in body {
         if let BodyElement::Clause(clause) = element {
-            collect_anchors(clause, map);
+            collect_anchors(clause, map, prefix);
         }
     }
 }
 
-fn collect_anchors(clause: &Clause, map: &mut HashMap<String, ClauseNumber>) {
+fn collect_anchors(clause: &Clause, map: &mut HashMap<String, String>, prefix: &str) {
     if let (Some(anchor), Some(number)) = (&clause.anchor, &clause.number) {
-        map.insert(anchor.clone(), number.clone());
+        map.insert(anchor.clone(), number.full_reference(prefix));
     }
     for element in &clause.body {
         if let ClauseBody::Children(kids) = element {
             for child in kids {
-                collect_anchors(child, map);
+                collect_anchors(child, map, prefix);
             }
         }
     }
@@ -206,7 +135,7 @@ fn collect_anchors(clause: &Clause, map: &mut HashMap<String, ClauseNumber>) {
 
 fn resolve_cross_refs(
     body: &mut [BodyElement],
-    anchor_map: &HashMap<String, ClauseNumber>,
+    anchor_map: &HashMap<String, String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for element in body.iter_mut() {
@@ -223,10 +152,10 @@ fn resolve_cross_refs(
 
 fn resolve_clause_cross_refs(
     clause: &mut Clause,
-    anchor_map: &HashMap<String, ClauseNumber>,
+    anchor_map: &HashMap<String, String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let clause_loc = clause.number.as_ref().map(|n| n.full_reference());
+    let clause_loc = clause.number.as_ref().map(|n| n.full_reference("clause"));
 
     if let Some(ref mut heading) = clause.heading {
         resolve_inlines_cross_refs(
@@ -257,7 +186,7 @@ fn resolve_clause_cross_refs(
 
 fn resolve_inlines_cross_refs(
     inlines: &mut [InlineContent],
-    anchor_map: &HashMap<String, ClauseNumber>,
+    anchor_map: &HashMap<String, String>,
     diagnostics: &mut Vec<Diagnostic>,
     location: Option<&str>,
 ) {
@@ -268,8 +197,8 @@ fn resolve_inlines_cross_refs(
             display,
         } = inline
         {
-            if let Some(number) = anchor_map.get(anchor_id.as_str()) {
-                *resolved = Some(number.full_reference());
+            if let Some(ref_text) = anchor_map.get(anchor_id.as_str()) {
+                *resolved = Some(ref_text.clone());
             } else {
                 diagnostics.push(Diagnostic {
                     level: DiagLevel::Warning,
@@ -286,7 +215,7 @@ fn resolve_inlines_cross_refs(
 
 fn resolve_addendum_cross_refs(
     addendum: &mut Addendum,
-    anchor_map: &HashMap<String, ClauseNumber>,
+    anchor_map: &HashMap<String, String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let loc = addendum.heading();
@@ -531,7 +460,7 @@ fn collect_clause_terms(
     schedule_items: &mut Vec<ScheduleItem>,
     patterns: &[(usize, Regex)],
 ) {
-    let clause_loc = clause.number.as_ref().map(|n| n.full_reference());
+    let clause_loc = clause.number.as_ref().map(|n| n.full_reference("clause"));
 
     for element in &clause.body {
         match element {

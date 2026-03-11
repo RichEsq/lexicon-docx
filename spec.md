@@ -328,11 +328,11 @@ The recitals section supports the same content types as the document body: order
 
 #### 3.9.2. Numbering
 
-Ordered list items in the recitals section are lettered (A), (B), (C) at the top level, rather than numbered. Sub-levels follow the same hierarchy as body clauses: A.1, A.1(a), A.1(a)(i), A.1(a)(i)(A), A.1(a)(i)(A)(I).
+Ordered list items in the recitals section use the same numbering hierarchy as body clauses: `1.`, `1.1`, `(a)`, `(i)`, `(A)`, `(I)`. Numbering restarts at 1 within the recitals section (independent of the body clause numbering).
 
 #### 3.9.3. Cross-References and Defined Terms
 
-Recitals support `{#id}` anchors and cross-references. A cross-reference to a recital resolves to "Recital A", "Recital A.1", etc. Bold terms in recitals are validated in the same way as the document body.
+Recitals support `{#id}` anchors and cross-references. A cross-reference to a recital resolves to "Recital 1", "Recital 1.1", etc. Bold terms in recitals are validated in the same way as the document body.
 
 #### 3.9.4. Rules
 
