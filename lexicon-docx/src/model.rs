@@ -124,6 +124,7 @@ pub enum ClauseLevel {
     Clause,
     SubClause,
     SubSubClause,
+    Paragraph,
 }
 
 #[derive(Debug)]
@@ -138,10 +139,12 @@ pub enum ClauseNumber {
     Clause(u32, u32),
     SubClause(u32, u32, char),
     SubSubClause(u32, u32, char, String),
+    Paragraph(u32, u32, char, String, char),
     RecitalTopLevel(char),
     RecitalClause(char, u32),
     RecitalSubClause(char, u32, char),
     RecitalSubSubClause(char, u32, char, String),
+    RecitalParagraph(char, u32, char, String, char),
 }
 
 impl std::fmt::Display for ClauseNumber {
@@ -151,10 +154,12 @@ impl std::fmt::Display for ClauseNumber {
             ClauseNumber::Clause(a, b) => write!(f, "{}.{}", a, b),
             ClauseNumber::SubClause(_, _, c) => write!(f, "({})", c),
             ClauseNumber::SubSubClause(_, _, _, r) => write!(f, "({})", r),
+            ClauseNumber::Paragraph(_, _, _, _, p) => write!(f, "({})", p),
             ClauseNumber::RecitalTopLevel(a) => write!(f, "({})", a),
             ClauseNumber::RecitalClause(a, b) => write!(f, "{}.{}", a, b),
             ClauseNumber::RecitalSubClause(_, _, c) => write!(f, "({})", c),
             ClauseNumber::RecitalSubSubClause(_, _, _, r) => write!(f, "({})", r),
+            ClauseNumber::RecitalParagraph(_, _, _, _, p) => write!(f, "({})", p),
         }
     }
 }
@@ -168,11 +173,17 @@ impl ClauseNumber {
             ClauseNumber::SubSubClause(a, b, c, r) => {
                 format!("clause {}.{}({})({})", a, b, c, r)
             }
+            ClauseNumber::Paragraph(a, b, c, r, p) => {
+                format!("clause {}.{}({})({})({})", a, b, c, r, p)
+            }
             ClauseNumber::RecitalTopLevel(a) => format!("Recital {}", a),
             ClauseNumber::RecitalClause(a, b) => format!("Recital {}.{}", a, b),
             ClauseNumber::RecitalSubClause(a, b, c) => format!("Recital {}.{}({})", a, b, c),
             ClauseNumber::RecitalSubSubClause(a, b, c, r) => {
                 format!("Recital {}.{}({})({})", a, b, c, r)
+            }
+            ClauseNumber::RecitalParagraph(a, b, c, r, p) => {
+                format!("Recital {}.{}({})({})({})", a, b, c, r, p)
             }
         }
     }

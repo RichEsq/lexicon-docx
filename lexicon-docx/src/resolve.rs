@@ -84,6 +84,14 @@ fn assign_children_numbers(parent: &mut Clause, top: u32) {
                         let roman = to_roman(i as u32 + 1);
                         ClauseNumber::SubSubClause(top, clause_num, letter, roman)
                     }
+                    ClauseLevel::Paragraph => {
+                        let (clause_num, letter, roman) = match &parent_number {
+                            Some(ClauseNumber::SubSubClause(_, c, l, r)) => (*c, *l, r.clone()),
+                            _ => (0, 'a', "i".to_string()),
+                        };
+                        let upper = (b'A' + i as u8) as char;
+                        ClauseNumber::Paragraph(top, clause_num, letter, roman, upper)
+                    }
                 };
                 child.number = Some(number);
                 assign_children_numbers(child, top);
@@ -137,6 +145,14 @@ fn assign_recital_children_numbers(parent: &mut Clause, top_letter: char) {
                         };
                         let roman = to_roman(i as u32 + 1);
                         ClauseNumber::RecitalSubSubClause(top_letter, clause_num, letter, roman)
+                    }
+                    ClauseLevel::Paragraph => {
+                        let (clause_num, letter, roman) = match &parent_number {
+                            Some(ClauseNumber::RecitalSubSubClause(_, c, l, r)) => (*c, *l, r.clone()),
+                            _ => (0, 'a', "i".to_string()),
+                        };
+                        let upper = (b'A' + i as u8) as char;
+                        ClauseNumber::RecitalParagraph(top_letter, clause_num, letter, roman, upper)
                     }
                 };
                 child.number = Some(number);

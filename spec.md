@@ -231,12 +231,13 @@ Sub-clauses are represented by indented ordered list items. Each level of nestin
 
 The hierarchy is:
 
-| Level         | Syntax                   | Rendered as (by processor) |
-| ------------- | ------------------------ | -------------------------- |
-| Top-level     | `1. ## Heading`          | `1. Heading`               |
-| Clause        | `    1. Text`            | `1.1.` or `1.1`           |
-| Sub-clause    | `        1. Text`        | `(a)`                      |
-| Sub-sub-clause| `            1. Text`    | `(i)`                      |
+| Level         | Syntax                       | Rendered as (by processor) |
+| ------------- | ---------------------------- | -------------------------- |
+| Top-level     | `1. ## Heading`              | `1. Heading`               |
+| Clause        | `    1. Text`                | `1.1` or `1.1.`           |
+| Sub-clause    | `        1. Text`            | `(a)`                      |
+| Sub-sub-clause| `            1. Text`        | `(i)`                      |
+| Paragraph     | `                1. Text`    | `(A)`                      |
 
 Without a processor, standard Markdown renderers will display these as nested numbered lists (`1.`, `1.`, `1.`, `1.`). With a processor (e.g., Pandoc with a custom filter, or a dedicated tool), the numbering is transformed to the legal convention shown in the table above.
 
@@ -326,7 +327,7 @@ The recitals section supports the same content types as the document body: order
 
 #### 3.9.2. Numbering
 
-Ordered list items in the recitals section are lettered (A), (B), (C) at the top level, rather than numbered. Sub-levels follow the same hierarchy as body clauses: A.1, A.1(a), A.1(a)(i).
+Ordered list items in the recitals section are lettered (A), (B), (C) at the top level, rather than numbered. Sub-levels follow the same hierarchy as body clauses: A.1, A.1(a), A.1(a)(i), A.1(a)(i)(A).
 
 #### 3.9.3. Cross-References and Defined Terms
 
