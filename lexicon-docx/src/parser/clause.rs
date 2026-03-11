@@ -173,8 +173,7 @@ fn extract_clause_from_item<'a>(
 ) -> Clause {
     let mut heading = None;
     let mut anchor = None;
-    let mut content = Vec::new();
-    let mut children = Vec::new();
+    let mut body: Vec<ClauseBody> = Vec::new();
 
     for child in item.children() {
         let data = child.data.borrow();
@@ -224,7 +223,7 @@ fn extract_clause_from_item<'a>(
                 }
 
                 if !inlines.is_empty() {
-                    content.push(ClauseContent::Paragraph(inlines));
+                    body.push(ClauseBody::Content(ClauseContent::Paragraph(inlines)));
                 }
             }
 
@@ -234,19 +233,19 @@ fn extract_clause_from_item<'a>(
                 drop(data);
                 let child_level = next_level(level);
                 let child_clauses = extract_clauses_from_list(child, child_level);
-                children.extend(child_clauses);
+                body.push(ClauseBody::Children(child_clauses));
             }
 
             NodeValue::BlockQuote => {
                 drop(data);
                 let inlines = extract_blockquote_inlines(child);
-                content.push(ClauseContent::Blockquote(inlines));
+                body.push(ClauseBody::Content(ClauseContent::Blockquote(inlines)));
             }
 
             NodeValue::Table(_) => {
                 drop(data);
                 let table = extract_table(child);
-                content.push(ClauseContent::Table(table));
+                body.push(ClauseBody::Content(ClauseContent::Table(table)));
             }
 
             _ => {
@@ -260,8 +259,7 @@ fn extract_clause_from_item<'a>(
         heading,
         anchor,
         number: None,
-        content,
-        children,
+        body,
     }
 }
 

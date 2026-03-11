@@ -273,52 +273,54 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
         docx = docx.add_paragraph(para);
     }
 
-    // Render clause content paragraphs
+    // Render clause body elements in source order (content and children interleaved)
     let mut first_content = true;
-    for content in &clause.content {
-        match content {
-            ClauseContent::Paragraph(inlines) => {
-                let body_size = StyleConfig::pt_to_half_points(style.font_size);
+    for element in &clause.body {
+        match element {
+            ClauseBody::Content(content) => {
+                match content {
+                    ClauseContent::Paragraph(inlines) => {
+                        let body_size = StyleConfig::pt_to_half_points(style.font_size);
 
-                let mut para = if clause.heading.is_none() && first_content {
-                    // First content paragraph of a non-headed clause: attach numbering.
-                    // Word's numbering engine handles the actual count — we don't need
-                    // an internally assigned clause.number for this to work.
-                    first_content = false;
-                    Paragraph::new()
-                        .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
-                } else {
-                    // Continuation paragraph — align to text position past the number
-                    Paragraph::new().indent(Some(indent + hanging), None, None, None)
-                };
+                        let mut para = if clause.heading.is_none() && first_content {
+                            // First content paragraph of a non-headed clause: attach numbering.
+                            first_content = false;
+                            Paragraph::new()
+                                .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
+                        } else {
+                            // Continuation paragraph — align to text position past the number
+                            Paragraph::new().indent(Some(indent + hanging), None, None, None)
+                        };
 
-                for inline in inlines {
-                    para = add_inline_run(para, inline, false, body_size, style, None);
+                        for inline in inlines {
+                            para = add_inline_run(para, inline, false, body_size, style, None);
+                        }
+
+                        docx = docx.add_paragraph(para);
+                    }
+                    ClauseContent::Blockquote(inlines) => {
+                        let body_size = StyleConfig::pt_to_half_points(style.font_size);
+                        let bq_indent = indent + hanging + step;
+                        let mut para = Paragraph::new()
+                            .indent(Some(bq_indent), None, None, None);
+
+                        for inline in inlines {
+                            para = add_inline_run(para, inline, false, body_size, style, None);
+                        }
+
+                        docx = docx.add_paragraph(para);
+                    }
+                    ClauseContent::Table(table) => {
+                        docx = render_table(docx, table, style);
+                    }
                 }
-
-                docx = docx.add_paragraph(para);
             }
-            ClauseContent::Blockquote(inlines) => {
-                let body_size = StyleConfig::pt_to_half_points(style.font_size);
-                let bq_indent = indent + hanging + step;
-                let mut para = Paragraph::new()
-                    .indent(Some(bq_indent), None, None, None);
-
-                for inline in inlines {
-                    para = add_inline_run(para, inline, false, body_size, style, None);
+            ClauseBody::Children(children) => {
+                for child in children {
+                    docx = render_clause(docx, child, style, numbering_id);
                 }
-
-                docx = docx.add_paragraph(para);
-            }
-            ClauseContent::Table(table) => {
-                docx = render_table(docx, table, style);
             }
         }
-    }
-
-    // Render children
-    for child in &clause.children {
-        docx = render_clause(docx, child, style, numbering_id);
     }
 
     docx

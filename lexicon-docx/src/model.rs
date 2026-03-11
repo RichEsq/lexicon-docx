@@ -77,8 +77,16 @@ pub struct Clause {
     pub heading: Option<ClauseHeading>,
     pub anchor: Option<String>,
     pub number: Option<ClauseNumber>,
-    pub content: Vec<ClauseContent>,
-    pub children: Vec<Clause>,
+    /// Interleaved content and children, preserving source order.
+    /// This ensures continuation paragraphs after sub-lists render
+    /// in the correct position.
+    pub body: Vec<ClauseBody>,
+}
+
+#[derive(Debug)]
+pub enum ClauseBody {
+    Content(ClauseContent),
+    Children(Vec<Clause>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

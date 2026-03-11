@@ -48,30 +48,36 @@ fn assign_clause_numbers(body: &mut [BodyElement]) {
 
 fn assign_children_numbers(parent: &mut Clause, top: u32) {
     let parent_number = parent.number.clone();
+    let mut i = 0usize;
 
-    for (i, child) in parent.children.iter_mut().enumerate() {
-        let number = match child.level {
-            ClauseLevel::TopLevel => ClauseNumber::TopLevel(i as u32 + 1),
-            ClauseLevel::Clause => ClauseNumber::Clause(top, i as u32 + 1),
-            ClauseLevel::SubClause => {
-                let clause_num = match &parent_number {
-                    Some(ClauseNumber::Clause(_, c)) => *c,
-                    _ => 0,
+    for element in &mut parent.body {
+        if let ClauseBody::Children(kids) = element {
+            for child in kids.iter_mut() {
+                let number = match child.level {
+                    ClauseLevel::TopLevel => ClauseNumber::TopLevel(i as u32 + 1),
+                    ClauseLevel::Clause => ClauseNumber::Clause(top, i as u32 + 1),
+                    ClauseLevel::SubClause => {
+                        let clause_num = match &parent_number {
+                            Some(ClauseNumber::Clause(_, c)) => *c,
+                            _ => 0,
+                        };
+                        let letter = (b'a' + i as u8) as char;
+                        ClauseNumber::SubClause(top, clause_num, letter)
+                    }
+                    ClauseLevel::SubSubClause => {
+                        let (clause_num, letter) = match &parent_number {
+                            Some(ClauseNumber::SubClause(_, c, l)) => (*c, *l),
+                            _ => (0, 'a'),
+                        };
+                        let roman = to_roman(i as u32 + 1);
+                        ClauseNumber::SubSubClause(top, clause_num, letter, roman)
+                    }
                 };
-                let letter = (b'a' + i as u8) as char;
-                ClauseNumber::SubClause(top, clause_num, letter)
+                child.number = Some(number);
+                assign_children_numbers(child, top);
+                i += 1;
             }
-            ClauseLevel::SubSubClause => {
-                let (clause_num, letter) = match &parent_number {
-                    Some(ClauseNumber::SubClause(_, c, l)) => (*c, *l),
-                    _ => (0, 'a'),
-                };
-                let roman = to_roman(i as u32 + 1);
-                ClauseNumber::SubSubClause(top, clause_num, letter, roman)
-            }
-        };
-        child.number = Some(number);
-        assign_children_numbers(child, top);
+        }
     }
 }
 
@@ -91,8 +97,12 @@ fn collect_anchors(clause: &Clause, map: &mut HashMap<String, ClauseNumber>) {
     if let (Some(anchor), Some(number)) = (&clause.anchor, &clause.number) {
         map.insert(anchor.clone(), number.clone());
     }
-    for child in &clause.children {
-        collect_anchors(child, map);
+    for element in &clause.body {
+        if let ClauseBody::Children(kids) = element {
+            for child in kids {
+                collect_anchors(child, map);
+            }
+        }
     }
 }
 
@@ -122,14 +132,6 @@ fn resolve_clause_cross_refs(
 ) {
     let clause_loc = clause.number.as_ref().map(|n| n.full_reference());
 
-    for content in &mut clause.content {
-        match content {
-            ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
-                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, clause_loc.as_deref());
-            }
-            _ => {}
-        }
-    }
     if let Some(ref mut heading) = clause.heading {
         resolve_inlines_cross_refs(
             &mut heading.text,
@@ -138,8 +140,22 @@ fn resolve_clause_cross_refs(
             clause_loc.as_deref(),
         );
     }
-    for child in &mut clause.children {
-        resolve_clause_cross_refs(child, anchor_map, diagnostics);
+    for element in &mut clause.body {
+        match element {
+            ClauseBody::Content(content) => {
+                match content {
+                    ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
+                        resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, clause_loc.as_deref());
+                    }
+                    _ => {}
+                }
+            }
+            ClauseBody::Children(kids) => {
+                for child in kids {
+                    resolve_clause_cross_refs(child, anchor_map, diagnostics);
+                }
+            }
+        }
     }
 }
 
@@ -404,16 +420,22 @@ fn collect_clause_terms(
 ) {
     let clause_loc = clause.number.as_ref().map(|n| n.full_reference());
 
-    for content in &clause.content {
-        match content {
-            ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
-                collect_inline_terms(inlines, defs, schedule_items, patterns, clause_loc.as_deref());
+    for element in &clause.body {
+        match element {
+            ClauseBody::Content(content) => {
+                match content {
+                    ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
+                        collect_inline_terms(inlines, defs, schedule_items, patterns, clause_loc.as_deref());
+                    }
+                    _ => {}
+                }
             }
-            _ => {}
+            ClauseBody::Children(kids) => {
+                for child in kids {
+                    collect_clause_terms(child, defs, schedule_items, patterns);
+                }
+            }
         }
-    }
-    for child in &clause.children {
-        collect_clause_terms(child, defs, schedule_items, patterns);
     }
 }
 
@@ -492,16 +514,22 @@ fn collect_clause_text(clause: &Clause, out: &mut String) {
     if let Some(ref heading) = clause.heading {
         collect_inlines_text(&heading.text, out);
     }
-    for content in &clause.content {
-        match content {
-            ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
-                collect_inlines_text(inlines, out);
+    for element in &clause.body {
+        match element {
+            ClauseBody::Content(content) => {
+                match content {
+                    ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
+                        collect_inlines_text(inlines, out);
+                    }
+                    _ => {}
+                }
             }
-            _ => {}
+            ClauseBody::Children(kids) => {
+                for child in kids {
+                    collect_clause_text(child, out);
+                }
+            }
         }
-    }
-    for child in &clause.children {
-        collect_clause_text(child, out);
     }
 }
 
