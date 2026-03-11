@@ -1,4 +1,10 @@
+pub mod addendum;
+pub mod common;
+pub mod cover;
 pub mod docx;
 pub mod exhibit;
+pub mod numbering;
+pub mod preamble;
+pub mod schedule;
 pub mod signatures;
 pub mod watermark;

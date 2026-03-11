@@ -1,25 +1,26 @@
 use std::path::Path;
 
 use docx_rs::{
-    AbstractNumbering, AlignmentType, BreakType, Docx, Footer, Header, IndentLevel,
-    Level, LevelJc, LevelOverride, LevelText, LineSpacing, LineSpacingType, NumberFormat,
-    NumberingId, NumPages, Numbering, PageMargin, PageNum, Paragraph, Pic, Run, RunFonts,
-    RunProperty, SpecialIndentType, Start, Style, StyleType, Tab, TabValueType,
-    Table as DocxTable, TableCell, TableOfContents, TableRow, VertAlignType, WidthType,
+    BreakType, Docx, Footer, Header, IndentLevel, LineSpacing, LineSpacingType, NumberingId,
+    NumPages, Numbering, PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, RunProperty, Style,
+    StyleType, Tab, TabValueType, TableOfContents,
 };
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
+use crate::render::addendum::render_addendum;
+use crate::render::common::{add_inline_run, render_inlines_paragraph, render_table};
+use crate::render::cover::{render_cover_page, render_inline_title};
 use crate::render::exhibit::{self as exhibit_loader, PdfRenderer};
+use crate::render::numbering::{
+    create_clause_numbering, create_simple_list_numbering, indent_for_level, numbering_level_for,
+    outline_level_for, ABSTRACT_NUM_ID, BODY_NUMBERING_ID, SIMPLE_LIST_ABSTRACT_NUM_ID,
+};
+use crate::render::preamble::render_preamble;
+use crate::render::schedule::render_schedules;
 use crate::render::signatures as sig_renderer;
 use crate::signatures::SignatureBlock;
-use crate::style::{DefinedTermStyle, PartyFormat, PreambleStyle, SchedulePosition, StyleConfig};
-
-// Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
-const ABSTRACT_NUM_ID: usize = 2;
-const BODY_NUMBERING_ID: usize = 2;
-// Simple numbered list (for addendum prose lists)
-const SIMPLE_LIST_ABSTRACT_NUM_ID: usize = 3;
+use crate::style::{SchedulePosition, StyleConfig};
 
 pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock], pdf_renderer: PdfRenderer) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
@@ -61,60 +62,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     }
 
     // Footer
-    let footer_size = StyleConfig::pt_to_half_points(style.font_size - 2.0);
-    let mut default_footer = Footer::new();
-    let has_ref = style.footer.show_ref && doc.meta.ref_.is_some();
-    let has_version = style.footer.show_version && doc.meta.version.is_some();
-    let has_page = style.footer.show_page_number;
-    let has_left = has_ref || has_version;
-
-    let right_tab_pos = (style.page_width_twips() as i32
-        - StyleConfig::cm_to_twips(style.margin_left_cm)
-        - StyleConfig::cm_to_twips(style.margin_right_cm)) as usize;
-    let mut footer_para = Paragraph::new();
-
-    // Right tab when we have content on both sides, or page number alone (right-aligned)
-    if (has_left && has_page) || (!has_left && has_page) {
-        footer_para = footer_para
-            .add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
-    }
-
-    // Left side: ref and/or version
-    if has_ref {
-        if let Some(ref ref_) = doc.meta.ref_ {
-            footer_para = footer_para.add_run(
-                Run::new()
-                    .add_text(format!("Ref: {}", ref_))
-                    .size(footer_size),
-            );
-        }
-    }
-    if has_version {
-        if let Some(ref version) = doc.meta.version {
-            if has_ref {
-                footer_para = footer_para.add_run(
-                    Run::new().add_text(" ").size(footer_size),
-                );
-            }
-            footer_para = footer_para.add_run(
-                Run::new()
-                    .add_text(format!("v{}", version))
-                    .size(footer_size),
-            );
-        }
-    }
-
-    if has_page {
-        footer_para = footer_para.add_run(Run::new().add_tab());
-        footer_para = footer_para
-            .add_run(Run::new().add_text("Page ").size(footer_size))
-            .add_page_num(PageNum::new())
-            .add_run(Run::new().add_text(" of ").size(footer_size))
-            .add_num_pages(NumPages::new());
-    }
-
-    default_footer = default_footer.add_paragraph(footer_para);
-    docx = docx.footer(default_footer);
+    docx = render_footer(docx, doc, style);
 
     if style.cover.enabled {
         // Empty first-page header/footer so cover page is clean
@@ -233,7 +181,65 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     Ok(cursor.into_inner())
 }
 
-fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize) -> Docx {
+fn render_footer(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
+    let footer_size = StyleConfig::pt_to_half_points(style.font_size - 2.0);
+    let mut default_footer = Footer::new();
+    let has_ref = style.footer.show_ref && doc.meta.ref_.is_some();
+    let has_version = style.footer.show_version && doc.meta.version.is_some();
+    let has_page = style.footer.show_page_number;
+    let has_left = has_ref || has_version;
+
+    let right_tab_pos = (style.page_width_twips() as i32
+        - StyleConfig::cm_to_twips(style.margin_left_cm)
+        - StyleConfig::cm_to_twips(style.margin_right_cm)) as usize;
+    let mut footer_para = Paragraph::new();
+
+    // Right tab when we have content on both sides, or page number alone (right-aligned)
+    if (has_left && has_page) || (!has_left && has_page) {
+        footer_para = footer_para
+            .add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
+    }
+
+    // Left side: ref and/or version
+    if has_ref {
+        if let Some(ref ref_) = doc.meta.ref_ {
+            footer_para = footer_para.add_run(
+                Run::new()
+                    .add_text(format!("Ref: {}", ref_))
+                    .size(footer_size),
+            );
+        }
+    }
+    if has_version {
+        if let Some(ref version) = doc.meta.version {
+            if has_ref {
+                footer_para = footer_para.add_run(
+                    Run::new().add_text(" ").size(footer_size),
+                );
+            }
+            footer_para = footer_para.add_run(
+                Run::new()
+                    .add_text(format!("v{}", version))
+                    .size(footer_size),
+            );
+        }
+    }
+
+    if has_page {
+        footer_para = footer_para.add_run(Run::new().add_tab());
+        footer_para = footer_para
+            .add_run(Run::new().add_text("Page ").size(footer_size))
+            .add_page_num(PageNum::new())
+            .add_run(Run::new().add_text(" of ").size(footer_size))
+            .add_num_pages(NumPages::new());
+    }
+
+    default_footer = default_footer.add_paragraph(footer_para);
+    docx = docx.footer(default_footer);
+    docx
+}
+
+pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize) -> Docx {
     let indent = indent_for_level(clause.level, style);
     let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
@@ -326,241 +332,6 @@ fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering
     docx
 }
 
-fn render_inlines_paragraph(
-    inlines: &[InlineContent],
-    indent: i32,
-    style: &StyleConfig,
-) -> Paragraph {
-    let body_size = StyleConfig::pt_to_half_points(style.font_size);
-    let mut para = Paragraph::new();
-    if indent > 0 {
-        para = para.indent(Some(indent), None, None, None);
-    }
-    for inline in inlines {
-        para = add_inline_run(para, inline, false, body_size, style, None);
-    }
-    para
-}
-
-fn add_inline_run(
-    para: Paragraph,
-    inline: &InlineContent,
-    heading_bold: bool,
-    size: usize,
-    style: &StyleConfig,
-    color: Option<&str>,
-) -> Paragraph {
-    // Helper: apply heading formatting (bold + optional color) to a run
-    let apply_heading = |mut run: Run| -> Run {
-        if heading_bold { run = run.bold(); }
-        if let Some(c) = color { run = run.color(c); }
-        run
-    };
-
-    match inline {
-        InlineContent::Text(t) => {
-            let run = apply_heading(Run::new().add_text(t).size(size));
-            para.add_run(run)
-        }
-        InlineContent::Bold(t) => {
-            render_defined_term(para, t, size, color, &style.defined_term_style)
-        }
-        InlineContent::Italic(t) => {
-            para.add_run(Run::new().add_text(t).italic().size(size))
-        }
-        InlineContent::Superscript(t) => {
-            let mut run = Run::new().add_text(t).size(size);
-            run.run_property = run.run_property.vert_align(VertAlignType::SuperScript);
-            let run = apply_heading(run);
-            para.add_run(run)
-        }
-        InlineContent::CrossRef {
-            display,
-            resolved,
-            ..
-        } => {
-            let text = resolved.as_ref().unwrap_or(display);
-            let run = apply_heading(Run::new().add_text(text).size(size));
-            para.add_run(run)
-        }
-        InlineContent::Link { text, .. } => {
-            let run = apply_heading(Run::new().add_text(text).size(size));
-            para.add_run(run)
-        }
-        InlineContent::SoftBreak => {
-            let run = apply_heading(Run::new().add_text(" ").size(size));
-            para.add_run(run)
-        }
-        InlineContent::LineBreak => {
-            para.add_run(Run::new().add_break(BreakType::TextWrapping))
-        }
-    }
-}
-
-/// Render a defined term according to the configured style.
-fn render_defined_term(
-    para: Paragraph,
-    text: &str,
-    size: usize,
-    color: Option<&str>,
-    term_style: &DefinedTermStyle,
-) -> Paragraph {
-    match term_style {
-        DefinedTermStyle::Bold => {
-            let mut run = Run::new().add_text(text).bold().size(size);
-            if let Some(c) = color { run = run.color(c); }
-            para.add_run(run)
-        }
-        DefinedTermStyle::Quoted => {
-            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", text)).size(size);
-            if let Some(c) = color { run = run.color(c); }
-            para.add_run(run)
-        }
-        DefinedTermStyle::BoldQuoted => {
-            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", text)).bold().size(size);
-            if let Some(c) = color { run = run.color(c); }
-            para.add_run(run)
-        }
-    }
-}
-
-fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx {
-    let body_size = StyleConfig::pt_to_half_points(style.font_size);
-    let mut rows = Vec::new();
-
-    // Header row
-    if !table.headers.is_empty() {
-        let mut cells = Vec::new();
-        for header_cell in &table.headers {
-            let mut para = Paragraph::new();
-            for inline in header_cell {
-                para = add_inline_run(para, inline, true, body_size, style, None);
-            }
-            cells.push(TableCell::new().add_paragraph(para));
-        }
-        rows.push(TableRow::new(cells));
-    }
-
-    // Data rows
-    for row in &table.rows {
-        let mut cells = Vec::new();
-        for cell_content in row {
-            let mut para = Paragraph::new();
-            for inline in cell_content {
-                para = add_inline_run(para, inline, false, body_size, style, None);
-            }
-            cells.push(TableCell::new().add_paragraph(para));
-        }
-        rows.push(TableRow::new(cells));
-    }
-
-    if !rows.is_empty() {
-        docx = docx.add_table(DocxTable::new(rows).width(5000, WidthType::Pct));
-    }
-
-    docx
-}
-
-fn render_addendum(
-    mut docx: Docx,
-    addendum: &Addendum,
-    style: &StyleConfig,
-    next_num_id: &mut usize,
-) -> Docx {
-    let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
-    let body_size = StyleConfig::pt_to_half_points(style.font_size);
-
-    // Page break before addendum
-    docx = docx.add_paragraph(
-        Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-    );
-
-    // Addendum heading (auto-numbered)
-    let heading_text = addendum.heading();
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text(&heading_text)
-                    .bold()
-                    .size(heading_size),
-            ),
-    );
-
-    docx = docx.add_paragraph(Paragraph::new());
-
-    // Addendum content
-    for content in &addendum.content {
-        match content {
-            AddendumContent::Paragraph(inlines) => {
-                docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
-            }
-            AddendumContent::Heading(level, inlines) => {
-                let size = match level {
-                    2 => StyleConfig::pt_to_half_points(style.heading1_size),
-                    _ => StyleConfig::pt_to_half_points(style.heading2_size),
-                };
-                let mut para = Paragraph::new().keep_next(true);
-                for inline in inlines {
-                    para = add_inline_run(para, inline, true, size, style, None);
-                }
-                docx = docx.add_paragraph(para);
-                docx = docx.add_paragraph(Paragraph::new());
-            }
-            AddendumContent::ClauseList(clauses) => {
-                // Create a new numbering instance for this addendum's clauses
-                let num_id = *next_num_id;
-                *next_num_id += 1;
-                docx = docx.add_numbering(
-                    Numbering::new(num_id, ABSTRACT_NUM_ID)
-                        .add_override(LevelOverride::new(0).start(1))
-                        .add_override(LevelOverride::new(1).start(1))
-                        .add_override(LevelOverride::new(2).start(1))
-                        .add_override(LevelOverride::new(3).start(1)),
-                );
-                for clause in clauses {
-                    docx = render_clause(docx, clause, style, num_id);
-                }
-            }
-            AddendumContent::Table(table) => {
-                docx = render_table(docx, table, style);
-            }
-            AddendumContent::NumberedList(items) => {
-                let num_id = *next_num_id;
-                *next_num_id += 1;
-                docx = docx.add_numbering(
-                    Numbering::new(num_id, SIMPLE_LIST_ABSTRACT_NUM_ID)
-                        .add_override(LevelOverride::new(0).start(1)),
-                );
-                for item in items {
-                    let mut para = Paragraph::new()
-                        .numbering(NumberingId::new(num_id), IndentLevel::new(0));
-                    for inline in item {
-                        para = add_inline_run(para, inline, false, body_size, style, None);
-                    }
-                    docx = docx.add_paragraph(para);
-                }
-            }
-            AddendumContent::BulletList(items) => {
-                let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
-                for item in items {
-                    let mut para = Paragraph::new()
-                        .indent(Some(step), None, None, None);
-                    // Bullet character
-                    para = para.add_run(Run::new().add_text("• \t").size(body_size));
-                    for inline in item {
-                        para = add_inline_run(para, inline, false, body_size, style, None);
-                    }
-                    docx = docx.add_paragraph(para);
-                }
-            }
-        }
-    }
-
-    docx
-}
-
 fn render_exhibit(
     mut docx: Docx,
     exhibit: &Exhibit,
@@ -580,7 +351,7 @@ fn render_exhibit(
     let heading_text = format!("EXHIBIT {} - {}", number, exhibit.title);
     docx = docx.add_paragraph(
         Paragraph::new()
-            .align(AlignmentType::Center)
+            .align(docx_rs::AlignmentType::Center)
             .add_run(
                 Run::new()
                     .add_text(&heading_text)
@@ -620,715 +391,11 @@ fn render_exhibit(
 
             docx = docx.add_paragraph(
                 Paragraph::new()
-                    .align(AlignmentType::Center)
+                    .align(docx_rs::AlignmentType::Center)
                     .add_run(Run::new().add_image(pic)),
             );
         }
     }
 
     Ok(docx)
-}
-
-fn render_schedules(
-    mut docx: Docx,
-    schedule_configs: &[ScheduleDecl],
-    items: &[ScheduleItem],
-    style: &StyleConfig,
-) -> Docx {
-    use crate::style::ScheduleOrder;
-
-    let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
-    let body_size = StyleConfig::pt_to_half_points(style.font_size);
-
-    for (idx, sched) in schedule_configs.iter().enumerate() {
-        let mut sched_items: Vec<&ScheduleItem> = items
-            .iter()
-            .filter(|item| item.schedule_index == idx)
-            .collect();
-
-        if sched_items.is_empty() {
-            continue;
-        }
-
-        if matches!(style.schedule_order, ScheduleOrder::Alphabetical) {
-            sched_items.sort_by(|a, b| a.term.to_lowercase().cmp(&b.term.to_lowercase()));
-        }
-
-        // Page break before schedule
-        docx = docx.add_paragraph(
-            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-        );
-
-        // Schedule heading (use title from YAML, uppercased)
-        docx = docx.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(sched.title.to_uppercase())
-                        .bold()
-                        .size(heading_size),
-                ),
-        );
-
-        docx = docx.add_paragraph(Paragraph::new());
-
-        // Schedule table: Item | Particulars
-        let mut rows = Vec::new();
-
-        // Header row
-        rows.push(TableRow::new(vec![
-            TableCell::new().add_paragraph(
-                Paragraph::new().add_run(
-                    Run::new().add_text("Item").bold().size(body_size),
-                ),
-            ),
-            TableCell::new().add_paragraph(
-                Paragraph::new().add_run(
-                    Run::new().add_text("Particulars").bold().size(body_size),
-                ),
-            ),
-        ]));
-
-        // Data rows
-        for item in &sched_items {
-            rows.push(TableRow::new(vec![
-                TableCell::new().add_paragraph(
-                    Paragraph::new().add_run(
-                        Run::new().add_text(&item.term).size(body_size),
-                    ),
-                ),
-                TableCell::new().add_paragraph(
-                    Paragraph::new(),
-                ),
-            ]));
-        }
-
-        docx = docx.add_table(DocxTable::new(rows).width(5000, WidthType::Pct));
-    }
-
-    docx
-}
-
-fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
-    let h1_size = StyleConfig::pt_to_half_points(style.heading1_size);
-    let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
-    let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
-    let align = style.align_first_level;
-
-    let level_indent = |level: usize| -> i32 {
-        let num_steps = if align {
-            match level { 0 | 1 => 0, n => n - 1 }
-        } else {
-            level
-        };
-        num_steps as i32 * step + hanging
-    };
-
-    let mut numbering = AbstractNumbering::new(ABSTRACT_NUM_ID);
-    numbering.multi_level_type = Some("multilevel".to_string());
-    let mut level0 = Level::new(
-        0,
-        Start::new(1),
-        NumberFormat::new("decimal"),
-        LevelText::new("%1."),
-        LevelJc::new("left"),
-    )
-    .indent(Some(level_indent(0)), Some(SpecialIndentType::Hanging(hanging)), None, None)
-    .bold()
-    .size(h1_size)
-    .fonts(
-        RunFonts::new()
-            .ascii(&style.heading_font_family)
-            .hi_ansi(&style.heading_font_family),
-    );
-    if let Some(ref color) = style.brand_color_hex() {
-        level0 = level0.color(color);
-    }
-
-    numbering
-        // Level 0: TopLevel — "1."
-        .add_level(level0)
-        // Level 1: Clause — "1.1"
-        .add_level(
-            Level::new(
-                1,
-                Start::new(1),
-                NumberFormat::new("decimal"),
-                LevelText::new("%1.%2"),
-                LevelJc::new("left"),
-            )
-            .indent(
-                Some(level_indent(1)),
-                Some(SpecialIndentType::Hanging(hanging)),
-                None, None,
-            )
-        )
-        // Level 2: SubClause — "(a)"
-        .add_level(
-            Level::new(
-                2,
-                Start::new(1),
-                NumberFormat::new("lowerLetter"),
-                LevelText::new("(%3)"),
-                LevelJc::new("left"),
-            )
-            .indent(
-                Some(level_indent(2)),
-                Some(SpecialIndentType::Hanging(hanging)),
-                None, None,
-            )
-        )
-        // Level 3: SubSubClause — "(i)"
-        .add_level(
-            Level::new(
-                3,
-                Start::new(1),
-                NumberFormat::new("lowerRoman"),
-                LevelText::new("(%4)"),
-                LevelJc::new("left"),
-            )
-            .indent(
-                Some(level_indent(3)),
-                Some(SpecialIndentType::Hanging(hanging)),
-                None, None,
-            )
-        )
-}
-
-fn create_simple_list_numbering(style: &StyleConfig) -> AbstractNumbering {
-    let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
-    let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
-
-    let mut numbering = AbstractNumbering::new(SIMPLE_LIST_ABSTRACT_NUM_ID);
-    numbering.multi_level_type = Some("singleLevel".to_string());
-    numbering.add_level(
-        Level::new(
-            0,
-            Start::new(1),
-            NumberFormat::new("decimal"),
-            LevelText::new("%1."),
-            LevelJc::new("left"),
-        )
-        .indent(Some(step + hanging), Some(SpecialIndentType::Hanging(hanging)), None, None),
-    )
-}
-
-fn numbering_level_for(level: ClauseLevel) -> usize {
-    match level {
-        ClauseLevel::TopLevel => 0,
-        ClauseLevel::Clause => 1,
-        ClauseLevel::SubClause => 2,
-        ClauseLevel::SubSubClause => 3,
-    }
-}
-
-fn indent_for_level(level: ClauseLevel, style: &StyleConfig) -> i32 {
-    let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
-    if style.align_first_level {
-        match level {
-            ClauseLevel::TopLevel => 0,
-            ClauseLevel::Clause => 0,
-            ClauseLevel::SubClause => step,
-            ClauseLevel::SubSubClause => step * 2,
-        }
-    } else {
-        match level {
-            ClauseLevel::TopLevel => 0,
-            ClauseLevel::Clause => step,
-            ClauseLevel::SubClause => step * 2,
-            ClauseLevel::SubSubClause => step * 3,
-        }
-    }
-}
-
-fn outline_level_for(level: ClauseLevel) -> usize {
-    match level {
-        ClauseLevel::TopLevel => 0,
-        ClauseLevel::Clause => 1,
-        ClauseLevel::SubClause => 2,
-        ClauseLevel::SubSubClause => 3,
-    }
-}
-
-// --- Inline title (no cover page) ---
-
-fn render_inline_title(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
-    let meta = &doc.meta;
-
-    // Title
-    let mut title_run = Run::new()
-        .add_text(&meta.title)
-        .bold()
-        .size(StyleConfig::pt_to_half_points(style.title_size))
-        .fonts(
-            RunFonts::new()
-                .ascii(&style.heading_font_family)
-                .hi_ansi(&style.heading_font_family),
-        );
-    if let Some(ref color) = style.brand_color_hex() {
-        title_run = title_run.color(color);
-    }
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(title_run),
-    );
-
-    docx
-}
-
-// --- Preamble (parties block when cover page is disabled) ---
-
-fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
-    let meta = &doc.meta;
-    let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
-    let doc_type = meta.doc_type.as_deref().unwrap_or("Agreement");
-    let formatted_date = format_date_with_format(&meta.date, &style.date_format);
-
-    match style.preamble.style {
-        PreambleStyle::Simple => {
-            let term_style = &style.defined_term_style;
-
-            // Opening line: This [title] ([type]) is dated [date] between
-            let between_word = if meta.parties.len() == 1 { "by" } else { "between" };
-            let mut opening = Paragraph::new();
-            opening = opening.add_run(
-                Run::new()
-                    .add_text(format!("This {} (", &meta.title))
-                    .size(body_half_pts),
-            );
-            opening = render_defined_term(opening, doc_type, body_half_pts, None, term_style);
-            opening = opening.add_run(
-                Run::new()
-                    .add_text(format!(") is dated {} {}", &formatted_date, between_word))
-                    .size(body_half_pts),
-            );
-            docx = docx.add_paragraph(opening);
-
-            // Spacer
-            docx = docx.add_paragraph(Paragraph::new());
-
-            // Parties
-            let party_count = meta.parties.len();
-            for (i, party) in meta.parties.iter().enumerate() {
-                let mut para = Paragraph::new();
-                para = para.add_run(
-                    Run::new()
-                        .add_text(&party.name)
-                        .size(body_half_pts),
-                );
-                if let Some(ref spec) = party.specifier {
-                    para = para.add_run(
-                        Run::new()
-                            .add_text(format!(" ({})", spec))
-                            .size(body_half_pts),
-                    );
-                }
-                para = para.add_run(
-                    Run::new()
-                        .add_text(" (")
-                        .size(body_half_pts),
-                );
-                para = render_defined_term(para, &party.role, body_half_pts, None, term_style);
-                para = para.add_run(
-                    Run::new()
-                        .add_text(")")
-                        .size(body_half_pts),
-                );
-
-                // "; and" suffix on all but the last party
-                if i < party_count - 1 {
-                    para = para.add_run(
-                        Run::new()
-                            .add_text("; and")
-                            .size(body_half_pts),
-                    );
-                }
-
-                docx = docx.add_paragraph(para);
-            }
-
-            // Spacer after parties
-            docx = docx.add_paragraph(Paragraph::new());
-        }
-        PreambleStyle::Prose => {
-            let term_style = &style.defined_term_style;
-
-            // Single paragraph: This [title] ([type]) is entered into as of [date]
-            // between [party1] and [party2].
-            let mut para = Paragraph::new();
-            para = para.add_run(
-                Run::new()
-                    .add_text(format!("This {} (", &meta.title))
-                    .size(body_half_pts),
-            );
-            para = render_defined_term(para, doc_type, body_half_pts, None, term_style);
-            para = para.add_run(
-                Run::new()
-                    .add_text(format!(
-                        ") is entered into as of {} {} ",
-                        &formatted_date,
-                        if meta.parties.len() == 1 { "by" } else { "between" }
-                    ))
-                    .size(body_half_pts),
-            );
-
-            // Parties
-            let party_count = meta.parties.len();
-            for (i, party) in meta.parties.iter().enumerate() {
-                para = para.add_run(
-                    Run::new()
-                        .add_text(&party.name)
-                        .size(body_half_pts),
-                );
-                if let Some(ref spec) = party.specifier {
-                    para = para.add_run(
-                        Run::new()
-                            .add_text(format!(" ({})", spec))
-                            .size(body_half_pts),
-                    );
-                }
-                para = para.add_run(
-                    Run::new()
-                        .add_text(" (")
-                        .size(body_half_pts),
-                );
-                para = render_defined_term(para, &party.role, body_half_pts, None, term_style);
-                para = para.add_run(
-                    Run::new()
-                        .add_text(")")
-                        .size(body_half_pts),
-                );
-
-                if party_count > 2 && i < party_count - 1 {
-                    // Comma-separated for 3+ parties
-                    if i < party_count - 2 {
-                        para = para.add_run(
-                            Run::new().add_text(", ").size(body_half_pts),
-                        );
-                    } else {
-                        para = para.add_run(
-                            Run::new().add_text(" and ").size(body_half_pts),
-                        );
-                    }
-                } else if party_count == 2 && i == 0 {
-                    para = para.add_run(
-                        Run::new().add_text(" and ").size(body_half_pts),
-                    );
-                }
-            }
-
-            // Closing period
-            para = para.add_run(
-                Run::new().add_text(".").size(body_half_pts),
-            );
-            docx = docx.add_paragraph(para);
-
-            // Spacer after preamble
-            docx = docx.add_paragraph(Paragraph::new());
-        }
-        PreambleStyle::Custom => {
-            let preamble = &style.preamble;
-
-            // Expand the opening template
-            let expanded_template = preamble.template
-                .replace("{title}", &meta.title)
-                .replace("{type}", doc_type)
-                .replace("{date}", &formatted_date);
-
-            // Render template lines as paragraphs
-            for line in expanded_template.split("\\n") {
-                let cleaned = clean_empty_parens(line);
-                docx = docx.add_paragraph(
-                    render_template_paragraph(&cleaned, body_half_pts, &style.defined_term_style),
-                );
-            }
-
-            // Spacer before parties
-            docx = docx.add_paragraph(Paragraph::new());
-
-            // Render each party
-            let party_count = meta.parties.len();
-            for (i, party) in meta.parties.iter().enumerate() {
-                let expanded_party = preamble.party_template
-                    .replace("{name}", &party.name)
-                    .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
-                    .replace("{role}", &party.role);
-                let cleaned = clean_empty_parens(&expanded_party);
-
-                // Append separator to all but the last party
-                let line = if i < party_count - 1 {
-                    format!("{}{}", cleaned, &preamble.party_separator)
-                } else {
-                    cleaned
-                };
-
-                docx = docx.add_paragraph(
-                    render_template_paragraph(&line, body_half_pts, &style.defined_term_style),
-                );
-            }
-
-            // Spacer after preamble
-            docx = docx.add_paragraph(Paragraph::new());
-        }
-    }
-
-    docx
-}
-
-/// Parse a template string with `**bold**` markers into a paragraph of Runs.
-/// Bold markers represent defined terms and are rendered according to `term_style`.
-fn render_template_paragraph(text: &str, size: usize, term_style: &DefinedTermStyle) -> Paragraph {
-    let mut para = Paragraph::new();
-    let mut remaining = text;
-
-    while let Some(start) = remaining.find("**") {
-        // Text before the bold marker
-        if start > 0 {
-            para = para.add_run(
-                Run::new().add_text(&remaining[..start]).size(size),
-            );
-        }
-
-        // Find the closing **
-        let after_open = &remaining[start + 2..];
-        if let Some(end) = after_open.find("**") {
-            let term_text = &after_open[..end];
-            para = render_defined_term(para, term_text, size, None, term_style);
-            remaining = &after_open[end + 2..];
-        } else {
-            // No closing **, treat rest as plain text
-            para = para.add_run(
-                Run::new().add_text(remaining).size(size),
-            );
-            remaining = "";
-        }
-    }
-
-    // Remaining plain text
-    if !remaining.is_empty() {
-        para = para.add_run(
-            Run::new().add_text(remaining).size(size),
-        );
-    }
-
-    para
-}
-
-/// Remove empty parentheses left over when {specifier} is absent.
-/// Handles `()`, `( )`, and surrounding whitespace collapse.
-fn clean_empty_parens(text: &str) -> String {
-    let result = text
-        .replace("()", "")
-        .replace("( )", "");
-    // Collapse any resulting double spaces
-    let mut prev = String::new();
-    let mut current = result;
-    while current != prev {
-        prev = current.clone();
-        current = current.replace("  ", " ");
-    }
-    current.trim().to_string()
-}
-
-// --- Cover page ---
-
-fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
-    let meta = &doc.meta;
-    let cover = &style.cover;
-    let heading_half_pts = StyleConfig::pt_to_half_points(style.heading1_size);
-    let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
-
-    // Spacer
-    docx = docx.add_paragraph(Paragraph::new());
-    docx = docx.add_paragraph(Paragraph::new());
-
-    // Title
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                {
-                    let mut run = Run::new()
-                        .add_text(&meta.title)
-                        .bold()
-                        .size(StyleConfig::pt_to_half_points(style.title_size))
-                        .fonts(
-                            RunFonts::new()
-                                .ascii(&style.heading_font_family)
-                                .hi_ansi(&style.heading_font_family),
-                        );
-                    if let Some(ref color) = style.brand_color_hex() {
-                        run = run.color(color);
-                    }
-                    run
-                },
-            ),
-    );
-
-    // Spacer
-    docx = docx.add_paragraph(Paragraph::new());
-
-    // Status + Version line
-    if cover.show_status && (meta.status.is_some() || meta.version.is_some()) {
-        let mut parts = Vec::new();
-        if let Some(ref status) = meta.status {
-            parts.push(status.to_string());
-        }
-        if let Some(ref version) = meta.version {
-            parts.push(format!("Version {}", version));
-        }
-        if !parts.is_empty() {
-            docx = docx.add_paragraph(
-                Paragraph::new()
-                    .align(AlignmentType::Center)
-                    .add_run(
-                        Run::new()
-                            .add_text(parts.join(" — "))
-                            .size(body_half_pts),
-                    ),
-            );
-        }
-    }
-
-    // Date
-    let formatted_date = format_date_with_format(&meta.date, &style.date_format);
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text(&formatted_date)
-                    .size(body_half_pts),
-            ),
-    );
-
-    // Spacer
-    docx = docx.add_paragraph(Paragraph::new());
-    docx = docx.add_paragraph(Paragraph::new());
-
-    // Ref
-    if cover.show_ref {
-        if let Some(ref ref_) = meta.ref_ {
-            docx = docx.add_paragraph(
-                Paragraph::new()
-                    .align(AlignmentType::Center)
-                    .add_run(
-                        Run::new()
-                            .add_text(format!("Ref: {}", ref_))
-                            .size(body_half_pts)
-                            .italic(),
-                    ),
-            );
-        }
-    }
-
-    // Author
-    if cover.show_author {
-        if let Some(ref author) = meta.author {
-            docx = docx.add_paragraph(
-                Paragraph::new()
-                    .align(AlignmentType::Center)
-                    .add_run(
-                        Run::new()
-                            .add_text(author.as_str())
-                            .size(body_half_pts)
-                            .italic(),
-                    ),
-            );
-        }
-    }
-
-    // Spacer before parties
-    docx = docx.add_paragraph(Paragraph::new());
-    docx = docx.add_paragraph(Paragraph::new());
-
-    // "Between" heading
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text(&cover.between_label)
-                    .bold()
-                    .size(heading_half_pts),
-            ),
-    );
-
-    docx = docx.add_paragraph(Paragraph::new());
-
-    // Parties
-    for (i, party) in meta.parties.iter().enumerate() {
-        let mut para = Paragraph::new().align(AlignmentType::Center);
-
-        para = para.add_run(
-            Run::new()
-                .add_text(&party.name)
-                .bold()
-                .size(body_half_pts),
-        );
-
-        match cover.party_format {
-            PartyFormat::NameSpecRole => {
-                if let Some(ref spec) = party.specifier {
-                    para = para.add_run(
-                        Run::new()
-                            .add_text(format!(" ({})", spec))
-                            .size(body_half_pts),
-                    );
-                }
-                docx = docx.add_paragraph(para);
-                docx = docx.add_paragraph(
-                    Paragraph::new()
-                        .align(AlignmentType::Center)
-                        .add_run(
-                            Run::new()
-                                .add_text(format!("(\"{}\")", party.role))
-                                .italic()
-                                .size(body_half_pts),
-                        ),
-                );
-            }
-            PartyFormat::NameRole => {
-                docx = docx.add_paragraph(para);
-                docx = docx.add_paragraph(
-                    Paragraph::new()
-                        .align(AlignmentType::Center)
-                        .add_run(
-                            Run::new()
-                                .add_text(format!("(\"{}\")", party.role))
-                                .italic()
-                                .size(body_half_pts),
-                        ),
-                );
-            }
-            PartyFormat::NameOnly => {
-                docx = docx.add_paragraph(para);
-            }
-        }
-
-        if i < meta.parties.len() - 1 {
-            docx = docx.add_paragraph(Paragraph::new());
-            docx = docx.add_paragraph(
-                Paragraph::new()
-                    .align(AlignmentType::Center)
-                    .add_run(
-                        Run::new()
-                            .add_text("and")
-                            .size(body_half_pts),
-                    ),
-            );
-            docx = docx.add_paragraph(Paragraph::new());
-        }
-    }
-
-    docx
-}
-
-fn format_date_with_format(date_str: &str, fmt: &str) -> String {
-    match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-        Ok(date) => date.format(fmt).to_string().trim().to_string(),
-        Err(_) => date_str.to_string(),
-    }
 }
