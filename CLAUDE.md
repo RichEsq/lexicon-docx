@@ -5,15 +5,16 @@
 Lexicon is a plain-text legal contract format built on standard Markdown, plus a Rust CLI processor that converts Lexicon Markdown contracts into formatted .docx files.
 
 The repository contains:
-- `spec.md` — the Lexicon Markdown specification (v1.0-draft)
-- `example.md` — a real-world Data Processing Addendum written in Lexicon format
+- `lexicon/` — git submodule ([RichEsq/lexicon](https://github.com/RichEsq/lexicon)) containing:
+  - `spec.md` — the Lexicon Markdown specification (v1.0-draft)
+  - `example.md` — a real-world Data Processing Addendum written in Lexicon format
 - `lexicon-docx/` — the Rust CLI processor
 
 ## First Steps
 
 Before starting any work, read these files to understand the current state of the project:
 
-1. **`spec.md`** — the Lexicon Markdown specification. The spec is the source of truth for all parsing and validation rules.
+1. **`lexicon/spec.md`** — the Lexicon Markdown specification. The spec is the source of truth for all parsing and validation rules.
 2. **`lexicon-docx/planning/implementation-status.md`** — what's done and what's remaining.
 3. **`lexicon-docx/planning/todo.md`** — open tasks and questions.
 4. **Other planning files in `lexicon-docx/planning/`** — design notes for specific features.
@@ -27,7 +28,7 @@ Lexicon Markdown extends standard Markdown with conventions for legal documents:
 - **Pandoc-style anchors** (`{#id}`) + standard links (`[clause X](#id)`) for cross-references
 - **Reference links as schedule items** (`[display][ref-id]` with `[ref-id]: #schedule "value"`)
 
-Full spec is in `spec.md`. The spec is the source of truth for all parsing and validation rules.
+Full spec is in `lexicon/spec.md`. The spec is the source of truth for all parsing and validation rules.
 
 ## Development Commands
 
@@ -37,16 +38,16 @@ cd lexicon-docx
 cargo build
 
 # Build a .docx from a Lexicon contract
-cargo run -- build ../example.md -o output.docx
+cargo run -- build ../lexicon/example.md -o output.docx
 
 # Validate a contract without generating output
-cargo run -- validate ../example.md
+cargo run -- validate ../lexicon/example.md
 
 # Build with a custom style config
-cargo run -- build ../example.md -o output.docx --style style.toml
+cargo run -- build ../lexicon/example.md -o output.docx --style style.toml
 
 # Run with --strict to fail on warnings
-cargo run -- build ../example.md --strict
+cargo run -- build ../lexicon/example.md --strict
 
 # Run tests
 cargo test
@@ -147,8 +148,8 @@ See `lexicon-docx/planning/implementation-status.md` for detailed status.
 
 After every successful piece of work (new feature, bug fix, spec change), complete ALL of the following before considering the task done:
 
-1. **Update `spec.md`** — if the change affects the Lexicon format (new front-matter fields, new syntax, changed behaviour), update the spec to match. The spec is the source of truth.
-2. **Update `example.md`** — if new front-matter fields or syntax features were added, add them to the example document so it exercises the full feature set.
+1. **Update `lexicon/spec.md`** — if the change affects the Lexicon format (new front-matter fields, new syntax, changed behaviour), update the spec to match. The spec is the source of truth. Changes to the submodule need to be committed and pushed in the `lexicon/` repo separately.
+2. **Update `lexicon/example.md`** — if new front-matter fields or syntax features were added, add them to the example document so it exercises the full feature set.
 3. **Update `CLAUDE.md`** — reflect any new files, dependencies, design decisions, or planning docs. Keep the Implementation Status line current.
 4. **Update `lexicon-docx/planning/implementation-status.md`** — move completed items to "Recently completed", remove from "Not yet implemented".
 5. **Run `cargo test`** — ensure all tests pass.
