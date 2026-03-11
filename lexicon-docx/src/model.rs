@@ -1,5 +1,24 @@
 use crate::error::Diagnostic;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
+
+/// Deserialize version as a string, accepting YAML integers, floats, or strings.
+fn deserialize_version<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
+    let value: Option<serde_yaml::Value> = Option::deserialize(deserializer)?;
+    Ok(value.map(|v| match v {
+        serde_yaml::Value::Number(n) => {
+            // Preserve integer formatting (no trailing ".0")
+            if let Some(i) = n.as_u64() {
+                i.to_string()
+            } else if let Some(f) = n.as_f64() {
+                f.to_string()
+            } else {
+                n.to_string()
+            }
+        }
+        serde_yaml::Value::String(s) => s,
+        other => other.as_str().unwrap_or("").to_string(),
+    }))
+}
 
 /// The fully parsed and resolved document.
 #[derive(Debug)]
@@ -21,7 +40,8 @@ pub struct DocumentMeta {
     pub ref_: Option<String>,
     pub author: Option<String>,
     pub status: Option<Status>,
-    pub version: Option<u32>,
+    #[serde(default, deserialize_with = "deserialize_version")]
+    pub version: Option<String>,
     pub parties: Vec<Party>,
     #[serde(default)]
     pub exhibits: Vec<Exhibit>,

@@ -90,7 +90,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         }
     }
     if has_version {
-        if let Some(version) = doc.meta.version {
+        if let Some(ref version) = doc.meta.version {
             if has_ref {
                 footer_para = footer_para.add_run(
                     Run::new().add_text(" ").size(footer_size),
@@ -1175,7 +1175,7 @@ fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Doc
         if let Some(ref status) = meta.status {
             parts.push(status.to_string());
         }
-        if let Some(version) = meta.version {
+        if let Some(ref version) = meta.version {
             parts.push(format!("Version {}", version));
         }
         if !parts.is_empty() {

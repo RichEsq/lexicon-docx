@@ -111,10 +111,12 @@ type: Deed
 
 #### 2.2.7. `version` (optional)
 
-The version number of the document, expressed as a positive integer. This tracks iterations during negotiation and review. A processor may display the version number alongside the document metadata.
+The version identifier of the document, expressed as a number or string. This tracks iterations during negotiation and review. A processor may display the version alongside the document metadata.
 
 ```yaml
 version: 2
+version: 1.4
+version: "2.1.0"
 ```
 
 #### 2.2.8. `parties` (required)
