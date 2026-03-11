@@ -10,6 +10,7 @@ use crate::style::{SignaturesConfig, StyleConfig};
 /// A resolved signature block ready for rendering.
 #[derive(Debug, Clone)]
 pub struct SignatureBlock {
+    pub layout: Layout,
     pub intro: String,
     pub signatories: Vec<Signatory>,
     pub fields: Vec<SignatureField>,
@@ -35,6 +36,19 @@ pub enum FieldType {
     Blank,
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Layout {
+    Short,
+    Long,
+}
+
+impl Default for Layout {
+    fn default() -> Self {
+        Layout::Long
+    }
+}
+
 // --- Definitions file types (deserialisable) ---
 
 /// The top-level definitions file structure.
@@ -44,6 +58,8 @@ type DefinitionsFile = HashMap<String, HashMap<String, HashMap<String, TemplateD
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TemplateDefinition {
+    #[serde(default)]
+    pub layout: Layout,
     pub intro: String,
     #[serde(default)]
     pub signatories: Vec<SignatoryDef>,
@@ -211,9 +227,10 @@ fn resolve_party_block(
     });
 
     // 3. Build the SignatureBlock from template (or hardcoded fallback)
-    let (base_intro, base_signatories, base_fields, base_witness, base_witness_fields) =
+    let (base_layout, base_intro, base_signatories, base_fields, base_witness, base_witness_fields) =
         match template {
             Some(t) => (
+                t.layout,
                 t.intro,
                 t.signatories
                     .into_iter()
@@ -250,6 +267,7 @@ fn resolve_party_block(
     );
 
     SignatureBlock {
+        layout: base_layout,
         intro,
         signatories,
         fields: base_fields,
@@ -274,8 +292,9 @@ fn convert_field_def(def: FieldDef) -> SignatureField {
     }
 }
 
-fn hardcoded_fallback() -> (String, Vec<Signatory>, Vec<SignatureField>, bool, Vec<SignatureField>) {
+fn hardcoded_fallback() -> (Layout, String, Vec<Signatory>, Vec<SignatureField>, bool, Vec<SignatureField>) {
     (
+        Layout::Short,
         "**Signed by {name}**:".to_string(),
         vec![Signatory { title: None }],
         vec![

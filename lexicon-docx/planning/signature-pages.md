@@ -218,6 +218,18 @@ SIGNATURE PAGE (optional heading — TBD)
 - Intro text rendered using the existing preamble placeholder/bold system
 - Borderless tables via `Table::without_borders()` with cell-level bottom borders for signature lines
 
+## Layout Modes
+
+Templates support two layout modes via a `layout` field (default: `"long"`):
+
+### "Long" layout (AU/UK/NZ-style)
+Each field becomes two table rows: a writing-space cell with bottom border + a label caption cell below. `type = "line"` fields (signatures) get taller writing space; blank fields (name/date) get shorter space. Labels support `{title}` placeholder expansion for per-signatory captions (e.g. `"{title} Signature"` → "Director Signature").
+
+### "Short" layout (US-style)
+Each field is a single table row with either an inline `Label: Value` or an empty bordered cell. This is the original rendering style.
+
+US templates set `layout = "short"` explicitly; all others default to `"long"`.
+
 ## Resolved Questions
 
 1. **Embed or disk?** — Load from disk. Allows user edits and community contributions without recompiling.

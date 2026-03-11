@@ -5,8 +5,13 @@ use docx_rs::{
 };
 
 use crate::model::Party;
-use crate::signatures::{expand_field_value, FieldType, SignatureBlock, SignatureField, Signatory};
+use crate::signatures::{expand_field_value, FieldType, Layout, SignatureBlock, SignatureField, Signatory};
 use crate::style::{DefinedTermStyle, StyleConfig};
+
+// Height of the writing space in "long" layout (in half-points).
+// Line fields (signatures) are taller than blank fields (names/dates).
+const LONG_LINE_HEIGHT_HALF_PTS: usize = 56; // 28pt
+const LONG_BLANK_HEIGHT_HALF_PTS: usize = 32; // 16pt
 
 /// Render all signature blocks into the document.
 pub fn render_signature_pages(
@@ -80,60 +85,23 @@ pub fn render_signature_pages(
         let total_gap = gap_width * gap_cols;
         let col_width = (5000 - total_gap) / content_cols;
 
-        // Build rows — each field definition becomes a row
+        // Build rows — each field definition becomes a row (short) or two rows (long)
         let max_fields = block.fields.len().max(if block.witness {
             block.witness_fields.len()
         } else {
             0
         });
 
-        let mut rows: Vec<TableRow> = Vec::new();
-
-        for field_idx in 0..max_fields {
-            let mut cells: Vec<TableCell> = Vec::new();
-
-            // Signatory columns with gap columns between them
-            for (sig_idx, signatory) in block.signatories.iter().enumerate() {
-                if sig_idx > 0 {
-                    cells.push(empty_cell(gap_width));
-                }
-                let cell = if field_idx < block.fields.len() {
-                    render_field_cell(
-                        &block.fields[field_idx],
-                        party,
-                        signatory,
-                        body_half_pts,
-                        label_half_pts,
-                        col_width,
-                        style,
-                    )
-                } else {
-                    empty_cell(col_width)
-                };
-                cells.push(cell);
-            }
-
-            // Witness column (with gap before it)
-            if block.witness {
-                cells.push(empty_cell(gap_width));
-                let cell = if field_idx < block.witness_fields.len() {
-                    render_field_cell(
-                        &block.witness_fields[field_idx],
-                        party,
-                        &Signatory { title: None },
-                        body_half_pts,
-                        label_half_pts,
-                        col_width,
-                        style,
-                    )
-                } else {
-                    empty_cell(col_width)
-                };
-                cells.push(cell);
-            }
-
-            rows.push(TableRow::new(cells));
-        }
+        let rows = match block.layout {
+            Layout::Short => build_short_rows(
+                block, party, max_fields, col_width, gap_width,
+                body_half_pts, label_half_pts, style,
+            ),
+            Layout::Long => build_long_rows(
+                block, party, max_fields, col_width, gap_width,
+                body_half_pts, label_half_pts,
+            ),
+        };
 
         // Single-column layouts match the width of one column in a two-column layout
         let table_width = if content_cols == 1 { 2400 } else { 5000 };
@@ -146,8 +114,206 @@ pub fn render_signature_pages(
     docx
 }
 
-/// Render a single field as a table cell.
-fn render_field_cell(
+/// Build rows for "short" layout — one row per field (current behaviour).
+fn build_short_rows(
+    block: &SignatureBlock,
+    party: &Party,
+    max_fields: usize,
+    col_width: usize,
+    gap_width: usize,
+    body_half_pts: usize,
+    label_half_pts: usize,
+    style: &StyleConfig,
+) -> Vec<TableRow> {
+    let mut rows = Vec::new();
+
+    for field_idx in 0..max_fields {
+        let mut cells: Vec<TableCell> = Vec::new();
+
+        for (sig_idx, signatory) in block.signatories.iter().enumerate() {
+            if sig_idx > 0 {
+                cells.push(empty_cell(gap_width));
+            }
+            let cell = if field_idx < block.fields.len() {
+                render_short_field_cell(
+                    &block.fields[field_idx],
+                    party,
+                    signatory,
+                    body_half_pts,
+                    label_half_pts,
+                    col_width,
+                    style,
+                )
+            } else {
+                empty_cell(col_width)
+            };
+            cells.push(cell);
+        }
+
+        if block.witness {
+            cells.push(empty_cell(gap_width));
+            let cell = if field_idx < block.witness_fields.len() {
+                render_short_field_cell(
+                    &block.witness_fields[field_idx],
+                    party,
+                    &Signatory { title: None },
+                    body_half_pts,
+                    label_half_pts,
+                    col_width,
+                    style,
+                )
+            } else {
+                empty_cell(col_width)
+            };
+            cells.push(cell);
+        }
+
+        rows.push(TableRow::new(cells));
+    }
+
+    rows
+}
+
+/// Build rows for "long" layout — each field produces two rows (space + label).
+fn build_long_rows(
+    block: &SignatureBlock,
+    party: &Party,
+    max_fields: usize,
+    col_width: usize,
+    gap_width: usize,
+    body_half_pts: usize,
+    label_half_pts: usize,
+) -> Vec<TableRow> {
+    let mut rows = Vec::new();
+
+    for field_idx in 0..max_fields {
+        // Row 1: writing space cells (with bottom border)
+        let mut space_cells: Vec<TableCell> = Vec::new();
+        // Row 2: label cells (small grey caption)
+        let mut label_cells: Vec<TableCell> = Vec::new();
+
+        for (sig_idx, signatory) in block.signatories.iter().enumerate() {
+            if sig_idx > 0 {
+                space_cells.push(empty_cell(gap_width));
+                label_cells.push(empty_cell(gap_width));
+            }
+            if field_idx < block.fields.len() {
+                let field = &block.fields[field_idx];
+                space_cells.push(render_long_space_cell(
+                    field, party, signatory, body_half_pts, col_width,
+                ));
+                label_cells.push(render_long_label_cell(
+                    field, party, signatory, label_half_pts, col_width,
+                ));
+            } else {
+                space_cells.push(empty_cell(col_width));
+                label_cells.push(empty_cell(col_width));
+            }
+        }
+
+        if block.witness {
+            space_cells.push(empty_cell(gap_width));
+            label_cells.push(empty_cell(gap_width));
+            if field_idx < block.witness_fields.len() {
+                let field = &block.witness_fields[field_idx];
+                let witness_sig = Signatory { title: None };
+                space_cells.push(render_long_space_cell(
+                    field, party, &witness_sig, body_half_pts, col_width,
+                ));
+                label_cells.push(render_long_label_cell(
+                    field, party, &witness_sig, label_half_pts, col_width,
+                ));
+            } else {
+                space_cells.push(empty_cell(col_width));
+                label_cells.push(empty_cell(col_width));
+            }
+        }
+
+        rows.push(TableRow::new(space_cells));
+        rows.push(TableRow::new(label_cells));
+    }
+
+    rows
+}
+
+/// Render a writing-space cell for "long" layout.
+/// Cell has a bottom border and height controlled by field type.
+fn render_long_space_cell(
+    field: &SignatureField,
+    party: &Party,
+    signatory: &Signatory,
+    body_half_pts: usize,
+    col_width: usize,
+) -> TableCell {
+    let height = match field.field_type {
+        FieldType::Line => LONG_LINE_HEIGHT_HALF_PTS,
+        FieldType::Blank => LONG_BLANK_HEIGHT_HALF_PTS,
+    };
+
+    let mut cell = TableCell::new().width(col_width, WidthType::Pct);
+
+    // If there's a pre-filled value, render it; otherwise use a sized NBSP for height
+    let display_value = field
+        .value
+        .as_ref()
+        .map(|v| expand_field_value(v, party, signatory))
+        .unwrap_or_default();
+
+    if display_value.is_empty() {
+        let para = Paragraph::new().add_run(
+            Run::new().add_text("\u{00A0}").size(height),
+        );
+        cell = cell.add_paragraph(para);
+    } else {
+        let para = Paragraph::new().add_run(
+            Run::new().add_text(&display_value).size(body_half_pts),
+        );
+        cell = cell.add_paragraph(para);
+    }
+
+    // Bottom border for the writing line
+    cell = cell.set_borders(
+        TableCellBorders::with_empty().set(
+            TableCellBorder::new(TableCellBorderPosition::Bottom)
+                .border_type(BorderType::Single)
+                .size(4)
+                .color("000000"),
+        ),
+    );
+
+    cell
+}
+
+/// Render a label cell for "long" layout.
+/// Small grey caption text, no borders.
+fn render_long_label_cell(
+    field: &SignatureField,
+    party: &Party,
+    signatory: &Signatory,
+    label_half_pts: usize,
+    col_width: usize,
+) -> TableCell {
+    let mut cell = TableCell::new().width(col_width, WidthType::Pct);
+
+    if let Some(ref label) = field.label {
+        let expanded = expand_field_value(label, party, signatory);
+        cell = cell.add_paragraph(
+            Paragraph::new().add_run(
+                Run::new()
+                    .add_text(&expanded)
+                    .size(label_half_pts)
+                    .color("666666"),
+            ),
+        );
+    } else {
+        cell = cell.add_paragraph(Paragraph::new());
+    }
+
+    cell
+}
+
+/// Render a single field as a table cell for "short" layout.
+fn render_short_field_cell(
     field: &SignatureField,
     party: &Party,
     signatory: &Signatory,

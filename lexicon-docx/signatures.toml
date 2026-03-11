@@ -2,16 +2,20 @@
 #
 # Structure: [jurisdiction.entity_type.execution_method]
 #
-# Placeholders:
+# Placeholders (in intro, field labels, and field values):
 #   {name}        — party name
 #   {specifier}   — party specifier (e.g. ACN number)
 #   {role}        — party role
 #   {type}        — document type
-#   {title}       — signatory title (in field values only)
+#   {title}       — signatory title
 #
 # Field types:
-#   type = "line"  — cell with bottom border (signature line)
-#   (default)      — blank/text field
+#   type = "line"  — signature line (taller writing space in long layout)
+#   (default)      — standard field (shorter writing space in long layout)
+#
+# Layout modes:
+#   layout = "long"   — each field is two rows: writing space + label caption (default)
+#   layout = "short"  — each field is one row: inline label/value
 #
 # Template intro supports **bold** markers.
 
@@ -26,9 +30,8 @@ signatories = [
   { title = "Director/Secretary" },
 ]
 fields = [
-  { type = "line" },
-  { label = "Name" },
-  { label = "Title", value = "{title}" },
+  { type = "line", label = "{title} Signature" },
+  { label = "Print Name" },
 ]
 witness = false
 
@@ -39,9 +42,8 @@ signatories = [
   { title = "Director/Secretary" },
 ]
 fields = [
-  { type = "line" },
-  { label = "Name" },
-  { label = "Title", value = "{title}" },
+  { type = "line", label = "{title} Signature" },
+  { label = "Print Name" },
 ]
 witness = false
 
@@ -49,14 +51,14 @@ witness = false
 intro = "**Signed sealed and delivered by {name}**:"
 signatories = [{}]
 fields = [
-  { type = "line" },
-  { label = "Name", value = "{name}" },
+  { type = "line", label = "Signature" },
+  { label = "Print Name", value = "{name}" },
   { label = "Date" },
 ]
 witness = true
 witness_fields = [
-  { type = "line" },
-  { label = "Witness name" },
+  { type = "line", label = "Witness Signature" },
+  { label = "Witness Name" },
   { label = "Address" },
 ]
 
@@ -64,8 +66,8 @@ witness_fields = [
 intro = "**Signed by {name}**:"
 signatories = [{}]
 fields = [
-  { type = "line" },
-  { label = "Name", value = "{name}" },
+  { type = "line", label = "Signature" },
+  { label = "Print Name", value = "{name}" },
   { label = "Date" },
 ]
 witness = false
@@ -76,9 +78,8 @@ signatories = [
   { title = "Sole Director and Sole Company Secretary" },
 ]
 fields = [
-  { type = "line" },
-  { label = "Name" },
-  { label = "Title", value = "{title}" },
+  { type = "line", label = "{title} Signature" },
+  { label = "Print Name" },
 ]
 witness = false
 
@@ -88,9 +89,8 @@ signatories = [
   { title = "Sole Director and Sole Company Secretary" },
 ]
 fields = [
-  { type = "line" },
-  { label = "Name" },
-  { label = "Title", value = "{title}" },
+  { type = "line", label = "{title} Signature" },
+  { label = "Print Name" },
 ]
 witness = false
 
@@ -105,9 +105,8 @@ signatories = [
   { title = "Company Secretary" },
 ]
 fields = [
-  { type = "line" },
-  { label = "Name" },
-  { label = "Title", value = "{title}" },
+  { type = "line", label = "{title} Signature" },
+  { label = "Print Name" },
 ]
 witness = false
 
@@ -117,9 +116,8 @@ signatories = [
   { title = "Director" },
 ]
 fields = [
-  { type = "line" },
-  { label = "Name" },
-  { label = "Title", value = "{title}" },
+  { type = "line", label = "{title} Signature" },
+  { label = "Print Name" },
 ]
 witness = false
 
@@ -127,13 +125,13 @@ witness = false
 intro = "**Signed as a deed by {name}** in the presence of a witness:"
 signatories = [{}]
 fields = [
-  { type = "line" },
-  { label = "Name", value = "{name}" },
+  { type = "line", label = "Signature" },
+  { label = "Print Name", value = "{name}" },
 ]
 witness = true
 witness_fields = [
-  { type = "line" },
-  { label = "Witness name" },
+  { type = "line", label = "Witness Signature" },
+  { label = "Witness Name" },
   { label = "Address" },
   { label = "Occupation" },
 ]
@@ -142,8 +140,8 @@ witness_fields = [
 intro = "**Signed by {name}**:"
 signatories = [{}]
 fields = [
-  { type = "line" },
-  { label = "Name", value = "{name}" },
+  { type = "line", label = "Signature" },
+  { label = "Print Name", value = "{name}" },
   { label = "Date" },
 ]
 witness = false
@@ -153,6 +151,7 @@ witness = false
 # ============================================================================
 
 [us.company.deed]
+layout = "short"
 intro = "**Executed by {name}**:"
 signatories = [
   { title = "Authorized Signatory" },
@@ -166,6 +165,7 @@ fields = [
 witness = false
 
 [us.company.agreement]
+layout = "short"
 intro = "**{name}**:"
 signatories = [
   { title = "Authorized Signatory" },
@@ -180,6 +180,7 @@ fields = [
 witness = false
 
 [us.individual.deed]
+layout = "short"
 intro = "**Signed by {name}**:"
 signatories = [{}]
 fields = [
@@ -195,6 +196,7 @@ witness_fields = [
 ]
 
 [us.individual.agreement]
+layout = "short"
 intro = "**Signed by {name}**:"
 signatories = [{}]
 fields = [
@@ -215,9 +217,8 @@ signatories = [
   { title = "Director" },
 ]
 fields = [
-  { type = "line" },
-  { label = "Name" },
-  { label = "Title", value = "{title}" },
+  { type = "line", label = "{title} Signature" },
+  { label = "Print Name" },
 ]
 witness = false
 
@@ -227,9 +228,8 @@ signatories = [
   { title = "Director" },
 ]
 fields = [
-  { type = "line" },
-  { label = "Name" },
-  { label = "Title", value = "{title}" },
+  { type = "line", label = "{title} Signature" },
+  { label = "Print Name" },
 ]
 witness = false
 
@@ -237,14 +237,14 @@ witness = false
 intro = "**Signed as a deed by {name}**:"
 signatories = [{}]
 fields = [
-  { type = "line" },
-  { label = "Name", value = "{name}" },
+  { type = "line", label = "Signature" },
+  { label = "Print Name", value = "{name}" },
   { label = "Date" },
 ]
 witness = true
 witness_fields = [
-  { type = "line" },
-  { label = "Witness name" },
+  { type = "line", label = "Witness Signature" },
+  { label = "Witness Name" },
   { label = "Occupation" },
   { label = "Address" },
 ]
@@ -253,8 +253,8 @@ witness_fields = [
 intro = "**Signed by {name}**:"
 signatories = [{}]
 fields = [
-  { type = "line" },
-  { label = "Name", value = "{name}" },
+  { type = "line", label = "Signature" },
+  { label = "Print Name", value = "{name}" },
   { label = "Date" },
 ]
 witness = false

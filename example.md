@@ -1,6 +1,6 @@
 ---
-title: Data Processing Addendum
-type: Addendum
+title: Data Processing Agreement
+type: Deed
 date: 2026-01-15
 ref: "OK:RP:20260115"
 author: Richard Prangell (Viridian Lawyers)
