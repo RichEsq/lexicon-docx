@@ -32,7 +32,8 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Option<Recitals>, Option<Stri
             // Top-level heading — check for recitals, body heading, or addendum
             NodeValue::Heading(h) if h.level == 1 => {
                 drop(data);
-                let heading_text = collect_plain_text(child);
+                let raw_heading = collect_plain_text(child);
+                let (heading_text, heading_anchor) = strip_anchor(&raw_heading);
 
                 if RECITALS_RE.is_match(&heading_text) {
                     if recitals.is_some() {
@@ -61,6 +62,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Option<Recitals>, Option<Stri
                     in_addendum = Some(Addendum {
                         number: addendum_counter,
                         title,
+                        anchor: heading_anchor.clone(),
                         content: Vec::new(),
                     });
                 } else if in_recitals {

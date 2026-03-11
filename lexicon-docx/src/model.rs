@@ -230,6 +230,7 @@ pub struct Table {
 pub struct Addendum {
     pub number: u32,
     pub title: String,
+    pub anchor: Option<String>,
     pub content: Vec<AddendumContent>,
 }
 

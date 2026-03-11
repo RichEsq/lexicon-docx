@@ -28,6 +28,13 @@ pub fn resolve(doc: &mut Document) {
     }
     collect_body_anchors(&doc.body, &mut anchor_map, "clause");
 
+    // Register addendum heading anchors
+    for addendum in &doc.addenda {
+        if let Some(ref anchor_id) = addendum.anchor {
+            anchor_map.insert(anchor_id.clone(), addendum.heading());
+        }
+    }
+
     // Resolve cross-references and validate
     if let Some(ref mut recitals) = doc.recitals {
         resolve_cross_refs(&mut recitals.body, &anchor_map, &mut doc.diagnostics);
