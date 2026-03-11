@@ -1,5 +1,5 @@
 use docx_rs::{
-    AbstractNumbering, Level, LevelJc, LevelText, NumberFormat, RunFonts, SpecialIndentType, Start,
+    AbstractNumbering, Level, LevelJc, LevelText, NumberFormat, SpecialIndentType, Start,
 };
 
 use crate::model::ClauseLevel;
@@ -23,7 +23,6 @@ pub fn create_recital_numbering(style: &StyleConfig) -> AbstractNumbering {
 }
 
 fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> AbstractNumbering {
-    let h1_size = StyleConfig::pt_to_half_points(style.heading1_size);
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
     let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
 
@@ -38,24 +37,14 @@ fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> 
 
     let mut numbering = AbstractNumbering::new(id);
     numbering.multi_level_type = Some("multilevel".to_string());
-    let mut level0 = Level::new(
+    let level0 = Level::new(
         0,
         Start::new(1),
         NumberFormat::new("decimal"),
         LevelText::new("%1."),
         LevelJc::new("left"),
     )
-    .indent(Some(level_indent(0)), Some(SpecialIndentType::Hanging(hanging)), None, None)
-    .bold()
-    .size(h1_size)
-    .fonts(
-        RunFonts::new()
-            .ascii(&style.heading_font_family)
-            .hi_ansi(&style.heading_font_family),
-    );
-    if let Some(ref color) = style.brand_color_hex() {
-        level0 = level0.color(color);
-    }
+    .indent(Some(level_indent(0)), Some(SpecialIndentType::Hanging(hanging)), None, None);
 
     numbering
         // Level 0: TopLevel — "1."
