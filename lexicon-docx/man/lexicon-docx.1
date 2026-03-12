@@ -1,0 +1,31 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH lexicon 1  "lexicon 0.1.0" 
+.SH NAME
+lexicon \- Lexicon Markdown processor for legal contracts
+.SH SYNOPSIS
+\fBlexicon\fR [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+Lexicon Markdown processor for legal contracts
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH SUBCOMMANDS
+.TP
+lexicon\-build(1)
+Build a .docx from a Lexicon Markdown file
+.TP
+lexicon\-validate(1)
+Validate a Lexicon Markdown file without generating output
+.TP
+lexicon\-man(1)
+Generate man pages to a directory
+.TP
+lexicon\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH VERSION
+v0.1.0

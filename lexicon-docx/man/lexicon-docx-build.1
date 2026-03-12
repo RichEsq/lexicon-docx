@@ -1,0 +1,216 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH build 1  "build " 
+.SH NAME
+build \- Build a .docx from a Lexicon Markdown file
+.SH SYNOPSIS
+\fBbuild\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-s\fR|\fB\-\-style\fR] [\fB\-\-signatures\fR] [\fB\-\-pdf\-renderer\fR] [\fB\-\-strict\fR] [\fB\-\-font\-family\fR] [\fB\-\-font\-size\fR] [\fB\-\-heading\-font\-family\fR] [\fB\-\-title\-size\fR] [\fB\-\-heading1\-size\fR] [\fB\-\-heading2\-size\fR] [\fB\-\-line\-spacing\fR] [\fB\-\-defined\-term\-style\fR] [\fB\-\-brand\-color\fR] [\fB\-\-page\-size\fR] [\fB\-\-margin\-top\fR] [\fB\-\-margin\-bottom\fR] [\fB\-\-margin\-left\fR] [\fB\-\-margin\-right\fR] [\fB\-\-indent\-per\-level\fR] [\fB\-\-hanging\-indent\fR] [\fB\-\-body\-align\-first\-level\fR] [\fB\-\-no\-body\-align\-first\-level\fR] [\fB\-\-recitals\-align\-first\-level\fR] [\fB\-\-no\-recitals\-align\-first\-level\fR] [\fB\-\-date\-format\fR] [\fB\-\-cover\fR] [\fB\-\-no\-cover\fR] [\fB\-\-cover\-between\-label\fR] [\fB\-\-cover\-party\-format\fR] [\fB\-\-cover\-ref\fR] [\fB\-\-no\-cover\-ref\fR] [\fB\-\-cover\-author\fR] [\fB\-\-no\-cover\-author\fR] [\fB\-\-cover\-status\fR] [\fB\-\-no\-cover\-status\fR] [\fB\-\-toc\fR] [\fB\-\-no\-toc\fR] [\fB\-\-toc\-heading\fR] [\fB\-\-footer\-ref\fR] [\fB\-\-no\-footer\-ref\fR] [\fB\-\-footer\-page\-number\fR] [\fB\-\-no\-footer\-page\-number\fR] [\fB\-\-footer\-version\fR] [\fB\-\-no\-footer\-version\fR] [\fB\-\-preamble\fR] [\fB\-\-no\-preamble\fR] [\fB\-\-preamble\-style\fR] [\fB\-\-schedule\-position\fR] [\fB\-\-schedule\-order\fR] [\fB\-\-enable\-signatures\fR] [\fB\-\-no\-signatures\fR] [\fB\-\-signatures\-heading\fR] [\fB\-\-signatures\-template\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIINPUT\fR> 
+.SH DESCRIPTION
+Build a .docx from a Lexicon Markdown file
+.SH OPTIONS
+.TP
+\fB\-o\fR, \fB\-\-output\fR \fI<OUTPUT>\fR
+Output .docx file (defaults to input stem + .docx)
+.TP
+\fB\-s\fR, \fB\-\-style\fR \fI<STYLE>\fR
+Style configuration file (TOML). If not specified, searches for style.toml in the input file\*(Aqs directory, then in $XDG_CONFIG_HOME/lexicon/
+.TP
+\fB\-\-signatures\fR \fI<SIGNATURES>\fR
+Signature definitions file (TOML). If not specified, searches for signatures.toml in the input file\*(Aqs directory, then in $XDG_CONFIG_HOME/lexicon/
+.TP
+\fB\-\-pdf\-renderer\fR \fI<PDF_RENDERER>\fR [default: auto]
+PDF rendering backend for exhibit imports
+.br
+
+.br
+[\fIpossible values: \fRauto, pdftoppm]
+.TP
+\fB\-\-strict\fR
+Fail on warnings (exit code 1)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fIINPUT\fR>
+Input Lexicon Markdown file
+.SH TYPOGRAPHY
+.TP
+\fB\-\-font\-family\fR \fI<FONT_FAMILY>\fR
+Body text font family
+.TP
+\fB\-\-font\-size\fR \fI<FONT_SIZE>\fR
+Body text font size in points
+.TP
+\fB\-\-heading\-font\-family\fR \fI<HEADING_FONT_FAMILY>\fR
+Heading font family
+.TP
+\fB\-\-title\-size\fR \fI<TITLE_SIZE>\fR
+Document title font size in points
+.TP
+\fB\-\-heading1\-size\fR \fI<HEADING1_SIZE>\fR
+Level 1 heading size in points
+.TP
+\fB\-\-heading2\-size\fR \fI<HEADING2_SIZE>\fR
+Level 2 heading size in points
+.TP
+\fB\-\-line\-spacing\fR \fI<LINE_SPACING>\fR
+Line spacing multiplier
+.TP
+\fB\-\-defined\-term\-style\fR \fI<DEFINED_TERM_STYLE>\fR
+Defined term style
+.br
+
+.br
+[\fIpossible values: \fRbold, quoted, bold\-quoted]
+.TP
+\fB\-\-brand\-color\fR \fI<BRAND_COLOR>\fR
+Brand color as hex (e.g. "#2E5090" or "2E5090")
+.SH "PAGE LAYOUT"
+.TP
+\fB\-\-page\-size\fR \fI<PAGE_SIZE>\fR
+Page size
+.br
+
+.br
+[\fIpossible values: \fRa4, letter]
+.TP
+\fB\-\-margin\-top\fR \fI<MARGIN_TOP>\fR
+Top margin in cm
+.TP
+\fB\-\-margin\-bottom\fR \fI<MARGIN_BOTTOM>\fR
+Bottom margin in cm
+.TP
+\fB\-\-margin\-left\fR \fI<MARGIN_LEFT>\fR
+Left margin in cm
+.TP
+\fB\-\-margin\-right\fR \fI<MARGIN_RIGHT>\fR
+Right margin in cm
+.SH "CLAUSE INDENTATION"
+.TP
+\fB\-\-indent\-per\-level\fR \fI<INDENT_PER_LEVEL>\fR
+Indent per clause level in cm
+.TP
+\fB\-\-hanging\-indent\fR \fI<HANGING_INDENT>\fR
+Hanging indent for clause numbers in cm
+.TP
+\fB\-\-body\-align\-first\-level\fR
+Align first\-level body clauses with second level
+.TP
+\fB\-\-no\-body\-align\-first\-level\fR
+Do not align first\-level body clauses with second level
+.TP
+\fB\-\-recitals\-align\-first\-level\fR
+Align first\-level recital clauses with second level
+.TP
+\fB\-\-no\-recitals\-align\-first\-level\fR
+Do not align first\-level recital clauses with second level
+.SH FORMATTING
+.TP
+\fB\-\-date\-format\fR \fI<DATE_FORMAT>\fR
+Date format string (chrono strftime syntax)
+.SH "COVER PAGE"
+.TP
+\fB\-\-cover\fR
+Enable cover page
+.TP
+\fB\-\-no\-cover\fR
+Disable cover page
+.TP
+\fB\-\-cover\-between\-label\fR \fI<COVER_BETWEEN_LABEL>\fR
+Cover page "between" label
+.TP
+\fB\-\-cover\-party\-format\fR \fI<COVER_PARTY_FORMAT>\fR
+Cover page party format
+.br
+
+.br
+[\fIpossible values: \fRname\-spec\-role, name\-role, name\-only]
+.TP
+\fB\-\-cover\-ref\fR
+Show reference on cover page
+.TP
+\fB\-\-no\-cover\-ref\fR
+Hide reference on cover page
+.TP
+\fB\-\-cover\-author\fR
+Show author on cover page
+.TP
+\fB\-\-no\-cover\-author\fR
+Hide author on cover page
+.TP
+\fB\-\-cover\-status\fR
+Show status on cover page
+.TP
+\fB\-\-no\-cover\-status\fR
+Hide status on cover page
+.SH "TABLE OF CONTENTS"
+.TP
+\fB\-\-toc\fR
+Enable table of contents
+.TP
+\fB\-\-no\-toc\fR
+Disable table of contents
+.TP
+\fB\-\-toc\-heading\fR \fI<TOC_HEADING>\fR
+Table of contents heading text
+.SH FOOTER
+.TP
+\fB\-\-footer\-ref\fR
+Show reference in footer
+.TP
+\fB\-\-no\-footer\-ref\fR
+Hide reference in footer
+.TP
+\fB\-\-footer\-page\-number\fR
+Show page numbers in footer
+.TP
+\fB\-\-no\-footer\-page\-number\fR
+Hide page numbers in footer
+.TP
+\fB\-\-footer\-version\fR
+Show version in footer (appended to reference)
+.TP
+\fB\-\-no\-footer\-version\fR
+Hide version in footer
+.SH PREAMBLE
+.TP
+\fB\-\-preamble\fR
+Enable parties preamble
+.TP
+\fB\-\-no\-preamble\fR
+Disable parties preamble
+.TP
+\fB\-\-preamble\-style\fR \fI<PREAMBLE_STYLE>\fR
+Preamble style
+.br
+
+.br
+[\fIpossible values: \fRsimple, prose, custom]
+.SH SCHEDULE
+.TP
+\fB\-\-schedule\-position\fR \fI<SCHEDULE_POSITION>\fR
+Schedule position in the document
+.br
+
+.br
+[\fIpossible values: \fRend, after\-toc]
+.TP
+\fB\-\-schedule\-order\fR \fI<SCHEDULE_ORDER>\fR
+Schedule item ordering
+.br
+
+.br
+[\fIpossible values: \fRdocument, alphabetical]
+.SH SIGNATURES
+.TP
+\fB\-\-enable\-signatures\fR
+Enable signature pages
+.TP
+\fB\-\-no\-signatures\fR
+Disable signature pages
+.TP
+\fB\-\-signatures\-heading\fR \fI<SIGNATURES_HEADING>\fR
+Signature pages heading text
+.TP
+\fB\-\-signatures\-template\fR \fI<SIGNATURES_TEMPLATE>\fR
+Default signature template key

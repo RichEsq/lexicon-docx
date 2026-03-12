@@ -46,14 +46,123 @@ Options:
       --strict                Fail on warnings (exit code 1)
 ```
 
-### Config file resolution
+### Config resolution and priority
 
-Both `style.toml` and `signatures.toml` are auto-discovered without flags. The processor searches:
+Style settings are resolved in this order (highest priority first):
 
-1. The input file's directory
-2. `$XDG_CONFIG_HOME/lexicon/` (defaults to `~/.config/lexicon/`)
+1. **CLI flags** — `--font-size 11`, `--no-cover`, etc.
+2. **TOML file in the input directory** — `style.toml` next to the contract
+3. **TOML file in XDG config** — `$XDG_CONFIG_HOME/lexicon/style.toml` (defaults to `~/.config/lexicon/`)
+4. **Built-in defaults**
 
-Explicit `--style` or `--signatures` flags override auto-discovery.
+An explicit `--style` flag replaces steps 2–3 (the specified file is loaded, then CLI flags still override it).
+
+Signature definitions (`signatures.toml`) follow the same discovery order (input dir → XDG), overridden by an explicit `--signatures` flag.
+
+### CLI style overrides
+
+Every style.toml setting can also be set from the command line. This is useful for one-off builds or scripting without creating a TOML file.
+
+**Typography:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--font-family <NAME>` | Body text font family | Times New Roman |
+| `--font-size <PT>` | Body text size in points | 12 |
+| `--heading-font-family <NAME>` | Heading font family | Times New Roman |
+| `--title-size <PT>` | Document title size in points | 20 |
+| `--heading1-size <PT>` | Level 1 heading size in points | 14 |
+| `--heading2-size <PT>` | Level 2 heading size in points | 12 |
+| `--line-spacing <N>` | Line spacing multiplier | 1.5 |
+| `--defined-term-style <STYLE>` | `bold`, `quoted`, or `bold-quoted` | bold |
+| `--brand-color <HEX>` | Brand color (e.g. `"#2E5090"`) | none |
+
+**Page layout:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--page-size <SIZE>` | `a4` or `letter` | a4 |
+| `--margin-top <CM>` | Top margin in cm | 2.54 |
+| `--margin-bottom <CM>` | Bottom margin in cm | 2.54 |
+| `--margin-left <CM>` | Left margin in cm | 2.54 |
+| `--margin-right <CM>` | Right margin in cm | 2.54 |
+
+**Clause indentation:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--indent-per-level <CM>` | Indent per clause level in cm | 1.27 |
+| `--hanging-indent <CM>` | Hanging indent for numbers in cm | 1.27 |
+| `--body-align-first-level` | Align first-level body clauses with second level | off |
+| `--no-body-align-first-level` | (opposite of above) | |
+| `--recitals-align-first-level` | Align first-level recital clauses with second level | off |
+| `--no-recitals-align-first-level` | (opposite of above) | |
+
+**Formatting:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--date-format <FMT>` | chrono strftime format string | `%e %B %Y` |
+
+**Cover page:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--cover` / `--no-cover` | Enable/disable cover page | on |
+| `--cover-between-label <TEXT>` | "Between" label on cover | BETWEEN |
+| `--cover-party-format <FMT>` | `name-spec-role`, `name-role`, or `name-only` | name-spec-role |
+| `--cover-ref` / `--no-cover-ref` | Show/hide reference on cover | on |
+| `--cover-author` / `--no-cover-author` | Show/hide author on cover | on |
+| `--cover-status` / `--no-cover-status` | Show/hide status on cover | on |
+
+**Table of contents:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--toc` / `--no-toc` | Enable/disable table of contents | on |
+| `--toc-heading <TEXT>` | TOC heading text | Contents |
+
+**Footer:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--footer-ref` / `--no-footer-ref` | Show/hide reference in footer | on |
+| `--footer-page-number` / `--no-footer-page-number` | Show/hide page numbers | on |
+| `--footer-version` / `--no-footer-version` | Show/hide version in footer | off |
+
+**Preamble:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--preamble` / `--no-preamble` | Enable/disable parties preamble | off |
+| `--preamble-style <STYLE>` | `simple`, `prose`, or `custom` | simple |
+
+**Schedule:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--schedule-position <POS>` | `end` or `after-toc` | end |
+| `--schedule-order <ORDER>` | `document` or `alphabetical` | document |
+
+**Signatures:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--enable-signatures` / `--no-signatures` | Enable/disable signature pages | off |
+| `--signatures-heading <TEXT>` | Heading text for signature section | none |
+| `--signatures-template <KEY>` | Default signature template key | none |
+
+> **Note:** Preamble templates (`preamble.template`, `preamble.party_template`, `preamble.party_separator`) and per-party signature overrides (`signatures.party.*`) are TOML-only — they contain structured data that doesn't lend itself to CLI flags.
+
+### Man pages
+
+Generate man pages with:
+
+```bash
+lexicon-docx man --dir man/
+```
+
+This creates `lexicon-docx.1`, `lexicon-docx-build.1`, and `lexicon-docx-validate.1` in the output directory. Install them to your man path (e.g. `/usr/local/share/man/man1/`) to use with `man lexicon-docx`.
 
 ## Features
 
