@@ -8,7 +8,7 @@ The repository contains:
 - `lexicon/` — git submodule ([RichEsq/lexicon](https://github.com/RichEsq/lexicon)) containing:
   - `spec.md` — the Lexicon Markdown specification (v1.0-draft)
   - `example.md` — a real-world Data Processing Addendum written in Lexicon format
-- `lexicon-docx/` — the Rust CLI processor
+- `src/`, `Cargo.toml`, etc. — the Rust CLI processor (root-level crate)
 
 ## First Steps
 
@@ -16,9 +16,9 @@ Before starting any work:
 
 1. Update the lexicon submodule: `git submodule update --init --remote`
 1. read **`lexicon/spec.md`** — the Lexicon Markdown specification. The spec is the source of truth for all parsing and validation rules.
-2. read **`lexicon-docx/planning/implementation-status.md`** — what's done and what's remaining.
-3. read **`lexicon-docx/planning/todo.md`** — open tasks and questions.
-4. **Other planning files in `lexicon-docx/planning/`** — design notes for specific features.
+2. read **`planning/implementation-status.md`** — what's done and what's remaining.
+3. read **`planning/todo.md`** — open tasks and questions.
+4. **Other planning files in `planning/`** — design notes for specific features.
 
 ## Specification
 
@@ -35,23 +35,22 @@ Full spec is in `lexicon/spec.md`. The spec is the source of truth for all parsi
 
 ```bash
 # Build the processor
-cd lexicon-docx
 cargo build
 
 # Build a .docx from a Lexicon contract
-cargo run -- build ../lexicon/example.md -o output.docx
+cargo run -- build lexicon/example.md -o output.docx
 
 # Validate a contract without generating output
-cargo run -- validate ../lexicon/example.md
+cargo run -- validate lexicon/example.md
 
 # Build with a custom style config
-cargo run -- build ../lexicon/example.md -o output.docx --style style.toml
+cargo run -- build lexicon/example.md -o output.docx --style style.toml
 
 # Build with CLI style overrides (override TOML or defaults)
-cargo run -- build ../lexicon/example.md --no-cover --page-size letter --font-family Arial
+cargo run -- build lexicon/example.md --no-cover --page-size letter --font-family Arial
 
 # Run with --strict to fail on warnings
-cargo run -- build ../lexicon/example.md --strict
+cargo run -- build lexicon/example.md --strict
 
 # Generate man pages
 cargo run -- man --dir man/
@@ -135,7 +134,7 @@ cargo test
 
 ## Planning
 
-Future work and design notes are in `lexicon-docx/planning/`:
+Future work and design notes are in `planning/`:
 - `implementation-status.md` — what's done, what's remaining, architecture notes
 - `library-extraction.md` — plan for extracting lexicon-core as a separate crate
 - `exhibit-file-import.md` — exhibit file import (Phase 1+2 complete, URL import is future)
@@ -150,13 +149,13 @@ Future work and design notes are in `lexicon-docx/planning/`:
 
 Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes), recitals/background section (lettered (A)/(B)/(C), body heading requirement), native Word cross-references (bookmarks + internal hyperlinks, Ctrl+click navigation), CLI style override flags (all style.toml options as --flags, priority: CLI > local TOML > XDG TOML > defaults), man page generation (`lexicon-docx man`)).
 
-See `lexicon-docx/planning/implementation-status.md` for detailed status.
+See `planning/implementation-status.md` for detailed status.
 
 ## Post-Work Checklist
 
 After every successful piece of work (new feature, bug fix, spec change), complete ALL of the following before considering the task done:
 
 1. **Update `CLAUDE.md`** — reflect any new files, dependencies, design decisions, or planning docs. Keep the Implementation Status line current.
-2. **Update `lexicon-docx/planning/implementation-status.md`** — move completed items to "Recently completed", remove from "Not yet implemented".
+2. **Update `planning/implementation-status.md`** — move completed items to "Recently completed", remove from "Not yet implemented".
 3. **Run `cargo test`** — ensure all tests pass.
 4. **Commit and push** — commit all changes with a descriptive message, then push to the remote.
