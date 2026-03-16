@@ -61,22 +61,18 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     // Build bookmark ID map: anchor_id → unique integer ID for Word bookmarks
     let bookmark_ids = build_bookmark_map(doc);
 
-    // Register heading styles so the TOC field can find them
+    // Register heading styles so the TOC field can find them.
+    // Brand colour is set on the Heading1 style (not as direct run formatting)
+    // so that Word's TOC regeneration doesn't carry the colour into TOC entries.
     for i in 1..=3 {
-        docx = docx.add_style(
-            Style::new(format!("Heading{}", i), StyleType::Paragraph)
-                .name(format!("heading {}", i)),
-        );
-    }
-
-    // Register ToC styles with black text so TOC entries don't inherit
-    // the brand colour from headings when Word regenerates the TOC
-    for i in 1..=3 {
-        docx = docx.add_style(
-            Style::new(format!("ToC{}", i), StyleType::Paragraph)
-                .name(format!("toc {}", i))
-                .color("000000"),
-        );
+        let mut heading_style = Style::new(format!("Heading{}", i), StyleType::Paragraph)
+            .name(format!("heading {}", i));
+        if i == 1 {
+            if let Some(ref color) = style.brand_color_hex() {
+                heading_style = heading_style.color(color);
+            }
+        }
+        docx = docx.add_style(heading_style);
     }
 
     // Footer
@@ -289,7 +285,7 @@ fn render_footer(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
 
 fn render_section_heading(mut docx: Docx, text: &str, style: &StyleConfig) -> Docx {
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
-    let mut heading_run = Run::new()
+    let heading_run = Run::new()
         .add_text(text.to_uppercase())
         .bold()
         .size(heading_size)
@@ -298,9 +294,6 @@ fn render_section_heading(mut docx: Docx, text: &str, style: &StyleConfig) -> Do
                 .ascii(&style.heading_font_family)
                 .hi_ansi(&style.heading_font_family),
         );
-    if let Some(ref color) = style.brand_color_hex() {
-        heading_run = heading_run.color(color);
-    }
     docx = docx.add_paragraph(Paragraph::new());
     docx = docx.add_paragraph(
         Paragraph::new()
@@ -335,15 +328,7 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
             .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
             .outline_lvl(outline_lvl)
             .keep_next(true)
-            .run_property({
-                let mut rp = RunProperty::new().bold().size(heading_size);
-                if heading.level == 2 {
-                    if let Some(ref color) = style.brand_color_hex() {
-                        rp = rp.color(color);
-                    }
-                }
-                rp
-            });
+            .run_property(RunProperty::new().bold().size(heading_size));
 
         // Place bookmark on the heading paragraph
         if let Some(ref anchor_id) = clause.anchor {
@@ -355,10 +340,11 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
             }
         }
 
-        // Heading inline content — Word generates the number
-        let heading_color = if heading.level == 2 { style.brand_color_hex() } else { None };
+        // Heading inline content — Word generates the number.
+        // Brand colour comes from the Heading style, not direct run formatting,
+        // so that TOC entries don't inherit it.
         for inline in &heading.text {
-            para = add_inline_run(para, inline, true, heading_size, style, heading_color.as_deref());
+            para = add_inline_run(para, inline, true, heading_size, style, None);
         }
 
         docx = docx.add_paragraph(para);
