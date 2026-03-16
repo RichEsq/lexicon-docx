@@ -4,7 +4,7 @@ use std::path::Path;
 use docx_rs::{
     BreakType, Docx, Footer, Header, IndentLevel, LineSpacing, LineSpacingType, NumberingId,
     NumPages, Numbering, PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, RunProperty, Style,
-    StyleType, Tab, TabValueType, TableOfContents,
+    StyleType, Tab, TabValueType, TableOfContents, TableOfContentsItem,
 };
 
 use crate::error::{LexiconError, Result};
@@ -115,12 +115,21 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         );
         docx = docx.add_paragraph(Paragraph::new());
 
-        // Table of contents — don't use .auto() because docx-rs double-escapes
-        // apostrophes (and other XML entities) in the cached TOC items it generates.
-        // Without .auto(), Word regenerates the TOC from headings on first open
-        // (the field is already marked dirty="true").
-        let toc = TableOfContents::new()
-            .heading_styles_range(1, 3);
+        // Build TOC items manually from our Document IR rather than using
+        // docx-rs .auto(), which double-escapes apostrophes and other XML
+        // entities in cached TOC text. The field is still marked dirty="true"
+        // so Word regenerates on open, but the cached items provide a
+        // readable fallback if the user declines the update prompt.
+        let mut toc = TableOfContents::new()
+            .heading_styles_range(1, 3)
+            .dirty();
+        for (text, level) in collect_toc_entries(doc) {
+            toc = toc.add_item(
+                TableOfContentsItem::new()
+                    .text(&text)
+                    .level(level),
+            );
+        }
         docx = docx.add_table_of_contents(toc);
 
         // Page break after TOC (skip if schedule follows — it has its own leading page break)
@@ -458,6 +467,57 @@ fn collect_clause_anchors(clause: &Clause, map: &mut HashMap<String, usize>, nex
         if let ClauseBody::Children(children) = element {
             for child in children {
                 collect_clause_anchors(child, map, next_id);
+            }
+        }
+    }
+}
+
+/// Collect TOC entries from the Document IR with their heading level (1-3).
+/// Used to build cached TOC items manually, avoiding docx-rs's .auto()
+/// which double-escapes XML entities like apostrophes.
+fn collect_toc_entries(doc: &Document) -> Vec<(String, usize)> {
+    let mut entries = Vec::new();
+
+    // Section headings use Heading1 (level 1)
+    if let Some(ref recitals) = doc.recitals {
+        entries.push((recitals.heading.to_uppercase(), 1));
+    }
+    if let Some(ref heading) = doc.body_heading {
+        entries.push((heading.to_uppercase(), 1));
+    }
+
+    // Clause headings from recitals
+    if let Some(ref recitals) = doc.recitals {
+        collect_clause_toc_entries(&recitals.body, &mut entries);
+    }
+
+    // Clause headings from body
+    collect_clause_toc_entries(&doc.body, &mut entries);
+
+    entries
+}
+
+fn collect_clause_toc_entries(body: &[BodyElement], entries: &mut Vec<(String, usize)>) {
+    for element in body {
+        if let BodyElement::Clause(clause) = element {
+            collect_clause_heading_entries(clause, entries);
+        }
+    }
+}
+
+fn collect_clause_heading_entries(clause: &Clause, entries: &mut Vec<(String, usize)>) {
+    if let Some(ref heading) = clause.heading {
+        let outline = outline_level_for(clause.level);
+        let heading_level = outline + 1; // Heading1 = level 1, etc.
+        if heading_level <= 3 {
+            let text: String = heading.text.iter().map(|i| i.as_plain_text()).collect();
+            entries.push((text, heading_level));
+        }
+    }
+    for element in &clause.body {
+        if let ClauseBody::Children(children) = element {
+            for child in children {
+                collect_clause_heading_entries(child, entries);
             }
         }
     }
