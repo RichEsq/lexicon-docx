@@ -131,6 +131,14 @@ struct StyleOverrides {
     #[arg(long, help_heading = "Typography")]
     heading2_size: Option<f32>,
 
+    /// Space before section headings in points
+    #[arg(long, help_heading = "Typography")]
+    heading_space_before_pt: Option<f32>,
+
+    /// Space after section headings in points
+    #[arg(long, help_heading = "Typography")]
+    heading_space_after_pt: Option<f32>,
+
     /// Line spacing multiplier
     #[arg(long, help_heading = "Typography")]
     line_spacing: Option<f32>,
@@ -331,6 +339,8 @@ impl StyleOverrides {
         if let Some(v) = self.title_size { config.title_size = v; }
         if let Some(v) = self.heading1_size { config.heading1_size = v; }
         if let Some(v) = self.heading2_size { config.heading2_size = v; }
+        if let Some(v) = self.heading_space_before_pt { config.heading_space_before_pt = v; }
+        if let Some(v) = self.heading_space_after_pt { config.heading_space_after_pt = v; }
         if let Some(v) = self.line_spacing { config.line_spacing = v; }
         if let Some(v) = self.brand_color { config.brand_color = Some(v); }
         if let Some(v) = self.defined_term_style {

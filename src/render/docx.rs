@@ -62,11 +62,15 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     let bookmark_ids = build_bookmark_map(doc);
 
     // Register heading styles so the TOC field can find them.
-    // Brand colour is set on the Heading1 style (not as direct run formatting)
+    // Brand colour and spacing are set on the style (not as direct formatting)
     // so that Word's TOC regeneration doesn't carry the colour into TOC entries.
+    let heading_spacing = LineSpacing::new()
+        .before(StyleConfig::pt_to_twips(style.heading_space_before_pt))
+        .after(StyleConfig::pt_to_twips(style.heading_space_after_pt));
     for i in 1..=3 {
         let mut heading_style = Style::new(format!("Heading{}", i), StyleType::Paragraph)
-            .name(format!("heading {}", i));
+            .name(format!("heading {}", i))
+            .line_spacing(heading_spacing.clone());
         if i == 1 {
             if let Some(ref color) = style.brand_color_hex() {
                 heading_style = heading_style.color(color);
@@ -116,12 +120,15 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         if let Some(ref color) = style.brand_color_hex() {
             toc_heading_run = toc_heading_run.color(color);
         }
-        docx = docx.add_paragraph(Paragraph::new());
         docx = docx.add_paragraph(
             Paragraph::new()
+                .line_spacing(
+                    LineSpacing::new()
+                        .before(StyleConfig::pt_to_twips(style.heading_space_before_pt))
+                        .after(StyleConfig::pt_to_twips(style.heading_space_after_pt)),
+                )
                 .add_run(toc_heading_run),
         );
-        docx = docx.add_paragraph(Paragraph::new());
 
         // Build TOC items manually from our Document IR rather than using
         // docx-rs .auto(), which double-escapes apostrophes and other XML
@@ -296,13 +303,11 @@ fn render_section_heading(mut docx: Docx, text: &str, style: &StyleConfig) -> Do
                 .ascii(&style.heading_font_family)
                 .hi_ansi(&style.heading_font_family),
         );
-    docx = docx.add_paragraph(Paragraph::new());
     docx = docx.add_paragraph(
         Paragraph::new()
             .style("Heading1")
             .add_run(heading_run),
     );
-    docx = docx.add_paragraph(Paragraph::new());
     docx
 }
 
@@ -558,13 +563,11 @@ fn render_exhibit(
                 .ascii(&style.heading_font_family)
                 .hi_ansi(&style.heading_font_family),
         );
-    docx = docx.add_paragraph(Paragraph::new());
     docx = docx.add_paragraph(
         Paragraph::new()
             .style("Heading1")
             .add_run(heading_run),
     );
-    docx = docx.add_paragraph(Paragraph::new());
 
     // If path is set, load and embed the file; otherwise leave as placeholder
     if let Some(ref path) = exhibit.path {

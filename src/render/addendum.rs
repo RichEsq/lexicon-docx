@@ -37,8 +37,6 @@ pub fn render_addendum(
                 .hi_ansi(&style.heading_font_family),
         );
 
-    docx = docx.add_paragraph(Paragraph::new());
-
     let mut heading_para = Paragraph::new()
         .style("Heading1")
         .add_run(heading_run);
@@ -53,8 +51,6 @@ pub fn render_addendum(
     }
 
     docx = docx.add_paragraph(heading_para);
-
-    docx = docx.add_paragraph(Paragraph::new());
 
     // Addendum content
     for content in &addendum.content {
