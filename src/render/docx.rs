@@ -115,10 +115,12 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         );
         docx = docx.add_paragraph(Paragraph::new());
 
-        // Table of contents
+        // Table of contents — don't use .auto() because docx-rs double-escapes
+        // apostrophes (and other XML entities) in the cached TOC items it generates.
+        // Without .auto(), Word regenerates the TOC from headings on first open
+        // (the field is already marked dirty="true").
         let toc = TableOfContents::new()
-            .heading_styles_range(1, 3)
-            .auto();
+            .heading_styles_range(1, 3);
         docx = docx.add_table_of_contents(toc);
 
         // Page break after TOC (skip if schedule follows — it has its own leading page break)
