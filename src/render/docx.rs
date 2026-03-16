@@ -69,6 +69,16 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         );
     }
 
+    // Register ToC styles with black text so TOC entries don't inherit
+    // the brand colour from headings when Word regenerates the TOC
+    for i in 1..=3 {
+        docx = docx.add_style(
+            Style::new(format!("ToC{}", i), StyleType::Paragraph)
+                .name(format!("toc {}", i))
+                .color("000000"),
+        );
+    }
+
     // Footer
     docx = render_footer(docx, doc, style);
 
