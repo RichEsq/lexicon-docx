@@ -104,7 +104,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         // TOC heading — same visual style as section headings (Heading1)
         // but without the Heading1 style so it doesn't appear in its own TOC
         let toc_heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
-        let toc_heading_run = Run::new()
+        let mut toc_heading_run = Run::new()
             .add_text(style.toc.heading.to_uppercase())
             .bold()
             .size(toc_heading_size)
@@ -113,6 +113,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                     .ascii(&style.heading_font_family)
                     .hi_ansi(&style.heading_font_family),
             );
+        if let Some(ref color) = style.brand_color_hex() {
+            toc_heading_run = toc_heading_run.color(color);
+        }
         docx = docx.add_paragraph(Paragraph::new());
         docx = docx.add_paragraph(
             Paragraph::new()
