@@ -61,6 +61,17 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     // Build bookmark ID map: anchor_id → unique integer ID for Word bookmarks
     let bookmark_ids = build_bookmark_map(doc);
 
+    // Register Normal style with paragraph spacing
+    docx = docx.add_style(
+        Style::new("Normal", StyleType::Paragraph)
+            .name("Normal")
+            .line_spacing(
+                LineSpacing::new()
+                    .before(StyleConfig::pt_to_twips(style.paragraph_space_before))
+                    .after(StyleConfig::pt_to_twips(style.paragraph_space_after)),
+            ),
+    );
+
     // Register heading styles so the TOC field can find them.
     // Brand colour and spacing are set on the style (not as direct formatting)
     // so that Word's TOC regeneration doesn't carry the colour into TOC entries.

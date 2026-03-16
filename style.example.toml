@@ -11,6 +11,8 @@ heading1_size = 14.0          # ## headings
 heading2_size = 12.0          # ### headings
 heading_space_before = 18.0  # space before section headings (pt)
 heading_space_after = 12.0   # space after section headings (pt)
+paragraph_space_before = 0.0 # space before paragraphs (pt)
+paragraph_space_after = 6.0  # space after paragraphs (pt)
 line_spacing = 1.5
 
 # Page setup

@@ -139,6 +139,14 @@ struct StyleOverrides {
     #[arg(long, help_heading = "Typography")]
     heading_space_after: Option<f32>,
 
+    /// Space before paragraphs in points
+    #[arg(long, help_heading = "Typography")]
+    paragraph_space_before: Option<f32>,
+
+    /// Space after paragraphs in points
+    #[arg(long, help_heading = "Typography")]
+    paragraph_space_after: Option<f32>,
+
     /// Line spacing multiplier
     #[arg(long, help_heading = "Typography")]
     line_spacing: Option<f32>,
@@ -341,6 +349,8 @@ impl StyleOverrides {
         if let Some(v) = self.heading2_size { config.heading2_size = v; }
         if let Some(v) = self.heading_space_before { config.heading_space_before = v; }
         if let Some(v) = self.heading_space_after { config.heading_space_after = v; }
+        if let Some(v) = self.paragraph_space_before { config.paragraph_space_before = v; }
+        if let Some(v) = self.paragraph_space_after { config.paragraph_space_after = v; }
         if let Some(v) = self.line_spacing { config.line_spacing = v; }
         if let Some(v) = self.brand_color { config.brand_color = Some(v); }
         if let Some(v) = self.defined_term_style {
