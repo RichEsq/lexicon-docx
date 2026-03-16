@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use docx_rs::{
-    AlignmentType, BreakType, Docx, IndentLevel, LevelOverride, NumberingId, Numbering, Paragraph,
-    Run,
+    BreakType, Docx, IndentLevel, LevelOverride, NumberingId, Numbering, Paragraph,
+    Run, RunFonts,
 };
 
 use crate::model::*;
@@ -25,16 +25,23 @@ pub fn render_addendum(
         Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
     );
 
-    // Addendum heading (auto-numbered)
+    // Addendum heading — styled as Heading1 (same as section headings)
     let heading_text = addendum.heading();
-    let mut heading_para = Paragraph::new()
-        .align(AlignmentType::Center)
-        .add_run(
-            Run::new()
-                .add_text(&heading_text)
-                .bold()
-                .size(heading_size),
+    let heading_run = Run::new()
+        .add_text(heading_text.to_uppercase())
+        .bold()
+        .size(heading_size)
+        .fonts(
+            RunFonts::new()
+                .ascii(&style.heading_font_family)
+                .hi_ansi(&style.heading_font_family),
         );
+
+    docx = docx.add_paragraph(Paragraph::new());
+
+    let mut heading_para = Paragraph::new()
+        .style("Heading1")
+        .add_run(heading_run);
 
     // Place bookmark on addendum heading
     if let Some(ref anchor_id) = addendum.anchor {

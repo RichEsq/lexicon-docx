@@ -101,10 +101,11 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         && has_schedule_items;
 
     if style.toc.enabled {
-        // TOC heading
+        // TOC heading — same visual style as section headings (Heading1)
+        // but without the Heading1 style so it doesn't appear in its own TOC
         let toc_heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
-        let mut toc_heading_run = Run::new()
-            .add_text(&style.toc.heading)
+        let toc_heading_run = Run::new()
+            .add_text(style.toc.heading.to_uppercase())
             .bold()
             .size(toc_heading_size)
             .fonts(
@@ -112,9 +113,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                     .ascii(&style.heading_font_family)
                     .hi_ansi(&style.heading_font_family),
             );
-        if let Some(ref color) = style.brand_color_hex() {
-            toc_heading_run = toc_heading_run.color(color);
-        }
+        docx = docx.add_paragraph(Paragraph::new());
         docx = docx.add_paragraph(
             Paragraph::new()
                 .add_run(toc_heading_run),
@@ -489,6 +488,11 @@ fn collect_toc_entries(doc: &Document) -> Vec<(String, usize)> {
 
     // Clause headings from body
     collect_clause_toc_entries(&doc.body, &mut entries);
+
+    // Addendum headings (Heading1)
+    for addendum in &doc.addenda {
+        entries.push((addendum.heading().to_uppercase(), 1));
+    }
 
     entries
 }
