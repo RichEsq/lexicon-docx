@@ -65,8 +65,8 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     // Brand colour and spacing are set on the style (not as direct formatting)
     // so that Word's TOC regeneration doesn't carry the colour into TOC entries.
     let heading_spacing = LineSpacing::new()
-        .before(StyleConfig::pt_to_twips(style.heading_space_before_pt))
-        .after(StyleConfig::pt_to_twips(style.heading_space_after_pt));
+        .before(StyleConfig::pt_to_twips(style.heading_space_before))
+        .after(StyleConfig::pt_to_twips(style.heading_space_after));
     for i in 1..=3 {
         let mut heading_style = Style::new(format!("Heading{}", i), StyleType::Paragraph)
             .name(format!("heading {}", i))
@@ -124,8 +124,8 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
             Paragraph::new()
                 .line_spacing(
                     LineSpacing::new()
-                        .before(StyleConfig::pt_to_twips(style.heading_space_before_pt))
-                        .after(StyleConfig::pt_to_twips(style.heading_space_after_pt)),
+                        .before(StyleConfig::pt_to_twips(style.heading_space_before))
+                        .after(StyleConfig::pt_to_twips(style.heading_space_after)),
                 )
                 .add_run(toc_heading_run),
         );
