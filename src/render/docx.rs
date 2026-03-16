@@ -497,6 +497,12 @@ fn collect_toc_entries(doc: &Document) -> Vec<(String, usize)> {
         entries.push((addendum.heading().to_uppercase(), 1));
     }
 
+    // Exhibit headings (Heading1)
+    for (i, exhibit) in doc.meta.exhibits.iter().enumerate() {
+        let text = format!("EXHIBIT {} - {}", i + 1, exhibit.title).to_uppercase();
+        entries.push((text, 1));
+    }
+
     entries
 }
 
@@ -541,18 +547,24 @@ fn render_exhibit(
         Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
     );
 
-    // Exhibit heading — centred title
-    let heading_text = format!("EXHIBIT {} - {}", number, exhibit.title);
+    // Exhibit heading — styled as Heading1 (same as section headings)
+    let heading_text = format!("EXHIBIT {} - {}", number, exhibit.title).to_uppercase();
+    let heading_run = Run::new()
+        .add_text(&heading_text)
+        .bold()
+        .size(heading_size)
+        .fonts(
+            RunFonts::new()
+                .ascii(&style.heading_font_family)
+                .hi_ansi(&style.heading_font_family),
+        );
+    docx = docx.add_paragraph(Paragraph::new());
     docx = docx.add_paragraph(
         Paragraph::new()
-            .align(docx_rs::AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text(&heading_text)
-                    .bold()
-                    .size(heading_size),
-            ),
+            .style("Heading1")
+            .add_run(heading_run),
     );
+    docx = docx.add_paragraph(Paragraph::new());
 
     // If path is set, load and embed the file; otherwise leave as placeholder
     if let Some(ref path) = exhibit.path {
