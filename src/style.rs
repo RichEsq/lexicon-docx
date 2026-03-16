@@ -12,6 +12,8 @@ pub struct StyleConfig {
     pub title_size: f32,
     pub heading1_size: f32,
     pub heading2_size: f32,
+    pub heading_space_before_pt: f32,
+    pub heading_space_after_pt: f32,
     pub line_spacing: f32,
     pub margin_top_cm: f32,
     pub margin_bottom_cm: f32,
@@ -237,6 +239,8 @@ impl Default for StyleConfig {
             title_size: 20.0,
             heading1_size: 14.0,
             heading2_size: 12.0,
+            heading_space_before_pt: 18.0,
+            heading_space_after_pt: 12.0,
             line_spacing: 1.5,
             margin_top_cm: 2.54,
             margin_bottom_cm: 2.54,
@@ -278,6 +282,11 @@ impl StyleConfig {
     /// Convert pt to half-points (docx-rs uses half-points for font size).
     pub fn pt_to_half_points(pt: f32) -> usize {
         (pt * 2.0) as usize
+    }
+
+    /// Convert pt to twentieths of a point (used for paragraph spacing before/after).
+    pub fn pt_to_twips(pt: f32) -> u32 {
+        (pt * 20.0) as u32
     }
 
     /// Return the brand color as a 6-char hex string (no #), or None.
