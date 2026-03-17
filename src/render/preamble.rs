@@ -16,12 +16,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
         PreambleStyle::Simple => {
             let term_style = &style.defined_term_style;
 
-            // Opening line: This [title] ([type]) is dated [date] between
-            let between_word = if meta.parties.len() == 1 {
-                "by"
-            } else {
-                "between"
-            };
+            // Opening line: This {title} ({type}) is made on {date}
             let mut opening = Paragraph::new();
             opening = opening.add_run(
                 Run::new()
@@ -31,15 +26,23 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             opening = render_defined_term(opening, doc_type, body_half_pts, None, term_style);
             opening = opening.add_run(
                 Run::new()
-                    .add_text(format!(") is dated {} {}", &formatted_date, between_word))
+                    .add_text(format!(") is made on {}", &formatted_date))
                     .size(body_half_pts),
             );
             docx = docx.add_paragraph(opening);
 
-            // Spacer
-            docx = docx.add_paragraph(Paragraph::new());
+            // BETWEEN / BY line
+            let connector = if meta.parties.len() == 1 {
+                "BY"
+            } else {
+                "BETWEEN"
+            };
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .add_run(Run::new().add_text(connector).bold().size(body_half_pts)),
+            );
 
-            // Parties
+            // Parties with AND between each
             let party_count = meta.parties.len();
             for (i, party) in meta.parties.iter().enumerate() {
                 let mut para = Paragraph::new();
@@ -54,13 +57,15 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
                 para = para.add_run(Run::new().add_text(" (").size(body_half_pts));
                 para = render_defined_term(para, &party.role, body_half_pts, None, term_style);
                 para = para.add_run(Run::new().add_text(")").size(body_half_pts));
-
-                // "; and" suffix on all but the last party
-                if i < party_count - 1 {
-                    para = para.add_run(Run::new().add_text("; and").size(body_half_pts));
-                }
-
                 docx = docx.add_paragraph(para);
+
+                // AND between parties (not after the last one)
+                if i < party_count - 1 {
+                    docx = docx.add_paragraph(
+                        Paragraph::new()
+                            .add_run(Run::new().add_text("AND").bold().size(body_half_pts)),
+                    );
+                }
             }
 
             // Spacer after parties
