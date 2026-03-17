@@ -12,7 +12,7 @@ use crate::model::*;
 use crate::render::addendum::render_addendum;
 use crate::render::common::{add_inline_run, bookmark_name, render_inlines_paragraph, render_table};
 use crate::render::cover::{render_cover_page, render_inline_title};
-use crate::render::exhibit::{self as exhibit_loader, PdfRenderer};
+use crate::render::exhibit::{self as exhibit_loader};
 use crate::render::numbering::{
     create_clause_numbering, create_recital_numbering, create_simple_list_numbering,
     indent_for_level, numbering_level_for, outline_level_for, ABSTRACT_NUM_ID,
@@ -24,7 +24,7 @@ use crate::render::signatures as sig_renderer;
 use crate::signatures::SignatureBlock;
 use crate::style::{SchedulePosition, StyleConfig};
 
-pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock], pdf_renderer: PdfRenderer) -> Result<Vec<u8>> {
+pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock]) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
 
     // Page setup
@@ -226,7 +226,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
 
     // Exhibits — placeholder pages or imported images/PDFs
     for (i, exhibit) in doc.meta.exhibits.iter().enumerate() {
-        docx = render_exhibit(docx, exhibit, i + 1, style, input_dir, pdf_renderer)?;
+        docx = render_exhibit(docx, exhibit, i + 1, style, input_dir)?;
     }
 
     // Schedule at end (if configured, this is the default)
@@ -577,7 +577,6 @@ fn render_exhibit(
     number: usize,
     style: &StyleConfig,
     input_dir: Option<&Path>,
-    pdf_renderer: PdfRenderer,
 ) -> Result<Docx> {
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
 
@@ -605,7 +604,7 @@ fn render_exhibit(
 
     // If path is set, load and embed the file; otherwise leave as placeholder
     if let Some(ref path) = exhibit.path {
-        let images = exhibit_loader::load_exhibit(path, input_dir, pdf_renderer)?;
+        let images = exhibit_loader::load_exhibit(path, input_dir)?;
 
         // Calculate content area in EMU (1 twip = 635 EMU)
         let margin_left = StyleConfig::cm_to_twips(style.margin_left_cm) as u32;

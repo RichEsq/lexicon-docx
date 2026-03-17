@@ -3,6 +3,8 @@ name = "lexicon-docx"
 version = "0.1.0"
 edition = "2024"
 description = "Lexicon Markdown to DOCX processor for legal contracts"
+license = "MIT"
+repository = "https://github.com/RichEsq/lexicon-docx"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -17,5 +19,4 @@ chrono = "0.4"
 thiserror = "2"
 zip = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-tempfile = "3"
 hayro = "0.5"

@@ -514,7 +514,7 @@ fn full_pipeline_produces_docx_bytes() {
 
     let style = StyleConfig::default();
     let bytes = lexicon_docx::render_docx(
-        &doc, &style, None, &[], lexicon_docx::PdfRenderer::Auto,
+        &doc, &style, None, &[],
     ).unwrap();
 
     // DOCX files are ZIP archives starting with PK magic bytes
@@ -530,7 +530,7 @@ fn process_convenience_function_works() {
     );
     let style = StyleConfig::default();
     let (bytes, diagnostics) = lexicon_docx::process(
-        &input, &style, None, None, lexicon_docx::PdfRenderer::Auto,
+        &input, &style, None, None,
     ).unwrap();
 
     assert!(bytes.len() > 100);
@@ -556,7 +556,7 @@ parties:
 "#;
     let style = StyleConfig::default();
     let (bytes, _) = lexicon_docx::process(
-        input, &style, None, None, lexicon_docx::PdfRenderer::Auto,
+        input, &style, None, None,
     ).unwrap();
 
     // The watermark is injected as VML XML containing "DRAFT" inside the DOCX ZIP

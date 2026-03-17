@@ -2,21 +2,6 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{LexiconError, Result};
 
-/// PDF rendering backend selection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PdfRenderer {
-    /// Try hayro (native Rust) first, fall back to pdftoppm if it fails.
-    Auto,
-    /// Force pdftoppm (requires poppler-utils installed on the system).
-    Pdftoppm,
-}
-
-impl Default for PdfRenderer {
-    fn default() -> Self {
-        PdfRenderer::Auto
-    }
-}
-
 /// Supported exhibit file types.
 pub enum ExhibitFileType {
     Png,
@@ -180,85 +165,13 @@ fn render_pdf_pages_hayro(path: &Path) -> Result<Vec<ExhibitImage>> {
     Ok(pages)
 }
 
-/// Render PDF pages to PNG images via pdftoppm (external command).
-fn render_pdf_pages_pdftoppm(path: &Path) -> Result<Vec<ExhibitImage>> {
-    let temp_dir = tempfile::tempdir().map_err(|e| {
-        LexiconError::Render(format!("Failed to create temp directory: {}", e))
-    })?;
-
-    let output_prefix = temp_dir.path().join("page");
-
-    let output = std::process::Command::new("pdftoppm")
-        .args(["-png", "-r", "200"])
-        .arg(path)
-        .arg(&output_prefix)
-        .output()
-        .map_err(|e| {
-            LexiconError::Render(format!(
-                "Failed to run pdftoppm (is poppler-utils installed?): {}",
-                e
-            ))
-        })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(LexiconError::Render(format!(
-            "pdftoppm failed for '{}': {}",
-            path.display(),
-            stderr
-        )));
-    }
-
-    // Collect output files (page-01.png, page-02.png, ...)
-    let mut entries: Vec<PathBuf> = std::fs::read_dir(temp_dir.path())
-        .map_err(|e| LexiconError::Render(format!("Failed to read temp directory: {}", e)))?
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("png"))
-        .collect();
-
-    entries.sort();
-
-    if entries.is_empty() {
-        return Err(LexiconError::Render(format!(
-            "pdftoppm produced no output for '{}'",
-            path.display()
-        )));
-    }
-
-    let mut pages = Vec::new();
-    for entry in &entries {
-        let bytes = std::fs::read(entry).map_err(|e| {
-            LexiconError::Render(format!("Failed to read rendered PDF page: {}", e))
-        })?;
-        let img = image::load_from_memory(&bytes).map_err(|e| {
-            LexiconError::Render(format!("Failed to decode rendered PDF page: {}", e))
-        })?;
-        pages.push(ExhibitImage {
-            png_bytes: bytes,
-            width_px: img.width(),
-            height_px: img.height(),
-        });
-    }
-
-    Ok(pages)
-}
-
-/// Render PDF pages using the selected renderer.
-pub fn render_pdf_pages(path: &Path, renderer: PdfRenderer) -> Result<Vec<ExhibitImage>> {
-    match renderer {
-        PdfRenderer::Pdftoppm => render_pdf_pages_pdftoppm(path),
-        PdfRenderer::Auto => {
-            match render_pdf_pages_hayro(path) {
-                Ok(pages) => Ok(pages),
-                Err(_) => render_pdf_pages_pdftoppm(path),
-            }
-        }
-    }
+/// Render PDF pages to PNG images using hayro (native Rust).
+pub fn render_pdf_pages(path: &Path) -> Result<Vec<ExhibitImage>> {
+    render_pdf_pages_hayro(path)
 }
 
 /// Load exhibit content: either a single image or multiple pages from a PDF.
-pub fn load_exhibit(path: &str, input_dir: Option<&Path>, pdf_renderer: PdfRenderer) -> Result<Vec<ExhibitImage>> {
+pub fn load_exhibit(path: &str, input_dir: Option<&Path>) -> Result<Vec<ExhibitImage>> {
     let resolved = resolve_exhibit_path(path, input_dir)?;
 
     if !resolved.exists() {
@@ -274,7 +187,7 @@ pub fn load_exhibit(path: &str, input_dir: Option<&Path>, pdf_renderer: PdfRende
         ExhibitFileType::Png | ExhibitFileType::Jpeg => {
             Ok(vec![load_image(&resolved)?])
         }
-        ExhibitFileType::Pdf => render_pdf_pages(&resolved, pdf_renderer),
+        ExhibitFileType::Pdf => render_pdf_pages(&resolved),
     }
 }
 
