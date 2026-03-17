@@ -592,9 +592,6 @@ fn render_exhibit(
         let max_w_emu = (style.page_width_twips() - margin_left - margin_right) * 635;
         let max_h_emu = (style.page_height_twips() - margin_top - margin_bottom) * 635;
 
-        // Blank line after heading
-        docx = docx.add_paragraph(Paragraph::new());
-
         for (i, img) in images.iter().enumerate() {
             // Page break between multi-page images (e.g. PDF pages), not before the first
             if i > 0 {
