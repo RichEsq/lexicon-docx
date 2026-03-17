@@ -82,6 +82,7 @@ heading = "Contents"          # heading text above the TOC
 enabled = false               # true: render signature blocks for each party
 # heading = "EXECUTION"       # optional heading above all signature blocks
 # default_template = "au.company.deed"  # override default template for all parties
+# separate_pages = false      # true: each party's signature block on its own page
 
 # Per-party overrides (key = party role from front-matter)
 # [signatures.party.Employer]
