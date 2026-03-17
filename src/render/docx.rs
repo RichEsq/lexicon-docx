@@ -513,6 +513,13 @@ fn collect_toc_entries(doc: &Document, style: &StyleConfig) -> Vec<(String, usiz
     // Clause headings from body
     collect_clause_toc_entries(&doc.body, &mut entries);
 
+    // Signature page heading (Heading1)
+    if style.signatures.enabled && !doc.meta.parties.is_empty() {
+        if let Some(ref heading) = style.signatures.heading {
+            entries.push((heading.to_uppercase(), 1));
+        }
+    }
+
     // Addendum headings (Heading1)
     for addendum in &doc.addenda {
         entries.push((addendum.heading().to_uppercase(), 1));

@@ -1,5 +1,5 @@
 use docx_rs::{
-    AlignmentType, BorderType, BreakType, Docx, Paragraph, Run, RunFonts,
+    BorderType, BreakType, Docx, Paragraph, Run, RunFonts,
     Table as DocxTable, TableCell, TableCellBorder, TableCellBorderPosition,
     TableCellBorders, TableCellContent, TableCellMargins, TableRow, TableRowChild, WidthType,
 };
@@ -32,26 +32,23 @@ pub fn render_signature_pages(
         Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
     );
 
-    // Optional heading
+    // Optional heading — styled as Heading1 (same as section headings)
     if let Some(ref heading) = style.signatures.heading {
         let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
+        let heading_run = Run::new()
+            .add_text(heading.to_uppercase())
+            .bold()
+            .size(heading_size)
+            .fonts(
+                RunFonts::new()
+                    .ascii(&style.heading_font_family)
+                    .hi_ansi(&style.heading_font_family),
+            );
         docx = docx.add_paragraph(
             Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(heading.to_uppercase())
-                        .bold()
-                        .size(heading_size)
-                        .fonts(
-                            RunFonts::new()
-                                .ascii(&style.heading_font_family)
-                                .hi_ansi(&style.heading_font_family),
-                        ),
-                ),
+                .style("Heading1")
+                .add_run(heading_run),
         );
-        // Spacer after heading
-        docx = docx.add_paragraph(Paragraph::new());
     }
 
     // Render each party's signature block
