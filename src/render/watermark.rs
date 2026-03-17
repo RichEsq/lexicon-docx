@@ -203,7 +203,7 @@ pub fn inject_watermark(docx_bytes: Vec<u8>, text: &str) -> Result<Vec<u8>> {
 
     for (name, contents) in &modified_files {
         writer
-            .start_file(name, options.clone())
+            .start_file(name, options)
             .map_err(|e| LexiconError::Render(format!("Failed to write ZIP entry: {}", e)))?;
         writer
             .write_all(contents)

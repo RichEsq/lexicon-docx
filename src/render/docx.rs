@@ -82,10 +82,8 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         let mut heading_style = Style::new(format!("Heading{}", i), StyleType::Paragraph)
             .name(format!("heading {}", i))
             .line_spacing(heading_spacing.clone());
-        if i == 1 {
-            if let Some(ref color) = style.brand_color_hex() {
-                heading_style = heading_style.color(color);
-            }
+        if i == 1 && let Some(ref color) = style.brand_color_hex() {
+            heading_style = heading_style.color(color);
         }
         docx = docx.add_style(heading_style);
     }
@@ -250,7 +248,6 @@ fn render_footer(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
     let has_ref = style.footer.show_ref && doc.meta.ref_.is_some();
     let has_version = style.footer.show_version && doc.meta.version.is_some();
     let has_page = style.footer.show_page_number;
-    let has_left = has_ref || has_version;
 
     let right_tab_pos = (style.page_width_twips() as i32
         - StyleConfig::cm_to_twips(style.margin_left_cm)
@@ -258,34 +255,30 @@ fn render_footer(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
     let mut footer_para = Paragraph::new();
 
     // Right tab when we have content on both sides, or page number alone (right-aligned)
-    if (has_left && has_page) || (!has_left && has_page) {
+    if has_page {
         footer_para = footer_para
             .add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
     }
 
     // Left side: ref and/or version
-    if has_ref {
-        if let Some(ref ref_) = doc.meta.ref_ {
-            footer_para = footer_para.add_run(
-                Run::new()
-                    .add_text(format!("Ref: {}", ref_))
-                    .size(footer_size),
-            );
-        }
+    if has_ref && let Some(ref ref_) = doc.meta.ref_ {
+        footer_para = footer_para.add_run(
+            Run::new()
+                .add_text(format!("Ref: {}", ref_))
+                .size(footer_size),
+        );
     }
-    if has_version {
-        if let Some(ref version) = doc.meta.version {
-            if has_ref {
-                footer_para = footer_para.add_run(
-                    Run::new().add_text(" ").size(footer_size),
-                );
-            }
+    if has_version && let Some(ref version) = doc.meta.version {
+        if has_ref {
             footer_para = footer_para.add_run(
-                Run::new()
-                    .add_text(format!("v{}", version))
-                    .size(footer_size),
+                Run::new().add_text(" ").size(footer_size),
             );
         }
+        footer_para = footer_para.add_run(
+            Run::new()
+                .add_text(format!("v{}", version))
+                .size(footer_size),
+        );
     }
 
     if has_page {
@@ -348,13 +341,11 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
             .run_property(RunProperty::new().bold().size(heading_size));
 
         // Place bookmark on the heading paragraph
-        if let Some(ref anchor_id) = clause.anchor {
-            if let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
-                para = para
-                    .add_bookmark_start(bm_id, bookmark_name(anchor_id))
-                    .add_bookmark_end(bm_id);
-                bookmark_placed = true;
-            }
+        if let Some(ref anchor_id) = clause.anchor && let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
+            para = para
+                .add_bookmark_start(bm_id, bookmark_name(anchor_id))
+                .add_bookmark_end(bm_id);
+            bookmark_placed = true;
         }
 
         // Heading inline content — Word generates the number.
@@ -387,15 +378,11 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
                         };
 
                         // Place bookmark on first content paragraph if not already on heading
-                        if !bookmark_placed {
-                            if let Some(ref anchor_id) = clause.anchor {
-                                if let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
-                                    para = para
-                                        .add_bookmark_start(bm_id, bookmark_name(anchor_id))
-                                        .add_bookmark_end(bm_id);
-                                    bookmark_placed = true;
-                                }
-                            }
+                        if !bookmark_placed && let Some(ref anchor_id) = clause.anchor && let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
+                            para = para
+                                .add_bookmark_start(bm_id, bookmark_name(anchor_id))
+                                .add_bookmark_end(bm_id);
+                            bookmark_placed = true;
                         }
 
                         for inline in inlines {
@@ -514,10 +501,8 @@ fn collect_toc_entries(doc: &Document, style: &StyleConfig) -> Vec<(String, usiz
     collect_clause_toc_entries(&doc.body, &mut entries);
 
     // Signature page heading (Heading1)
-    if style.signatures.enabled && !doc.meta.parties.is_empty() {
-        if let Some(ref heading) = style.signatures.heading {
-            entries.push((heading.to_uppercase(), 1));
-        }
+    if style.signatures.enabled && !doc.meta.parties.is_empty() && let Some(ref heading) = style.signatures.heading {
+        entries.push((heading.to_uppercase(), 1));
     }
 
     // Addendum headings (Heading1)
