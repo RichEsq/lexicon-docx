@@ -88,8 +88,12 @@ cargo test
 | `src/parser/anchors.rs` | Regex-based `{#id}` stripping |
 | `src/resolve.rs` | Numbering (1., 1.1, (a), (i)), cross-refs, defined term validation, schedule phrase detection |
 | `src/signatures.rs` | Signature template types, definitions file loading, resolution, placeholder expansion |
-| `src/render/docx.rs` | DOCX generation — cover page, clauses, addenda, exhibits, tables |
-| `src/render/signatures.rs` | Signature page rendering — borderless tables, cell-border signature lines |
+| `src/render/docx.rs` | DOCX generation — cover page, clauses, addenda, exhibits, tables, TOC item collection |
+| `src/render/cover.rs` | Cover page and inline title rendering |
+| `src/render/common.rs` | Shared rendering helpers — inline runs, tables, paragraphs |
+| `src/render/addendum.rs` | Addendum page rendering |
+| `src/render/schedule.rs` | Schedule page rendering — heading + item/particulars table |
+| `src/render/signatures.rs` | Signature page rendering — borderless tables, cell-border signature lines, keep_next |
 | `src/render/exhibit.rs` | Exhibit file import — image loading, PDF rendering, sizing |
 | `src/render/watermark.rs` | Draft watermark injection via ZIP post-processing |
 | `src/style.rs` | Style configuration with TOML override support |
@@ -131,6 +135,9 @@ cargo test
 - **docx-rs does not expose VML or watermark APIs** — watermarks require ZIP post-processing. The `zip` crate reads/rewrites the .docx archive to inject raw XML into header parts.
 - **Do NOT use `TableCell::set_border()` for selective borders** — `set_border()` calls `unwrap_or_default()` internally, and `TableCellBorders::default()` creates all six borders (top, left, bottom, right, insideH, insideV). So setting a single bottom border gives you a full box. Instead, use `cell.set_borders(TableCellBorders::with_empty().set(border))` to start from no borders.
 - **No cell-level margin methods on `TableCell`** — use `table.margins(TableCellMargins::new().margin(...))` at the table level instead.
+- **docx-rs `.auto()` on `TableOfContents` double-escapes XML entities** — `raw_text()` returns pre-escaped text, then `Text::new()` escapes again. Build TOC items manually from the Document IR instead, passing raw un-escaped text to `TableOfContentsItem::text()`.
+- **Use Word native spacing instead of blank paragraphs** — blank `Paragraph::new()` for vertical gaps should be replaced with `LineSpacing::new().before()/after()` on styles or paragraphs. This gives precise control and avoids extra elements.
+- **Use `cantSplit` + `keep_next` to prevent table page breaks** — `TableRow::cant_split()` prevents a row from splitting across pages. To keep an entire table on one page, also set `keep_next = Some(true)` on all cell paragraphs (accessible via public `row.cells` / `cell.children` / `para.property.keep_next`).
 
 ## Planning
 
@@ -147,7 +154,7 @@ Future work and design notes are in `planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes), recitals/background section (lettered (A)/(B)/(C), body heading requirement), native Word cross-references (bookmarks + internal hyperlinks, Ctrl+click navigation), CLI style override flags (all style.toml options as --flags, priority: CLI > local TOML > XDG TOML > defaults), man page generation (`lexicon-docx man`)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes, separate_pages toggle, default enabled), recitals/background section (lettered (A)/(B)/(C), body heading requirement), native Word cross-references (bookmarks + internal hyperlinks, Ctrl+click navigation), CLI style override flags (all style.toml options as --flags, priority: CLI > local TOML > XDG TOML > defaults), man page generation (`lexicon-docx man`), TOC fixes (manual TOC item building to avoid docx-rs double-escaping, black TOC text via style), consistent Heading1 styling (section headings, addendum, exhibit, schedule, execution headings all use Heading1 with brand colour via style), heading/paragraph spacing config (heading_space_before/after, paragraph_space_before/after replacing blank paragraphs with Word native spacing), table layout (cantSplit on all table rows, keep_next on signature block cells)).
 
 See `planning/implementation-status.md` for detailed status.
 
