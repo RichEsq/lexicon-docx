@@ -148,7 +148,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         let mut toc = TableOfContents::new()
             .heading_styles_range(1, 3)
             .dirty();
-        for (text, level) in collect_toc_entries(doc) {
+        for (text, level) in collect_toc_entries(doc, style) {
             toc = toc.add_item(
                 TableOfContentsItem::new()
                     .text(&text)
@@ -488,8 +488,14 @@ fn collect_clause_anchors(clause: &Clause, map: &mut HashMap<String, usize>, nex
 /// Collect TOC entries from the Document IR with their heading level (1-3).
 /// Used to build cached TOC items manually, avoiding docx-rs's .auto()
 /// which double-escapes XML entities like apostrophes.
-fn collect_toc_entries(doc: &Document) -> Vec<(String, usize)> {
+fn collect_toc_entries(doc: &Document, style: &StyleConfig) -> Vec<(String, usize)> {
     let mut entries = Vec::new();
+    let has_schedule_items = !doc.schedule_items.is_empty();
+
+    // Schedule headings (if placed after TOC)
+    if matches!(style.schedule_position, SchedulePosition::AfterToc) && has_schedule_items {
+        collect_schedule_toc_entries(&doc.meta.schedule, &mut entries);
+    }
 
     // Section headings use Heading1 (level 1)
     if let Some(ref recitals) = doc.recitals {
@@ -518,6 +524,11 @@ fn collect_toc_entries(doc: &Document) -> Vec<(String, usize)> {
         entries.push((text, 1));
     }
 
+    // Schedule headings (if placed at end)
+    if matches!(style.schedule_position, SchedulePosition::End) && has_schedule_items {
+        collect_schedule_toc_entries(&doc.meta.schedule, &mut entries);
+    }
+
     entries
 }
 
@@ -544,6 +555,12 @@ fn collect_clause_heading_entries(clause: &Clause, entries: &mut Vec<(String, us
                 collect_clause_heading_entries(child, entries);
             }
         }
+    }
+}
+
+fn collect_schedule_toc_entries(schedules: &[ScheduleDecl], entries: &mut Vec<(String, usize)>) {
+    for sched in schedules {
+        entries.push((sched.title.to_uppercase(), 1));
     }
 }
 
