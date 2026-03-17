@@ -36,17 +36,12 @@ pub enum FieldType {
     Blank,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Layout {
     Short,
+    #[default]
     Long,
-}
-
-impl Default for Layout {
-    fn default() -> Self {
-        Layout::Long
-    }
 }
 
 // --- Definitions file types (deserialisable) ---

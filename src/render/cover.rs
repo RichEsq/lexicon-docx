@@ -79,35 +79,35 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
     docx = docx.add_paragraph(Paragraph::new());
 
     // Ref
-    if cover.show_ref {
-        if let Some(ref ref_) = meta.ref_ {
-            docx = docx.add_paragraph(
-                Paragraph::new()
-                    .align(AlignmentType::Center)
-                    .add_run(
-                        Run::new()
-                            .add_text(format!("Ref: {}", ref_))
-                            .size(body_half_pts)
-                            .italic(),
-                    ),
-            );
-        }
+    if cover.show_ref
+        && let Some(ref ref_) = meta.ref_
+    {
+        docx = docx.add_paragraph(
+            Paragraph::new()
+                .align(AlignmentType::Center)
+                .add_run(
+                    Run::new()
+                        .add_text(format!("Ref: {}", ref_))
+                        .size(body_half_pts)
+                        .italic(),
+                ),
+        );
     }
 
     // Author
-    if cover.show_author {
-        if let Some(ref author) = meta.author {
-            docx = docx.add_paragraph(
-                Paragraph::new()
-                    .align(AlignmentType::Center)
-                    .add_run(
-                        Run::new()
-                            .add_text(author.as_str())
-                            .size(body_half_pts)
-                            .italic(),
-                    ),
-            );
-        }
+    if cover.show_author
+        && let Some(ref author) = meta.author
+    {
+        docx = docx.add_paragraph(
+            Paragraph::new()
+                .align(AlignmentType::Center)
+                .add_run(
+                    Run::new()
+                        .add_text(author.as_str())
+                        .size(body_half_pts)
+                        .italic(),
+                ),
+        );
     }
 
     // Spacer before parties

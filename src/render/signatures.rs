@@ -83,7 +83,7 @@ pub fn render_signature_pages(
             continue;
         }
 
-        let gap_cols = if content_cols > 1 { content_cols - 1 } else { 0 };
+        let gap_cols = content_cols.saturating_sub(1);
         let gap_width: usize = 200; // narrow gap column (~4% of table width)
         let total_gap = gap_width * gap_cols;
         let col_width = (5000 - total_gap) / content_cols;
@@ -121,6 +121,7 @@ pub fn render_signature_pages(
 }
 
 /// Build rows for "short" layout — one row per field (current behaviour).
+#[allow(clippy::too_many_arguments)]
 fn build_short_rows(
     block: &SignatureBlock,
     party: &Party,

@@ -35,7 +35,7 @@ enum Commands {
         strict: bool,
 
         #[command(flatten)]
-        overrides: StyleOverrides,
+        overrides: Box<StyleOverrides>,
     },
 
     /// Validate a Lexicon Markdown file without generating output
@@ -70,6 +70,7 @@ enum DefinedTermStyleArg {
 }
 
 #[derive(Clone, ValueEnum)]
+#[allow(clippy::enum_variant_names)]
 enum PartyFormatArg {
     NameSpecRole,
     NameRole,

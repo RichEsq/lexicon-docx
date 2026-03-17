@@ -635,9 +635,7 @@ fn term_variants(term: &str) -> Vec<String> {
     let mut s = term.to_string();
 
     // Strip possessive
-    if s.ends_with("'s") {
-        s.truncate(s.len() - 2);
-    } else if s.ends_with("s'") {
+    if s.ends_with("'s") || s.ends_with("s'") {
         s.truncate(s.len() - 2);
     }
 
@@ -677,19 +675,19 @@ fn classify_term(
     schedule_patterns: &[(usize, Regex)],
 ) -> TermKind {
     // Check for inline definition pattern: ("**Term**") or (the "**Term**")
-    if index > 0 {
-        if let Some(InlineContent::Text(before)) = inlines.get(index - 1) {
-            let trimmed = before.trim_end();
-            if trimmed.ends_with("(\"") || trimmed.ends_with("(the \"") {
-                return TermKind::InlineDefinition;
-            }
-            // Also match: "**Term**" (quoted without parens, used in grouped defs)
-            if trimmed.ends_with('"') || trimmed.ends_with("\", \"") {
-                // Check if this is part of a "shall have the same meaning" pattern
-                // by scanning the rest of the inlines for that phrase
-                if inlines_contain_meaning_phrase(inlines) {
-                    return TermKind::FormalDefinition;
-                }
+    if index > 0
+        && let Some(InlineContent::Text(before)) = inlines.get(index - 1)
+    {
+        let trimmed = before.trim_end();
+        if trimmed.ends_with("(\"") || trimmed.ends_with("(the \"") {
+            return TermKind::InlineDefinition;
+        }
+        // Also match: "**Term**" (quoted without parens, used in grouped defs)
+        if trimmed.ends_with('"') || trimmed.ends_with("\", \"") {
+            // Check if this is part of a "shall have the same meaning" pattern
+            // by scanning the rest of the inlines for that phrase
+            if inlines_contain_meaning_phrase(inlines) {
+                return TermKind::FormalDefinition;
             }
         }
     }
@@ -728,10 +726,10 @@ static GROUPED_DEF_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// a grouped definition (e.g., "shall have the same meaning as in the GDPR").
 fn inlines_contain_meaning_phrase(inlines: &[InlineContent]) -> bool {
     for inline in inlines {
-        if let InlineContent::Text(t) = inline {
-            if GROUPED_DEF_RE.is_match(t) {
-                return true;
-            }
+        if let InlineContent::Text(t) = inline
+            && GROUPED_DEF_RE.is_match(t)
+        {
+            return true;
         }
     }
     false

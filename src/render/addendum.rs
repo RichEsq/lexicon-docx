@@ -42,12 +42,12 @@ pub fn render_addendum(
         .add_run(heading_run);
 
     // Place bookmark on addendum heading
-    if let Some(ref anchor_id) = addendum.anchor {
-        if let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
-            heading_para = heading_para
-                .add_bookmark_start(bm_id, bookmark_name(anchor_id))
-                .add_bookmark_end(bm_id);
-        }
+    if let Some(ref anchor_id) = addendum.anchor
+        && let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str())
+    {
+        heading_para = heading_para
+            .add_bookmark_start(bm_id, bookmark_name(anchor_id))
+            .add_bookmark_end(bm_id);
     }
 
     docx = docx.add_paragraph(heading_para);

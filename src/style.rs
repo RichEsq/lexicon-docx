@@ -97,18 +97,13 @@ impl Default for CoverConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PartyFormat {
+    #[default]
     NameSpecRole,
     NameRole,
     NameOnly,
-}
-
-impl Default for PartyFormat {
-    fn default() -> Self {
-        PartyFormat::NameSpecRole
-    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -145,44 +140,29 @@ impl Default for FooterConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SchedulePosition {
+    #[default]
     End,
     AfterToc,
 }
 
-impl Default for SchedulePosition {
-    fn default() -> Self {
-        SchedulePosition::End
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScheduleOrder {
+    #[default]
     Document,
     Alphabetical,
 }
 
-impl Default for ScheduleOrder {
-    fn default() -> Self {
-        ScheduleOrder::Document
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PreambleStyle {
+    #[default]
     Simple,
     Prose,
     Custom,
-}
-
-impl Default for PreambleStyle {
-    fn default() -> Self {
-        PreambleStyle::Simple
-    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -207,31 +187,21 @@ impl Default for PreambleConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PageSize {
+    #[default]
     A4,
     Letter,
 }
 
-impl Default for PageSize {
-    fn default() -> Self {
-        PageSize::A4
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DefinedTermStyle {
+    #[default]
     Bold,
     Quoted,
     BoldQuoted,
-}
-
-impl Default for DefinedTermStyle {
-    fn default() -> Self {
-        DefinedTermStyle::Bold
-    }
 }
 
 impl Default for StyleConfig {

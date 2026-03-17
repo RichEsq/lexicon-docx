@@ -14,9 +14,12 @@ static RECITALS_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^(recitals|background)$").unwrap()
 });
 
+/// Return type for `extract_body`: (recitals, body_heading, body, addenda, diagnostics).
+type ExtractBodyResult = (Option<Recitals>, Option<String>, Vec<BodyElement>, Vec<Addendum>, Vec<Diagnostic>);
+
 /// Walk a comrak AST and extract the document body as a list of BodyElements.
 /// `root` should be the Document node from comrak.
-pub fn extract_body<'a>(root: &'a AstNode<'a>) -> (Option<Recitals>, Option<String>, Vec<BodyElement>, Vec<Addendum>, Vec<Diagnostic>) {
+pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
     let mut body = Vec::new();
     let mut addenda = Vec::new();
     let mut diagnostics = Vec::new();
@@ -266,17 +269,15 @@ fn extract_clause_from_item<'a>(
                 let mut inlines = extract_inlines(child);
 
                 // Check last inline for anchor
-                if let Some(last) = inlines.last() {
-                    if let InlineContent::Text(t) = last {
-                        let (cleaned, para_anchor) = strip_anchor(t);
-                        if para_anchor.is_some() {
-                            anchor = para_anchor;
-                            if cleaned.is_empty() {
-                                inlines.pop();
-                            } else {
-                                let len = inlines.len();
-                                inlines[len - 1] = InlineContent::Text(cleaned);
-                            }
+                if let Some(InlineContent::Text(t)) = inlines.last() {
+                    let (cleaned, para_anchor) = strip_anchor(t);
+                    if para_anchor.is_some() {
+                        anchor = para_anchor;
+                        if cleaned.is_empty() {
+                            inlines.pop();
+                        } else {
+                            let len = inlines.len();
+                            inlines[len - 1] = InlineContent::Text(cleaned);
                         }
                     }
                 }
@@ -357,10 +358,10 @@ pub fn extract_inlines<'a>(node: &'a AstNode<'a>) -> Vec<InlineContent> {
                 let link_url = link.url.clone();
                 drop(data);
                 let display = collect_plain_text(child);
-                if link_url.starts_with('#') {
+                if let Some(anchor_id_str) = link_url.strip_prefix('#') {
                     inlines.push(InlineContent::CrossRef {
                         display,
-                        anchor_id: link_url[1..].to_string(),
+                        anchor_id: anchor_id_str.to_string(),
                         resolved: None,
                     });
                 } else {
@@ -423,11 +424,9 @@ fn inlines_to_plain_text(inlines: &[InlineContent]) -> String {
 fn rebuild_inlines_stripped<'a>(node: &'a AstNode<'a>) -> Vec<InlineContent> {
     let mut inlines = extract_inlines(node);
     // Strip anchor from last text element
-    if let Some(last) = inlines.last_mut() {
-        if let InlineContent::Text(t) = last {
-            let (cleaned, _) = strip_anchor(t);
-            *t = cleaned;
-        }
+    if let Some(InlineContent::Text(t)) = inlines.last_mut() {
+        let (cleaned, _) = strip_anchor(t);
+        *t = cleaned;
     }
     inlines
 }
