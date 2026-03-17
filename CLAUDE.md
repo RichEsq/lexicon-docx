@@ -47,7 +47,7 @@ cargo run -- validate lexicon/example.md
 cargo run -- build lexicon/example.md -o output.docx --style style.toml
 
 # Build with CLI style overrides (override TOML or defaults)
-cargo run -- build lexicon/example.md --no-cover --page-size letter --font-family Arial
+cargo run -- build lexicon/example.md -o output.docx --no-cover --page-size letter --font-family Arial
 
 # Run with --strict to fail on warnings
 cargo run -- build lexicon/example.md --strict
@@ -114,8 +114,7 @@ cargo test
 | `thiserror` | Error type derivation |
 | `zip` 2 | ZIP read/write for .docx post-processing (watermark) |
 | `image` 0.25 | PNG/JPEG decoding + JPEG→PNG conversion for exhibit import |
-| `tempfile` 3 | Temporary directories for PDF-to-image rendering (pdftoppm fallback) |
-| `hayro` 0.5 | Native Rust PDF rendering for exhibit import (primary backend) |
+| `hayro` 0.5 | Native Rust PDF rendering for exhibit import |
 
 ### Design Decisions
 
@@ -154,7 +153,7 @@ Future work and design notes are in `planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer + pdftoppm fallback), signature pages (template-based, external definitions file, short/long layout modes, separate_pages toggle, default enabled), recitals/background section (lettered (A)/(B)/(C), body heading requirement), native Word cross-references (bookmarks + internal hyperlinks, Ctrl+click navigation), CLI style override flags (all style.toml options as --flags, priority: CLI > local TOML > XDG TOML > defaults), man page generation (`lexicon-docx man`), TOC fixes (manual TOC item building to avoid docx-rs double-escaping, black TOC text via style), consistent Heading1 styling (section headings, addendum, exhibit, schedule, execution headings all use Heading1 with brand colour via style), heading/paragraph spacing config (heading_space_before/after, paragraph_space_before/after replacing blank paragraphs with Word native spacing), table layout (cantSplit on all table rows, keep_next on signature block cells)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer), signature pages (template-based, external definitions file, short/long layout modes, separate_pages toggle, default enabled), recitals/background section (lettered (A)/(B)/(C), body heading requirement), native Word cross-references (bookmarks + internal hyperlinks, Ctrl+click navigation), CLI style override flags (all style.toml options as --flags, priority: CLI > local TOML > XDG TOML > defaults), man page generation (`lexicon-docx man`), TOC fixes (manual TOC item building to avoid docx-rs double-escaping, black TOC text via style), consistent Heading1 styling (section headings, addendum, exhibit, schedule, execution headings all use Heading1 with brand colour via style), heading/paragraph spacing config (heading_space_before/after, paragraph_space_before/after replacing blank paragraphs with Word native spacing), table layout (cantSplit on all table rows, keep_next on signature block cells)).
 
 See `planning/implementation-status.md` for detailed status.
 
