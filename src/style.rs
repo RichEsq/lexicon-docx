@@ -52,7 +52,7 @@ pub struct SignaturesConfig {
 impl Default for SignaturesConfig {
     fn default() -> Self {
         SignaturesConfig {
-            enabled: false,
+            enabled: true,
             heading: None,
             default_template: None,
             separate_pages: false,
