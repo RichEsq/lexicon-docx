@@ -168,7 +168,7 @@ fn build_short_rows(
             cells.push(cell);
         }
 
-        rows.push(TableRow::new(cells));
+        rows.push(TableRow::new(cells).cant_split());
     }
 
     rows
@@ -229,8 +229,8 @@ fn build_long_rows(
             }
         }
 
-        rows.push(TableRow::new(space_cells));
-        rows.push(TableRow::new(label_cells));
+        rows.push(TableRow::new(space_cells).cant_split());
+        rows.push(TableRow::new(label_cells).cant_split());
     }
 
     rows

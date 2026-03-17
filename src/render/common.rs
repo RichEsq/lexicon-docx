@@ -120,7 +120,7 @@ pub fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx 
             }
             cells.push(TableCell::new().add_paragraph(para));
         }
-        rows.push(TableRow::new(cells));
+        rows.push(TableRow::new(cells).cant_split());
     }
 
     // Data rows
@@ -133,7 +133,7 @@ pub fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx 
             }
             cells.push(TableCell::new().add_paragraph(para));
         }
-        rows.push(TableRow::new(cells));
+        rows.push(TableRow::new(cells).cant_split());
     }
 
     if !rows.is_empty() {

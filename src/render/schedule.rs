@@ -65,7 +65,7 @@ pub fn render_schedules(
                     Run::new().add_text("Particulars").bold().size(body_size),
                 ),
             ),
-        ]));
+        ]).cant_split());
 
         // Data rows
         for item in &sched_items {
@@ -78,7 +78,7 @@ pub fn render_schedules(
                 TableCell::new().add_paragraph(
                     Paragraph::new(),
                 ),
-            ]));
+            ]).cant_split());
         }
 
         docx = docx.add_table(DocxTable::new(rows).width(5000, WidthType::Pct));
