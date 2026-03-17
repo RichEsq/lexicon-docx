@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::error::{Diagnostic, DiagLevel};
+use crate::error::{DiagLevel, Diagnostic};
 use crate::model::Party;
 use crate::style::{SignaturesConfig, StyleConfig};
 
@@ -80,10 +80,7 @@ pub struct FieldDef {
 }
 
 /// Load the definitions file from disk. Returns None with a diagnostic if not found.
-pub fn load_definitions(
-    path: &Path,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<DefinitionsFile> {
+pub fn load_definitions(path: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option<DefinitionsFile> {
     match std::fs::read_to_string(path) {
         Ok(content) => match toml::from_str(&content) {
             Ok(defs) => Some(defs),
@@ -99,10 +96,7 @@ pub fn load_definitions(
         Err(_) => {
             diagnostics.push(Diagnostic {
                 level: DiagLevel::Warning,
-                message: format!(
-                    "Signatures definitions file not found: {}",
-                    path.display()
-                ),
+                message: format!("Signatures definitions file not found: {}", path.display()),
                 location: None,
             });
             None
@@ -118,10 +112,7 @@ fn lookup_definition(
     execution: &str,
 ) -> Option<TemplateDefinition> {
     let (jurisdiction, etype) = split_entity_type(entity_type)?;
-    defs.get(jurisdiction)?
-        .get(etype)?
-        .get(execution)
-        .cloned()
+    defs.get(jurisdiction)?.get(etype)?.get(execution).cloned()
 }
 
 /// Split "au-company" into ("au", "company"). Returns None if no hyphen.
@@ -233,33 +224,33 @@ fn resolve_party_block(
                     .collect(),
                 t.fields.into_iter().map(convert_field_def).collect(),
                 t.witness,
-                t.witness_fields.into_iter().map(convert_field_def).collect(),
+                t.witness_fields
+                    .into_iter()
+                    .map(convert_field_def)
+                    .collect(),
             ),
             None => hardcoded_fallback(),
         };
 
     // 4. Apply TOML overrides
-    let signatories = if let Some(override_sigs) = party_override.and_then(|o| o.signatories.as_ref()) {
-        override_sigs
-            .iter()
-            .map(|s| Signatory {
-                title: s.title.clone(),
-            })
-            .collect()
-    } else {
-        base_signatories
-    };
+    let signatories =
+        if let Some(override_sigs) = party_override.and_then(|o| o.signatories.as_ref()) {
+            override_sigs
+                .iter()
+                .map(|s| Signatory {
+                    title: s.title.clone(),
+                })
+                .collect()
+        } else {
+            base_signatories
+        };
 
     let witness = party_override
         .and_then(|o| o.witness)
         .unwrap_or(base_witness);
 
     // 5. Expand placeholders in intro
-    let intro = expand_placeholders(
-        &base_intro,
-        party,
-        doc_type,
-    );
+    let intro = expand_placeholders(&base_intro, party, doc_type);
 
     SignatureBlock {
         layout: base_layout,
@@ -287,7 +278,14 @@ fn convert_field_def(def: FieldDef) -> SignatureField {
     }
 }
 
-fn hardcoded_fallback() -> (Layout, String, Vec<Signatory>, Vec<SignatureField>, bool, Vec<SignatureField>) {
+fn hardcoded_fallback() -> (
+    Layout,
+    String,
+    Vec<Signatory>,
+    Vec<SignatureField>,
+    bool,
+    Vec<SignatureField>,
+) {
     (
         Layout::Short,
         "**Signed by {name}**:".to_string(),
@@ -335,11 +333,7 @@ fn default_witness_fields() -> Vec<SignatureField> {
 }
 
 /// Expand `{name}`, `{specifier}`, `{role}`, `{type}` in a template string.
-fn expand_placeholders(
-    template: &str,
-    party: &Party,
-    doc_type: Option<&str>,
-) -> String {
+fn expand_placeholders(template: &str, party: &Party, doc_type: Option<&str>) -> String {
     let result = template
         .replace("{name}", &party.name)
         .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
@@ -350,11 +344,7 @@ fn expand_placeholders(
 }
 
 /// Expand `{title}`, `{name}` etc. within a field value, using signatory + party data.
-pub fn expand_field_value(
-    value: &str,
-    party: &Party,
-    signatory: &Signatory,
-) -> String {
+pub fn expand_field_value(value: &str, party: &Party, signatory: &Signatory) -> String {
     value
         .replace("{title}", signatory.title.as_deref().unwrap_or(""))
         .replace("{name}", &party.name)

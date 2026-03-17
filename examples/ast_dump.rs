@@ -1,5 +1,5 @@
-use comrak::{parse_document, Arena, Options};
 use comrak::nodes::{AstNode, NodeValue};
+use comrak::{Arena, Options, parse_document};
 
 fn main() {
     let input = r#"1. ## Definitions {#definitions}
@@ -29,7 +29,7 @@ fn main() {
     let arena = Arena::new();
     let opts = Options::default();
     let root = parse_document(&arena, input, &opts);
-    
+
     dump(root, 0);
 }
 
@@ -38,7 +38,10 @@ fn dump<'a>(node: &'a AstNode<'a>, depth: usize) {
     let data = node.data.borrow();
     match &data.value {
         NodeValue::Document => println!("{}Document", indent),
-        NodeValue::List(l) => println!("{}List(type={}, start={})", indent, l.list_type as u8, l.start),
+        NodeValue::List(l) => println!(
+            "{}List(type={}, start={})",
+            indent, l.list_type as u8, l.start
+        ),
         NodeValue::Item(l) => println!("{}Item", indent),
         NodeValue::Heading(h) => println!("{}Heading(level={})", indent, h.level),
         NodeValue::Paragraph => println!("{}Paragraph", indent),

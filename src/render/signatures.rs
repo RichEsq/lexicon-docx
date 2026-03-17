@@ -1,11 +1,13 @@
 use docx_rs::{
-    BorderType, BreakType, Docx, Paragraph, Run, RunFonts,
-    Table as DocxTable, TableCell, TableCellBorder, TableCellBorderPosition,
-    TableCellBorders, TableCellContent, TableCellMargins, TableRow, TableRowChild, WidthType,
+    BorderType, BreakType, Docx, Paragraph, Run, RunFonts, Table as DocxTable, TableCell,
+    TableCellBorder, TableCellBorderPosition, TableCellBorders, TableCellContent, TableCellMargins,
+    TableRow, TableRowChild, WidthType,
 };
 
 use crate::model::Party;
-use crate::signatures::{expand_field_value, FieldType, Layout, SignatureBlock, SignatureField, Signatory};
+use crate::signatures::{
+    FieldType, Layout, Signatory, SignatureBlock, SignatureField, expand_field_value,
+};
 use crate::style::{DefinedTermStyle, StyleConfig};
 
 // Height of the writing space in "long" layout (in half-points).
@@ -28,9 +30,7 @@ pub fn render_signature_pages(
     let label_half_pts = StyleConfig::pt_to_half_points(style.font_size - 2.0);
 
     // Page break before signature page
-    docx = docx.add_paragraph(
-        Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-    );
+    docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
 
     // Optional heading — styled as Heading1 (same as section headings)
     if let Some(ref heading) = style.signatures.heading {
@@ -44,20 +44,15 @@ pub fn render_signature_pages(
                     .ascii(&style.heading_font_family)
                     .hi_ansi(&style.heading_font_family),
             );
-        docx = docx.add_paragraph(
-            Paragraph::new()
-                .style("Heading1")
-                .add_run(heading_run),
-        );
+        docx = docx.add_paragraph(Paragraph::new().style("Heading1").add_run(heading_run));
     }
 
     // Render each party's signature block
     for (i, (block, party)) in blocks.iter().zip(parties.iter()).enumerate() {
         if i > 0 {
             if style.signatures.separate_pages {
-                docx = docx.add_paragraph(
-                    Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-                );
+                docx = docx
+                    .add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
             } else {
                 // Vertical spacing between blocks
                 docx = docx.add_paragraph(Paragraph::new());
@@ -66,11 +61,10 @@ pub fn render_signature_pages(
         }
 
         // Intro paragraph with **bold** markers (keep with table)
-        docx = docx.add_paragraph(render_intro_paragraph(
-            &block.intro,
-            body_half_pts,
-            &style.defined_term_style,
-        ).keep_next(true));
+        docx = docx.add_paragraph(
+            render_intro_paragraph(&block.intro, body_half_pts, &style.defined_term_style)
+                .keep_next(true),
+        );
 
         // Spacer between intro and table (keep with table)
         docx = docx.add_paragraph(Paragraph::new().keep_next(true));
@@ -97,12 +91,23 @@ pub fn render_signature_pages(
 
         let mut rows = match block.layout {
             Layout::Short => build_short_rows(
-                block, party, max_fields, col_width, gap_width,
-                body_half_pts, label_half_pts, style,
+                block,
+                party,
+                max_fields,
+                col_width,
+                gap_width,
+                body_half_pts,
+                label_half_pts,
+                style,
             ),
             Layout::Long => build_long_rows(
-                block, party, max_fields, col_width, gap_width,
-                body_half_pts, label_half_pts,
+                block,
+                party,
+                max_fields,
+                col_width,
+                gap_width,
+                body_half_pts,
+                label_half_pts,
             ),
         };
 
@@ -207,10 +212,18 @@ fn build_long_rows(
             if field_idx < block.fields.len() {
                 let field = &block.fields[field_idx];
                 space_cells.push(render_long_space_cell(
-                    field, party, signatory, body_half_pts, col_width,
+                    field,
+                    party,
+                    signatory,
+                    body_half_pts,
+                    col_width,
                 ));
                 label_cells.push(render_long_label_cell(
-                    field, party, signatory, label_half_pts, col_width,
+                    field,
+                    party,
+                    signatory,
+                    label_half_pts,
+                    col_width,
                 ));
             } else {
                 space_cells.push(empty_cell(col_width));
@@ -225,10 +238,18 @@ fn build_long_rows(
                 let field = &block.witness_fields[field_idx];
                 let witness_sig = Signatory { title: None };
                 space_cells.push(render_long_space_cell(
-                    field, party, &witness_sig, body_half_pts, col_width,
+                    field,
+                    party,
+                    &witness_sig,
+                    body_half_pts,
+                    col_width,
                 ));
                 label_cells.push(render_long_label_cell(
-                    field, party, &witness_sig, label_half_pts, col_width,
+                    field,
+                    party,
+                    &witness_sig,
+                    label_half_pts,
+                    col_width,
                 ));
             } else {
                 space_cells.push(empty_cell(col_width));
@@ -267,14 +288,11 @@ fn render_long_space_cell(
         .unwrap_or_default();
 
     if display_value.is_empty() {
-        let para = Paragraph::new().add_run(
-            Run::new().add_text("\u{00A0}").size(height),
-        );
+        let para = Paragraph::new().add_run(Run::new().add_text("\u{00A0}").size(height));
         cell = cell.add_paragraph(para);
     } else {
-        let para = Paragraph::new().add_run(
-            Run::new().add_text(&display_value).size(body_half_pts),
-        );
+        let para =
+            Paragraph::new().add_run(Run::new().add_text(&display_value).size(body_half_pts));
         cell = cell.add_paragraph(para);
     }
 
@@ -334,9 +352,7 @@ fn render_short_field_cell(
     match field.field_type {
         FieldType::Line => {
             // Signature line — empty cell with only a bottom border
-            let para = Paragraph::new().add_run(
-                Run::new().add_text("").size(body_size),
-            );
+            let para = Paragraph::new().add_run(Run::new().add_text("").size(body_size));
             cell = cell.add_paragraph(para);
             cell = cell.set_borders(
                 TableCellBorders::with_empty().set(
@@ -350,12 +366,8 @@ fn render_short_field_cell(
             // Label below the line (if any)
             if let Some(ref label) = field.label {
                 cell = cell.add_paragraph(
-                    Paragraph::new().add_run(
-                        Run::new()
-                            .add_text(label)
-                            .size(label_size)
-                            .color("666666"),
-                    ),
+                    Paragraph::new()
+                        .add_run(Run::new().add_text(label).size(label_size).color("666666")),
                 );
             }
         }
@@ -370,11 +382,8 @@ fn render_short_field_cell(
             if let Some(ref label) = field.label {
                 if display_value.is_empty() {
                     // Label only — for handwriting
-                    let para = Paragraph::new().add_run(
-                        Run::new()
-                            .add_text(format!("{}:", label))
-                            .size(body_size),
-                    );
+                    let para = Paragraph::new()
+                        .add_run(Run::new().add_text(format!("{}:", label)).size(body_size));
                     cell = cell.add_paragraph(para);
                 } else {
                     // Label: Value
@@ -385,17 +394,12 @@ fn render_short_field_cell(
                                 .size(label_size)
                                 .color("666666"),
                         )
-                        .add_run(
-                            Run::new()
-                                .add_text(&display_value)
-                                .size(body_size),
-                        );
+                        .add_run(Run::new().add_text(&display_value).size(body_size));
                     cell = cell.add_paragraph(para);
                 }
             } else if !display_value.is_empty() {
-                let para = Paragraph::new().add_run(
-                    Run::new().add_text(&display_value).size(body_size),
-                );
+                let para =
+                    Paragraph::new().add_run(Run::new().add_text(&display_value).size(body_size));
                 cell = cell.add_paragraph(para);
             } else {
                 cell = cell.add_paragraph(Paragraph::new());
@@ -415,19 +419,13 @@ fn empty_cell(col_width: usize) -> TableCell {
 /// Parse a template string with `**bold**` markers into a paragraph.
 /// Bold in signature intros is always rendered as bold (not as defined term style),
 /// since this is emphasis, not a term definition.
-fn render_intro_paragraph(
-    text: &str,
-    size: usize,
-    _term_style: &DefinedTermStyle,
-) -> Paragraph {
+fn render_intro_paragraph(text: &str, size: usize, _term_style: &DefinedTermStyle) -> Paragraph {
     let mut para = Paragraph::new();
     let mut remaining = text;
 
     while let Some(start) = remaining.find("**") {
         if start > 0 {
-            para = para.add_run(
-                Run::new().add_text(&remaining[..start]).size(size),
-            );
+            para = para.add_run(Run::new().add_text(&remaining[..start]).size(size));
         }
 
         let after_open = &remaining[start + 2..];

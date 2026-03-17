@@ -36,8 +36,7 @@ mod tests {
 
     #[test]
     fn test_anchor_with_text_before() {
-        let (text, anchor) =
-            strip_anchor("The Employer shall pay. {#payment-timeframe}");
+        let (text, anchor) = strip_anchor("The Employer shall pay. {#payment-timeframe}");
         assert_eq!(text, "The Employer shall pay.");
         assert_eq!(anchor, Some("payment-timeframe".to_string()));
     }

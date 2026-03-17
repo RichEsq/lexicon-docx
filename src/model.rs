@@ -2,7 +2,9 @@ use crate::error::Diagnostic;
 use serde::{Deserialize, Deserializer};
 
 /// Deserialize version as a string, accepting YAML integers, floats, or strings.
-fn deserialize_version<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
+fn deserialize_version<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
     let value: Option<serde_yaml::Value> = Option::deserialize(deserializer)?;
     Ok(value.map(|v| match v {
         serde_yaml::Value::Number(n) => {
@@ -210,9 +212,9 @@ impl InlineContent {
             | InlineContent::Bold(s)
             | InlineContent::Italic(s)
             | InlineContent::Superscript(s) => s.clone(),
-            InlineContent::CrossRef { display, resolved, .. } => {
-                resolved.as_ref().unwrap_or(display).clone()
-            }
+            InlineContent::CrossRef {
+                display, resolved, ..
+            } => resolved.as_ref().unwrap_or(display).clone(),
             InlineContent::Link { text, .. } => text.clone(),
             InlineContent::SoftBreak => " ".to_string(),
             InlineContent::LineBreak => "\n".to_string(),

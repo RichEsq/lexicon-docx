@@ -32,8 +32,12 @@ pub fn add_inline_run(
 ) -> Paragraph {
     // Helper: apply heading formatting (bold + optional color) to a run
     let apply_heading = |mut run: Run| -> Run {
-        if heading_bold { run = run.bold(); }
-        if let Some(c) = color { run = run.color(c); }
+        if heading_bold {
+            run = run.bold();
+        }
+        if let Some(c) = color {
+            run = run.color(c);
+        }
         run
     };
 
@@ -45,9 +49,7 @@ pub fn add_inline_run(
         InlineContent::Bold(t) => {
             render_defined_term(para, t, size, color, &style.defined_term_style)
         }
-        InlineContent::Italic(t) => {
-            para.add_run(Run::new().add_text(t).italic().size(size))
-        }
+        InlineContent::Italic(t) => para.add_run(Run::new().add_text(t).italic().size(size)),
         InlineContent::Superscript(t) => {
             let mut run = Run::new().add_text(t).size(size);
             run.run_property = run.run_property.vert_align(VertAlignType::SuperScript);
@@ -61,8 +63,7 @@ pub fn add_inline_run(
         } => {
             let text = resolved.as_ref().unwrap_or(display);
             let run = apply_heading(Run::new().add_text(text).size(size));
-            let link = Hyperlink::new(bookmark_name(anchor_id), HyperlinkType::Anchor)
-                .add_run(run);
+            let link = Hyperlink::new(bookmark_name(anchor_id), HyperlinkType::Anchor).add_run(run);
             para.add_hyperlink(link)
         }
         InlineContent::Link { text, .. } => {
@@ -73,9 +74,7 @@ pub fn add_inline_run(
             let run = apply_heading(Run::new().add_text(" ").size(size));
             para.add_run(run)
         }
-        InlineContent::LineBreak => {
-            para.add_run(Run::new().add_break(BreakType::TextWrapping))
-        }
+        InlineContent::LineBreak => para.add_run(Run::new().add_break(BreakType::TextWrapping)),
     }
 }
 
@@ -90,17 +89,28 @@ pub fn render_defined_term(
     match term_style {
         DefinedTermStyle::Bold => {
             let mut run = Run::new().add_text(text).bold().size(size);
-            if let Some(c) = color { run = run.color(c); }
+            if let Some(c) = color {
+                run = run.color(c);
+            }
             para.add_run(run)
         }
         DefinedTermStyle::Quoted => {
-            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", text)).size(size);
-            if let Some(c) = color { run = run.color(c); }
+            let mut run = Run::new()
+                .add_text(format!("\u{201c}{}\u{201d}", text))
+                .size(size);
+            if let Some(c) = color {
+                run = run.color(c);
+            }
             para.add_run(run)
         }
         DefinedTermStyle::BoldQuoted => {
-            let mut run = Run::new().add_text(format!("\u{201c}{}\u{201d}", text)).bold().size(size);
-            if let Some(c) = color { run = run.color(c); }
+            let mut run = Run::new()
+                .add_text(format!("\u{201c}{}\u{201d}", text))
+                .bold()
+                .size(size);
+            if let Some(c) = color {
+                run = run.color(c);
+            }
             para.add_run(run)
         }
     }
@@ -145,16 +155,18 @@ pub fn render_table(mut docx: Docx, table: &Table, style: &StyleConfig) -> Docx 
 
 /// Parse a template string with `**bold**` markers into a paragraph of Runs.
 /// Bold markers represent defined terms and are rendered according to `term_style`.
-pub fn render_template_paragraph(text: &str, size: usize, term_style: &DefinedTermStyle) -> Paragraph {
+pub fn render_template_paragraph(
+    text: &str,
+    size: usize,
+    term_style: &DefinedTermStyle,
+) -> Paragraph {
     let mut para = Paragraph::new();
     let mut remaining = text;
 
     while let Some(start) = remaining.find("**") {
         // Text before the bold marker
         if start > 0 {
-            para = para.add_run(
-                Run::new().add_text(&remaining[..start]).size(size),
-            );
+            para = para.add_run(Run::new().add_text(&remaining[..start]).size(size));
         }
 
         // Find the closing **
@@ -165,18 +177,14 @@ pub fn render_template_paragraph(text: &str, size: usize, term_style: &DefinedTe
             remaining = &after_open[end + 2..];
         } else {
             // No closing **, treat rest as plain text
-            para = para.add_run(
-                Run::new().add_text(remaining).size(size),
-            );
+            para = para.add_run(Run::new().add_text(remaining).size(size));
             remaining = "";
         }
     }
 
     // Remaining plain text
     if !remaining.is_empty() {
-        para = para.add_run(
-            Run::new().add_text(remaining).size(size),
-        );
+        para = para.add_run(Run::new().add_text(remaining).size(size));
     }
 
     para
@@ -185,9 +193,7 @@ pub fn render_template_paragraph(text: &str, size: usize, term_style: &DefinedTe
 /// Remove empty parentheses left over when {specifier} is absent.
 /// Handles `()`, `( )`, and surrounding whitespace collapse.
 pub fn clean_empty_parens(text: &str) -> String {
-    let result = text
-        .replace("()", "")
-        .replace("( )", "");
+    let result = text.replace("()", "").replace("( )", "");
     // Collapse any resulting double spaces
     let mut prev = String::new();
     let mut current = result;

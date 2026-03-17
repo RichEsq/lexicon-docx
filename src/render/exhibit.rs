@@ -56,7 +56,11 @@ pub fn load_image(path: &Path) -> Result<ExhibitImage> {
     let file_type = detect_file_type(path)?;
 
     let raw_bytes = std::fs::read(path).map_err(|e| {
-        LexiconError::Render(format!("Failed to read exhibit file '{}': {}", path.display(), e))
+        LexiconError::Render(format!(
+            "Failed to read exhibit file '{}': {}",
+            path.display(),
+            e
+        ))
     })?;
 
     match file_type {
@@ -76,15 +80,14 @@ pub fn load_image(path: &Path) -> Result<ExhibitImage> {
             })
         }
         ExhibitFileType::Jpeg => {
-            let img =
-                image::load_from_memory_with_format(&raw_bytes, image::ImageFormat::Jpeg)
-                    .map_err(|e| {
-                        LexiconError::Render(format!(
-                            "Failed to decode JPEG '{}': {}",
-                            path.display(),
-                            e
-                        ))
-                    })?;
+            let img = image::load_from_memory_with_format(&raw_bytes, image::ImageFormat::Jpeg)
+                .map_err(|e| {
+                    LexiconError::Render(format!(
+                        "Failed to decode JPEG '{}': {}",
+                        path.display(),
+                        e
+                    ))
+                })?;
             // Convert to PNG for docx-rs
             let mut png_buf = std::io::Cursor::new(Vec::new());
             img.write_to(&mut png_buf, image::ImageFormat::Png)
@@ -109,9 +112,9 @@ pub fn load_image(path: &Path) -> Result<ExhibitImage> {
 
 /// Render PDF pages to PNG images using hayro (native Rust).
 fn render_pdf_pages_hayro(path: &Path) -> Result<Vec<ExhibitImage>> {
-    use std::sync::Arc;
     use hayro::hayro_syntax::Pdf;
-    use hayro::{render, RenderSettings};
+    use hayro::{RenderSettings, render};
+    use std::sync::Arc;
 
     let file_bytes = std::fs::read(path).map_err(|e| {
         LexiconError::Render(format!("Failed to read PDF '{}': {}", path.display(), e))
@@ -184,21 +187,14 @@ pub fn load_exhibit(path: &str, input_dir: Option<&Path>) -> Result<Vec<ExhibitI
     let file_type = detect_file_type(&resolved)?;
 
     match file_type {
-        ExhibitFileType::Png | ExhibitFileType::Jpeg => {
-            Ok(vec![load_image(&resolved)?])
-        }
+        ExhibitFileType::Png | ExhibitFileType::Jpeg => Ok(vec![load_image(&resolved)?]),
         ExhibitFileType::Pdf => render_pdf_pages(&resolved),
     }
 }
 
 /// Calculate display size in EMU to fit within page content area, preserving aspect ratio.
 /// Returns (width_emu, height_emu).
-pub fn fit_to_page(
-    img_w_px: u32,
-    img_h_px: u32,
-    max_w_emu: u32,
-    max_h_emu: u32,
-) -> (u32, u32) {
+pub fn fit_to_page(img_w_px: u32, img_h_px: u32, max_w_emu: u32, max_h_emu: u32) -> (u32, u32) {
     const EMU_PER_PX: u32 = 9525;
 
     let img_w_emu = img_w_px as u64 * EMU_PER_PX as u64;
@@ -257,10 +253,22 @@ mod tests {
 
     #[test]
     fn test_detect_file_type() {
-        assert!(matches!(detect_file_type(Path::new("foo.png")), Ok(ExhibitFileType::Png)));
-        assert!(matches!(detect_file_type(Path::new("foo.jpg")), Ok(ExhibitFileType::Jpeg)));
-        assert!(matches!(detect_file_type(Path::new("foo.jpeg")), Ok(ExhibitFileType::Jpeg)));
-        assert!(matches!(detect_file_type(Path::new("foo.pdf")), Ok(ExhibitFileType::Pdf)));
+        assert!(matches!(
+            detect_file_type(Path::new("foo.png")),
+            Ok(ExhibitFileType::Png)
+        ));
+        assert!(matches!(
+            detect_file_type(Path::new("foo.jpg")),
+            Ok(ExhibitFileType::Jpeg)
+        ));
+        assert!(matches!(
+            detect_file_type(Path::new("foo.jpeg")),
+            Ok(ExhibitFileType::Jpeg)
+        ));
+        assert!(matches!(
+            detect_file_type(Path::new("foo.pdf")),
+            Ok(ExhibitFileType::Pdf)
+        ));
         assert!(matches!(detect_file_type(Path::new("foo.docx")), Err(_)));
     }
 

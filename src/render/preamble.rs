@@ -17,7 +17,11 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             let term_style = &style.defined_term_style;
 
             // Opening line: This [title] ([type]) is dated [date] between
-            let between_word = if meta.parties.len() == 1 { "by" } else { "between" };
+            let between_word = if meta.parties.len() == 1 {
+                "by"
+            } else {
+                "between"
+            };
             let mut opening = Paragraph::new();
             opening = opening.add_run(
                 Run::new()
@@ -39,11 +43,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             let party_count = meta.parties.len();
             for (i, party) in meta.parties.iter().enumerate() {
                 let mut para = Paragraph::new();
-                para = para.add_run(
-                    Run::new()
-                        .add_text(&party.name)
-                        .size(body_half_pts),
-                );
+                para = para.add_run(Run::new().add_text(&party.name).size(body_half_pts));
                 if let Some(ref spec) = party.specifier {
                     para = para.add_run(
                         Run::new()
@@ -51,25 +51,13 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
                             .size(body_half_pts),
                     );
                 }
-                para = para.add_run(
-                    Run::new()
-                        .add_text(" (")
-                        .size(body_half_pts),
-                );
+                para = para.add_run(Run::new().add_text(" (").size(body_half_pts));
                 para = render_defined_term(para, &party.role, body_half_pts, None, term_style);
-                para = para.add_run(
-                    Run::new()
-                        .add_text(")")
-                        .size(body_half_pts),
-                );
+                para = para.add_run(Run::new().add_text(")").size(body_half_pts));
 
                 // "; and" suffix on all but the last party
                 if i < party_count - 1 {
-                    para = para.add_run(
-                        Run::new()
-                            .add_text("; and")
-                            .size(body_half_pts),
-                    );
+                    para = para.add_run(Run::new().add_text("; and").size(body_half_pts));
                 }
 
                 docx = docx.add_paragraph(para);
@@ -95,7 +83,11 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
                     .add_text(format!(
                         ") is entered into as of {} {} ",
                         &formatted_date,
-                        if meta.parties.len() == 1 { "by" } else { "between" }
+                        if meta.parties.len() == 1 {
+                            "by"
+                        } else {
+                            "between"
+                        }
                     ))
                     .size(body_half_pts),
             );
@@ -103,11 +95,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             // Parties
             let party_count = meta.parties.len();
             for (i, party) in meta.parties.iter().enumerate() {
-                para = para.add_run(
-                    Run::new()
-                        .add_text(&party.name)
-                        .size(body_half_pts),
-                );
+                para = para.add_run(Run::new().add_text(&party.name).size(body_half_pts));
                 if let Some(ref spec) = party.specifier {
                     para = para.add_run(
                         Run::new()
@@ -115,40 +103,24 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
                             .size(body_half_pts),
                     );
                 }
-                para = para.add_run(
-                    Run::new()
-                        .add_text(" (")
-                        .size(body_half_pts),
-                );
+                para = para.add_run(Run::new().add_text(" (").size(body_half_pts));
                 para = render_defined_term(para, &party.role, body_half_pts, None, term_style);
-                para = para.add_run(
-                    Run::new()
-                        .add_text(")")
-                        .size(body_half_pts),
-                );
+                para = para.add_run(Run::new().add_text(")").size(body_half_pts));
 
                 if party_count > 2 && i < party_count - 1 {
                     // Comma-separated for 3+ parties
                     if i < party_count - 2 {
-                        para = para.add_run(
-                            Run::new().add_text(", ").size(body_half_pts),
-                        );
+                        para = para.add_run(Run::new().add_text(", ").size(body_half_pts));
                     } else {
-                        para = para.add_run(
-                            Run::new().add_text(" and ").size(body_half_pts),
-                        );
+                        para = para.add_run(Run::new().add_text(" and ").size(body_half_pts));
                     }
                 } else if party_count == 2 && i == 0 {
-                    para = para.add_run(
-                        Run::new().add_text(" and ").size(body_half_pts),
-                    );
+                    para = para.add_run(Run::new().add_text(" and ").size(body_half_pts));
                 }
             }
 
             // Closing period
-            para = para.add_run(
-                Run::new().add_text(".").size(body_half_pts),
-            );
+            para = para.add_run(Run::new().add_text(".").size(body_half_pts));
             docx = docx.add_paragraph(para);
 
             // Spacer after preamble
@@ -158,7 +130,8 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             let preamble = &style.preamble;
 
             // Expand the opening template
-            let expanded_template = preamble.template
+            let expanded_template = preamble
+                .template
                 .replace("{title}", &meta.title)
                 .replace("{type}", doc_type)
                 .replace("{date}", &formatted_date);
@@ -166,9 +139,11 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             // Render template lines as paragraphs
             for line in expanded_template.split("\\n") {
                 let cleaned = clean_empty_parens(line);
-                docx = docx.add_paragraph(
-                    render_template_paragraph(&cleaned, body_half_pts, &style.defined_term_style),
-                );
+                docx = docx.add_paragraph(render_template_paragraph(
+                    &cleaned,
+                    body_half_pts,
+                    &style.defined_term_style,
+                ));
             }
 
             // Spacer before parties
@@ -177,7 +152,8 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             // Render each party
             let party_count = meta.parties.len();
             for (i, party) in meta.parties.iter().enumerate() {
-                let expanded_party = preamble.party_template
+                let expanded_party = preamble
+                    .party_template
                     .replace("{name}", &party.name)
                     .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
                     .replace("{role}", &party.role);
@@ -190,9 +166,11 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
                     cleaned
                 };
 
-                docx = docx.add_paragraph(
-                    render_template_paragraph(&line, body_half_pts, &style.defined_term_style),
-                );
+                docx = docx.add_paragraph(render_template_paragraph(
+                    &line,
+                    body_half_pts,
+                    &style.defined_term_style,
+                ));
             }
 
             // Spacer after preamble

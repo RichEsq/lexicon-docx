@@ -19,7 +19,11 @@ pub fn create_clause_numbering(style: &StyleConfig) -> AbstractNumbering {
 }
 
 pub fn create_recital_numbering(style: &StyleConfig) -> AbstractNumbering {
-    create_clause_numbering_with(style, RECITAL_ABSTRACT_NUM_ID, style.recitals_align_first_level)
+    create_clause_numbering_with(
+        style,
+        RECITAL_ABSTRACT_NUM_ID,
+        style.recitals_align_first_level,
+    )
 }
 
 fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> AbstractNumbering {
@@ -28,7 +32,10 @@ fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> 
 
     let level_indent = |level: usize| -> i32 {
         let num_steps = if align {
-            match level { 0 | 1 => 0, n => n - 1 }
+            match level {
+                0 | 1 => 0,
+                n => n - 1,
+            }
         } else {
             level
         };
@@ -44,7 +51,12 @@ fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> 
         LevelText::new("%1."),
         LevelJc::new("left"),
     )
-    .indent(Some(level_indent(0)), Some(SpecialIndentType::Hanging(hanging)), None, None);
+    .indent(
+        Some(level_indent(0)),
+        Some(SpecialIndentType::Hanging(hanging)),
+        None,
+        None,
+    );
 
     numbering
         // Level 0: TopLevel — "1."
@@ -61,8 +73,9 @@ fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> 
             .indent(
                 Some(level_indent(1)),
                 Some(SpecialIndentType::Hanging(hanging)),
-                None, None,
-            )
+                None,
+                None,
+            ),
         )
         // Level 2: SubClause — "(a)"
         .add_level(
@@ -76,8 +89,9 @@ fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> 
             .indent(
                 Some(level_indent(2)),
                 Some(SpecialIndentType::Hanging(hanging)),
-                None, None,
-            )
+                None,
+                None,
+            ),
         )
         // Level 3: SubSubClause — "(i)"
         .add_level(
@@ -91,8 +105,9 @@ fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> 
             .indent(
                 Some(level_indent(3)),
                 Some(SpecialIndentType::Hanging(hanging)),
-                None, None,
-            )
+                None,
+                None,
+            ),
         )
         // Level 4: Paragraph — "(A)"
         .add_level(
@@ -106,8 +121,9 @@ fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> 
             .indent(
                 Some(level_indent(4)),
                 Some(SpecialIndentType::Hanging(hanging)),
-                None, None,
-            )
+                None,
+                None,
+            ),
         )
         // Level 5: SubParagraph — "(I)"
         .add_level(
@@ -121,8 +137,9 @@ fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> 
             .indent(
                 Some(level_indent(5)),
                 Some(SpecialIndentType::Hanging(hanging)),
-                None, None,
-            )
+                None,
+                None,
+            ),
         )
 }
 
@@ -140,7 +157,12 @@ pub fn create_simple_list_numbering(style: &StyleConfig) -> AbstractNumbering {
             LevelText::new("%1."),
             LevelJc::new("left"),
         )
-        .indent(Some(step + hanging), Some(SpecialIndentType::Hanging(hanging)), None, None),
+        .indent(
+            Some(step + hanging),
+            Some(SpecialIndentType::Hanging(hanging)),
+            None,
+            None,
+        ),
     )
 }
 

@@ -2,20 +2,24 @@ use comrak::nodes::{AstNode, NodeValue};
 use regex::Regex;
 use std::sync::LazyLock;
 
+use super::anchors::strip_anchor;
 use crate::error::{DiagLevel, Diagnostic};
 use crate::model::*;
-use super::anchors::strip_anchor;
 
-static ADDENDUM_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^addendum(?:\s+\d+)?(?:\s*[-–—]\s*(.*))?$").unwrap()
-});
+static ADDENDUM_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^addendum(?:\s+\d+)?(?:\s*[-–—]\s*(.*))?$").unwrap());
 
-static RECITALS_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^(recitals|background)$").unwrap()
-});
+static RECITALS_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^(recitals|background)$").unwrap());
 
 /// Return type for `extract_body`: (recitals, body_heading, body, addenda, diagnostics).
-type ExtractBodyResult = (Option<Recitals>, Option<String>, Vec<BodyElement>, Vec<Addendum>, Vec<Diagnostic>);
+type ExtractBodyResult = (
+    Option<Recitals>,
+    Option<String>,
+    Vec<BodyElement>,
+    Vec<Addendum>,
+    Vec<Diagnostic>,
+);
 
 /// Walk a comrak AST and extract the document body as a list of BodyElements.
 /// `root` should be the Document node from comrak.
@@ -59,7 +63,8 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                         addenda.push(add);
                     }
                     addendum_counter += 1;
-                    let title = caps.get(1)
+                    let title = caps
+                        .get(1)
                         .map(|m| m.as_str().to_string())
                         .unwrap_or_default();
                     in_addendum = Some(Addendum {
@@ -195,9 +200,7 @@ fn is_clause_list<'a>(list_node: &'a AstNode<'a>) -> bool {
             let child_data = child.data.borrow();
             match &child_data.value {
                 NodeValue::Heading(_) => return true,
-                NodeValue::List(list)
-                    if list.list_type == comrak::nodes::ListType::Ordered =>
-                {
+                NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Ordered => {
                     return true;
                 }
                 _ => {}
@@ -208,10 +211,7 @@ fn is_clause_list<'a>(list_node: &'a AstNode<'a>) -> bool {
 }
 
 /// Extract clauses from an ordered List node.
-fn extract_clauses_from_list<'a>(
-    list_node: &'a AstNode<'a>,
-    level: ClauseLevel,
-) -> Vec<Clause> {
+fn extract_clauses_from_list<'a>(list_node: &'a AstNode<'a>, level: ClauseLevel) -> Vec<Clause> {
     let mut clauses = Vec::new();
 
     for item in list_node.children() {
@@ -229,10 +229,7 @@ fn extract_clauses_from_list<'a>(
 }
 
 /// Extract a single Clause from a list Item node.
-fn extract_clause_from_item<'a>(
-    item: &'a AstNode<'a>,
-    level: ClauseLevel,
-) -> Clause {
+fn extract_clause_from_item<'a>(item: &'a AstNode<'a>, level: ClauseLevel) -> Clause {
     let mut heading = None;
     let mut anchor = None;
     let mut body: Vec<ClauseBody> = Vec::new();
@@ -287,9 +284,7 @@ fn extract_clause_from_item<'a>(
                 }
             }
 
-            NodeValue::List(list)
-                if list.list_type == comrak::nodes::ListType::Ordered =>
-            {
+            NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Ordered => {
                 drop(data);
                 let child_level = next_level(level);
                 let child_clauses = extract_clauses_from_list(child, child_level);

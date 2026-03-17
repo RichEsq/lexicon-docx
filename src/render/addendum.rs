@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use docx_rs::{
-    BreakType, Docx, IndentLevel, LevelOverride, NumberingId, Numbering, Paragraph,
-    Run, RunFonts,
+    BreakType, Docx, IndentLevel, LevelOverride, Numbering, NumberingId, Paragraph, Run, RunFonts,
 };
 
 use crate::model::*;
-use crate::render::common::{add_inline_run, bookmark_name, render_inlines_paragraph, render_table};
+use crate::render::common::{
+    add_inline_run, bookmark_name, render_inlines_paragraph, render_table,
+};
 use crate::render::numbering::{ABSTRACT_NUM_ID, SIMPLE_LIST_ABSTRACT_NUM_ID};
 use crate::style::StyleConfig;
 
@@ -21,9 +22,7 @@ pub fn render_addendum(
     let body_size = StyleConfig::pt_to_half_points(style.font_size);
 
     // Page break before addendum
-    docx = docx.add_paragraph(
-        Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-    );
+    docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
 
     // Addendum heading — styled as Heading1 (same as section headings)
     let heading_text = addendum.heading();
@@ -37,9 +36,7 @@ pub fn render_addendum(
                 .hi_ansi(&style.heading_font_family),
         );
 
-    let mut heading_para = Paragraph::new()
-        .style("Heading1")
-        .add_run(heading_run);
+    let mut heading_para = Paragraph::new().style("Heading1").add_run(heading_run);
 
     // Place bookmark on addendum heading
     if let Some(ref anchor_id) = addendum.anchor
@@ -82,7 +79,14 @@ pub fn render_addendum(
                         .add_override(LevelOverride::new(3).start(1)),
                 );
                 for clause in clauses {
-                    docx = super::docx::render_clause(docx, clause, style, num_id, style.body_align_first_level, bookmark_ids);
+                    docx = super::docx::render_clause(
+                        docx,
+                        clause,
+                        style,
+                        num_id,
+                        style.body_align_first_level,
+                        bookmark_ids,
+                    );
                 }
             }
             AddendumContent::Table(table) => {
@@ -96,8 +100,8 @@ pub fn render_addendum(
                         .add_override(LevelOverride::new(0).start(1)),
                 );
                 for item in items {
-                    let mut para = Paragraph::new()
-                        .numbering(NumberingId::new(num_id), IndentLevel::new(0));
+                    let mut para =
+                        Paragraph::new().numbering(NumberingId::new(num_id), IndentLevel::new(0));
                     for inline in item {
                         para = add_inline_run(para, inline, false, body_size, style, None);
                     }
@@ -107,8 +111,7 @@ pub fn render_addendum(
             AddendumContent::BulletList(items) => {
                 let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
                 for item in items {
-                    let mut para = Paragraph::new()
-                        .indent(Some(step), None, None, None);
+                    let mut para = Paragraph::new().indent(Some(step), None, None, None);
                     // Bullet character
                     para = para.add_run(Run::new().add_text("• \t").size(body_size));
                     for inline in item {
