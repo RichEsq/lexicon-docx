@@ -108,7 +108,6 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     } else {
         // Inline title at top of first page
         docx = render_inline_title(docx, doc, style);
-        docx = docx.add_paragraph(Paragraph::new());
     }
 
     let has_schedule_items = !doc.schedule_items.is_empty();
