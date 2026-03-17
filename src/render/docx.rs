@@ -616,24 +616,22 @@ fn render_exhibit(
         let max_h_emu = (style.page_height_twips() - margin_top - margin_bottom) * 635;
 
         for (i, img) in images.iter().enumerate() {
-            // Page break between multi-page images (e.g. PDF pages), not before the first
-            if i > 0 {
-                docx = docx.add_paragraph(
-                    Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-                );
-            }
-
             let (fit_w, fit_h) =
                 exhibit_loader::fit_to_page(img.width_px, img.height_px, max_w_emu, max_h_emu);
 
             let pic = Pic::new_with_dimensions(img.png_bytes.clone(), img.width_px, img.height_px)
                 .size(fit_w, fit_h);
 
-            docx = docx.add_paragraph(
-                Paragraph::new()
-                    .align(docx_rs::AlignmentType::Center)
-                    .add_run(Run::new().add_image(pic)),
-            );
+            let mut para = Paragraph::new()
+                .align(docx_rs::AlignmentType::Center);
+
+            // Page break before image (in same paragraph) for pages after the first
+            if i > 0 {
+                para = para.add_run(Run::new().add_break(BreakType::Page));
+            }
+
+            para = para.add_run(Run::new().add_image(pic));
+            docx = docx.add_paragraph(para);
         }
     }
 
