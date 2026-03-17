@@ -67,8 +67,14 @@ exhibits:
     assert_eq!(doc.meta.author.as_deref(), Some("Legal Team"));
     assert_eq!(doc.meta.status, Some(Status::Draft));
     assert_eq!(doc.meta.version.as_deref(), Some("2.1"));
-    assert_eq!(doc.meta.parties[0].specifier.as_deref(), Some("ACN 123 456 789"));
-    assert_eq!(doc.meta.parties[0].entity_type.as_deref(), Some("au-company"));
+    assert_eq!(
+        doc.meta.parties[0].specifier.as_deref(),
+        Some("ACN 123 456 789")
+    );
+    assert_eq!(
+        doc.meta.parties[0].entity_type.as_deref(),
+        Some("au-company")
+    );
     assert_eq!(doc.meta.schedule.len(), 1);
     assert_eq!(doc.meta.exhibits.len(), 1);
     assert_eq!(doc.meta.exhibits[0].title, "Terms of Service");
@@ -106,7 +112,11 @@ parties:
 
 #[test]
 fn frontmatter_status_variants() {
-    for (yaml_val, expected) in [("draft", Status::Draft), ("final", Status::Final), ("executed", Status::Executed)] {
+    for (yaml_val, expected) in [
+        ("draft", Status::Draft),
+        ("final", Status::Final),
+        ("executed", Status::Executed),
+    ] {
         let input = format!(
             "---\ntitle: T\ndate: 2026-01-01\nstatus: {}\nparties:\n  - name: A\n    role: R\n---\n",
             yaml_val
@@ -138,7 +148,9 @@ parties:
 ---
 "#;
     let doc = parse_and_resolve(input);
-    let errors: Vec<_> = doc.diagnostics.iter()
+    let errors: Vec<_> = doc
+        .diagnostics
+        .iter()
         .filter(|d| d.message.contains("not a valid YYYY-MM-DD"))
         .collect();
     assert_eq!(errors.len(), 1);
@@ -148,7 +160,9 @@ parties:
 fn frontmatter_missing_parties() {
     let input = "---\ntitle: T\ndate: 2026-01-01\nparties: []\n---\n";
     let doc = parse_and_resolve(input);
-    let errors: Vec<_> = doc.diagnostics.iter()
+    let errors: Vec<_> = doc
+        .diagnostics
+        .iter()
         .filter(|d| d.message.contains("No parties"))
         .collect();
     assert_eq!(errors.len(), 1);
@@ -193,7 +207,10 @@ fn nested_clause_numbering() {
     assert!(matches!(child.number, Some(ClauseNumber::Clause(1, 1))));
 
     let sub = first_child_clause(child).expect("Expected sub-clause");
-    assert!(matches!(sub.number, Some(ClauseNumber::SubClause(1, 1, 'a'))));
+    assert!(matches!(
+        sub.number,
+        Some(ClauseNumber::SubClause(1, 1, 'a'))
+    ));
 
     let subsub = first_child_clause(sub).expect("Expected sub-sub-clause");
     match &subsub.number {
@@ -222,9 +239,18 @@ fn multiple_top_level_clauses_numbered_sequentially() {
 
 #[test]
 fn clause_number_full_reference() {
-    assert_eq!(ClauseNumber::TopLevel(3).full_reference("clause"), "clause 3");
-    assert_eq!(ClauseNumber::Clause(2, 5).full_reference("clause"), "clause 2.5");
-    assert_eq!(ClauseNumber::SubClause(1, 2, 'c').full_reference("clause"), "clause 1.2(c)");
+    assert_eq!(
+        ClauseNumber::TopLevel(3).full_reference("clause"),
+        "clause 3"
+    );
+    assert_eq!(
+        ClauseNumber::Clause(2, 5).full_reference("clause"),
+        "clause 2.5"
+    );
+    assert_eq!(
+        ClauseNumber::SubClause(1, 2, 'c').full_reference("clause"),
+        "clause 1.2(c)"
+    );
     assert_eq!(
         ClauseNumber::SubSubClause(1, 2, 'a', "ii".to_string()).full_reference("clause"),
         "clause 1.2(a)(ii)"
@@ -244,7 +270,9 @@ fn bold_text_parsed_as_defined_term() {
     let doc = parse_and_resolve(&input);
 
     let inlines = first_clause_paragraph_inlines(&doc);
-    let has_bold = inlines.iter().any(|i| matches!(i, InlineContent::Bold(t) if t == "Agreement"));
+    let has_bold = inlines
+        .iter()
+        .any(|i| matches!(i, InlineContent::Bold(t) if t == "Agreement"));
     assert!(has_bold, "Expected Bold('Agreement') in {:?}", inlines);
 }
 
@@ -257,7 +285,9 @@ fn italic_text_preserved() {
     let doc = parse_and_resolve(&input);
 
     let inlines = first_clause_paragraph_inlines(&doc);
-    let has_italic = inlines.iter().any(|i| matches!(i, InlineContent::Italic(t) if t == "important"));
+    let has_italic = inlines
+        .iter()
+        .any(|i| matches!(i, InlineContent::Italic(t) if t == "important"));
     assert!(has_italic, "Expected Italic('important') in {:?}", inlines);
 }
 
@@ -274,13 +304,23 @@ fn cross_reference_resolves() {
     let doc = parse_and_resolve(&input);
 
     let inlines = first_clause_paragraph_inlines(&doc);
-    let xref = inlines.iter().find(|i| matches!(i, InlineContent::CrossRef { .. }));
+    let xref = inlines
+        .iter()
+        .find(|i| matches!(i, InlineContent::CrossRef { .. }));
     assert!(xref.is_some(), "Expected CrossRef in {:?}", inlines);
 
-    if let Some(InlineContent::CrossRef { resolved, anchor_id, .. }) = xref {
+    if let Some(InlineContent::CrossRef {
+        resolved,
+        anchor_id,
+        ..
+    }) = xref
+    {
         assert_eq!(anchor_id, "obligations");
         assert!(resolved.is_some(), "Cross-reference should be resolved");
-        assert!(resolved.as_ref().unwrap().contains("2"), "Should reference clause 2");
+        assert!(
+            resolved.as_ref().unwrap().contains("2"),
+            "Should reference clause 2"
+        );
     }
 }
 
@@ -292,10 +332,15 @@ fn broken_cross_reference_produces_warning() {
     );
     let doc = parse_and_resolve(&input);
 
-    let warnings: Vec<_> = doc.diagnostics.iter()
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
         .filter(|d| d.message.contains("nonexistent"))
         .collect();
-    assert!(!warnings.is_empty(), "Expected warning about broken cross-ref");
+    assert!(
+        !warnings.is_empty(),
+        "Expected warning about broken cross-ref"
+    );
 }
 
 // ===========================================================================
@@ -313,10 +358,16 @@ fn defined_but_unused_term_produces_warning() {
     );
     let doc = parse_and_resolve(&input);
 
-    let warnings: Vec<_> = doc.diagnostics.iter()
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
         .filter(|d| d.message.contains("Seller") && d.message.contains("never used"))
         .collect();
-    assert!(!warnings.is_empty(), "Expected warning about unused 'Seller' role: {:?}", doc.diagnostics);
+    assert!(
+        !warnings.is_empty(),
+        "Expected warning about unused 'Seller' role: {:?}",
+        doc.diagnostics
+    );
 }
 
 #[test]
@@ -327,10 +378,16 @@ fn defined_term_used_later_no_warning() {
     );
     let doc = parse_and_resolve(&input);
 
-    let term_warnings: Vec<_> = doc.diagnostics.iter()
+    let term_warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
         .filter(|d| d.message.contains("Service"))
         .collect();
-    assert!(term_warnings.is_empty(), "Should not warn about defined+used term: {:?}", term_warnings);
+    assert!(
+        term_warnings.is_empty(),
+        "Should not warn about defined+used term: {:?}",
+        term_warnings
+    );
 }
 
 #[test]
@@ -341,10 +398,16 @@ fn party_role_not_flagged_as_undefined() {
     );
     let doc = parse_and_resolve(&input);
 
-    let buyer_warnings: Vec<_> = doc.diagnostics.iter()
+    let buyer_warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
         .filter(|d| d.message.contains("Buyer"))
         .collect();
-    assert!(buyer_warnings.is_empty(), "Party role should not be flagged: {:?}", buyer_warnings);
+    assert!(
+        buyer_warnings.is_empty(),
+        "Party role should not be flagged: {:?}",
+        buyer_warnings
+    );
 }
 
 // ===========================================================================
@@ -403,7 +466,11 @@ schedule:
     let doc = parse_and_resolve(input);
 
     assert_eq!(doc.schedule_items.len(), 2);
-    let amount = doc.schedule_items.iter().find(|i| i.term == "Amount").unwrap();
+    let amount = doc
+        .schedule_items
+        .iter()
+        .find(|i| i.term == "Amount")
+        .unwrap();
     let fee = doc.schedule_items.iter().find(|i| i.term == "Fee").unwrap();
     assert_eq!(amount.schedule_index, 0);
     assert_eq!(fee.schedule_index, 1);
@@ -431,10 +498,7 @@ fn addendum_parsed_and_numbered() {
 
 #[test]
 fn addendum_without_title() {
-    let input = format!(
-        "{}# ADDENDUM\n\nContent here.\n",
-        MINIMAL
-    );
+    let input = format!("{}# ADDENDUM\n\nContent here.\n", MINIMAL);
     let doc = parse_and_resolve(&input);
 
     assert_eq!(doc.addenda.len(), 1);
@@ -477,7 +541,10 @@ fn anchor_stripped_from_heading_text() {
     };
     let heading = clause.heading.as_ref().unwrap();
     let heading_text: String = heading.text.iter().map(|i| i.as_plain_text()).collect();
-    assert!(!heading_text.contains("{#"), "Anchor should be stripped from heading text");
+    assert!(
+        !heading_text.contains("{#"),
+        "Anchor should be stripped from heading text"
+    );
     assert_eq!(clause.anchor.as_deref(), Some("definitions"));
 }
 
@@ -495,8 +562,15 @@ fn table_in_addendum_parsed() {
     let doc = parse_and_resolve(&input);
 
     assert_eq!(doc.addenda.len(), 1);
-    let has_table = doc.addenda[0].content.iter().any(|c| matches!(c, AddendumContent::Table(_)));
-    assert!(has_table, "Expected a table in addendum content: {:?}", doc.addenda[0].content);
+    let has_table = doc.addenda[0]
+        .content
+        .iter()
+        .any(|c| matches!(c, AddendumContent::Table(_)));
+    assert!(
+        has_table,
+        "Expected a table in addendum content: {:?}",
+        doc.addenda[0].content
+    );
 }
 
 // ===========================================================================
@@ -513,9 +587,7 @@ fn full_pipeline_produces_docx_bytes() {
     lexicon_docx::resolve(&mut doc);
 
     let style = StyleConfig::default();
-    let bytes = lexicon_docx::render_docx(
-        &doc, &style, None, &[],
-    ).unwrap();
+    let bytes = lexicon_docx::render_docx(&doc, &style, None, &[]).unwrap();
 
     // DOCX files are ZIP archives starting with PK magic bytes
     assert!(bytes.len() > 100, "DOCX output should be non-trivial");
@@ -524,14 +596,9 @@ fn full_pipeline_produces_docx_bytes() {
 
 #[test]
 fn process_convenience_function_works() {
-    let input = format!(
-        "{}\n1. ## Clause\n\n    1. Text.\n",
-        MINIMAL
-    );
+    let input = format!("{}\n1. ## Clause\n\n    1. Text.\n", MINIMAL);
     let style = StyleConfig::default();
-    let (bytes, diagnostics) = lexicon_docx::process(
-        &input, &style, None, None,
-    ).unwrap();
+    let (bytes, diagnostics) = lexicon_docx::process(&input, &style, None, None).unwrap();
 
     assert!(bytes.len() > 100);
     assert_eq!(&bytes[0..2], b"PK");
@@ -555,9 +622,7 @@ parties:
     1. Text.
 "#;
     let style = StyleConfig::default();
-    let (bytes, _) = lexicon_docx::process(
-        input, &style, None, None,
-    ).unwrap();
+    let (bytes, _) = lexicon_docx::process(input, &style, None, None).unwrap();
 
     // The watermark is injected as VML XML containing "DRAFT" inside the DOCX ZIP
     let cursor = std::io::Cursor::new(&bytes);
@@ -575,7 +640,10 @@ parties:
             }
         }
     }
-    assert!(found_draft, "Draft watermark should be present in header XML");
+    assert!(
+        found_draft,
+        "Draft watermark should be present in header XML"
+    );
 }
 
 // ===========================================================================
@@ -625,9 +693,17 @@ fn recitals_basic_parsing() {
     assert_eq!(recitals.heading, "Background");
 
     // Two recital clauses with letters A, B
-    let clauses: Vec<_> = recitals.body.iter().filter_map(|e| {
-        if let BodyElement::Clause(c) = e { Some(c) } else { None }
-    }).collect();
+    let clauses: Vec<_> = recitals
+        .body
+        .iter()
+        .filter_map(|e| {
+            if let BodyElement::Clause(c) = e {
+                Some(c)
+            } else {
+                None
+            }
+        })
+        .collect();
     assert_eq!(clauses.len(), 2);
     assert!(matches!(clauses[0].number, Some(ClauseNumber::TopLevel(1))));
     assert!(matches!(clauses[1].number, Some(ClauseNumber::TopLevel(2))));
@@ -659,7 +735,11 @@ fn recitals_prose_content() {
     );
     let doc = parse_and_resolve(&input);
     let recitals = doc.recitals.as_ref().unwrap();
-    let prose_count = recitals.body.iter().filter(|e| matches!(e, BodyElement::Prose(_))).count();
+    let prose_count = recitals
+        .body
+        .iter()
+        .filter(|e| matches!(e, BodyElement::Prose(_)))
+        .count();
     assert_eq!(prose_count, 1);
 }
 
@@ -681,7 +761,10 @@ fn recitals_cross_reference() {
                 false
             }
         });
-        assert!(has_resolved, "Cross-reference to recital should resolve to 'Recital 1'");
+        assert!(
+            has_resolved,
+            "Cross-reference to recital should resolve to 'Recital 1'"
+        );
     }
 }
 
@@ -693,16 +776,19 @@ fn recitals_no_body_heading_warning() {
     );
     let doc = parse_and_resolve(&input);
     assert!(doc.body_heading.is_none());
-    let has_warning = doc.diagnostics.iter().any(|d| d.message.contains("no body heading"));
-    assert!(has_warning, "Should warn about missing body heading when recitals present");
+    let has_warning = doc
+        .diagnostics
+        .iter()
+        .any(|d| d.message.contains("no body heading"));
+    assert!(
+        has_warning,
+        "Should warn about missing body heading when recitals present"
+    );
 }
 
 #[test]
 fn no_recitals_backward_compatible() {
-    let input = format!(
-        "{}1. ## Clause One\n\n    1. Text here.\n",
-        MINIMAL
-    );
+    let input = format!("{}1. ## Clause One\n\n    1. Text here.\n", MINIMAL);
     let doc = parse_and_resolve(&input);
     assert!(doc.recitals.is_none());
     assert!(doc.body_heading.is_none());
@@ -717,9 +803,13 @@ fn recitals_defined_terms_validated() {
     );
     let doc = parse_and_resolve(&input);
     // "Principal Agreement" should not produce an unused-term warning
-    let unused_warnings: Vec<_> = doc.diagnostics.iter()
+    let unused_warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
         .filter(|d| d.message.contains("Principal Agreement") && d.message.contains("never used"))
         .collect();
-    assert!(unused_warnings.is_empty(), "Principal Agreement should be found in body text");
+    assert!(
+        unused_warnings.is_empty(),
+        "Principal Agreement should be found in body text"
+    );
 }
-

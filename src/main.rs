@@ -3,7 +3,11 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
-#[command(name = "lexicon", version, about = "Lexicon Markdown processor for legal contracts")]
+#[command(
+    name = "lexicon",
+    version,
+    about = "Lexicon Markdown processor for legal contracts"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -103,7 +107,6 @@ enum ScheduleOrderArg {
 #[derive(Args)]
 struct StyleOverrides {
     // --- Typography ---
-
     /// Body text font family
     #[arg(long, help_heading = "Typography")]
     font_family: Option<String>,
@@ -157,7 +160,6 @@ struct StyleOverrides {
     brand_color: Option<String>,
 
     // --- Page Layout ---
-
     /// Page size
     #[arg(long, value_enum, help_heading = "Page Layout")]
     page_size: Option<PageSizeArg>,
@@ -179,7 +181,6 @@ struct StyleOverrides {
     margin_right: Option<f32>,
 
     // --- Clause Indentation ---
-
     /// Indent per clause level in cm
     #[arg(long, help_heading = "Clause Indentation")]
     indent_per_level: Option<f32>,
@@ -189,35 +190,57 @@ struct StyleOverrides {
     hanging_indent: Option<f32>,
 
     /// Align first-level body clauses with second level
-    #[arg(long, conflicts_with = "no_body_align_first_level", help_heading = "Clause Indentation")]
+    #[arg(
+        long,
+        conflicts_with = "no_body_align_first_level",
+        help_heading = "Clause Indentation"
+    )]
     body_align_first_level: bool,
 
     /// Do not align first-level body clauses with second level
-    #[arg(long, conflicts_with = "body_align_first_level", help_heading = "Clause Indentation")]
+    #[arg(
+        long,
+        conflicts_with = "body_align_first_level",
+        help_heading = "Clause Indentation"
+    )]
     no_body_align_first_level: bool,
 
     /// Align first-level recital clauses with second level
-    #[arg(long, conflicts_with = "no_recitals_align_first_level", help_heading = "Clause Indentation")]
+    #[arg(
+        long,
+        conflicts_with = "no_recitals_align_first_level",
+        help_heading = "Clause Indentation"
+    )]
     recitals_align_first_level: bool,
 
     /// Do not align first-level recital clauses with second level
-    #[arg(long, conflicts_with = "recitals_align_first_level", help_heading = "Clause Indentation")]
+    #[arg(
+        long,
+        conflicts_with = "recitals_align_first_level",
+        help_heading = "Clause Indentation"
+    )]
     no_recitals_align_first_level: bool,
 
     // --- Formatting ---
-
     /// Date format string (chrono strftime syntax)
     #[arg(long, help_heading = "Formatting")]
     date_format: Option<String>,
 
     // --- Cover Page ---
-
     /// Enable cover page
-    #[arg(long = "cover", conflicts_with = "no_cover", help_heading = "Cover Page")]
+    #[arg(
+        long = "cover",
+        conflicts_with = "no_cover",
+        help_heading = "Cover Page"
+    )]
     cover: bool,
 
     /// Disable cover page
-    #[arg(long = "no-cover", conflicts_with = "cover", help_heading = "Cover Page")]
+    #[arg(
+        long = "no-cover",
+        conflicts_with = "cover",
+        help_heading = "Cover Page"
+    )]
     no_cover: bool,
 
     /// Cover page "between" label
@@ -253,13 +276,20 @@ struct StyleOverrides {
     no_cover_status: bool,
 
     // --- Table of Contents ---
-
     /// Enable table of contents
-    #[arg(long = "toc", conflicts_with = "no_toc", help_heading = "Table of Contents")]
+    #[arg(
+        long = "toc",
+        conflicts_with = "no_toc",
+        help_heading = "Table of Contents"
+    )]
     toc: bool,
 
     /// Disable table of contents
-    #[arg(long = "no-toc", conflicts_with = "toc", help_heading = "Table of Contents")]
+    #[arg(
+        long = "no-toc",
+        conflicts_with = "toc",
+        help_heading = "Table of Contents"
+    )]
     no_toc: bool,
 
     /// Table of contents heading text
@@ -267,7 +297,6 @@ struct StyleOverrides {
     toc_heading: Option<String>,
 
     // --- Footer ---
-
     /// Show reference in footer
     #[arg(long, conflicts_with = "no_footer_ref", help_heading = "Footer")]
     footer_ref: bool,
@@ -277,7 +306,11 @@ struct StyleOverrides {
     no_footer_ref: bool,
 
     /// Show page numbers in footer
-    #[arg(long, conflicts_with = "no_footer_page_number", help_heading = "Footer")]
+    #[arg(
+        long,
+        conflicts_with = "no_footer_page_number",
+        help_heading = "Footer"
+    )]
     footer_page_number: bool,
 
     /// Hide page numbers in footer
@@ -293,13 +326,20 @@ struct StyleOverrides {
     no_footer_version: bool,
 
     // --- Preamble ---
-
     /// Enable parties preamble
-    #[arg(long = "preamble", conflicts_with = "no_preamble", help_heading = "Preamble")]
+    #[arg(
+        long = "preamble",
+        conflicts_with = "no_preamble",
+        help_heading = "Preamble"
+    )]
     preamble: bool,
 
     /// Disable parties preamble
-    #[arg(long = "no-preamble", conflicts_with = "preamble", help_heading = "Preamble")]
+    #[arg(
+        long = "no-preamble",
+        conflicts_with = "preamble",
+        help_heading = "Preamble"
+    )]
     no_preamble: bool,
 
     /// Preamble style
@@ -307,7 +347,6 @@ struct StyleOverrides {
     preamble_style: Option<PreambleStyleArg>,
 
     // --- Schedule ---
-
     /// Schedule position in the document
     #[arg(long, value_enum, help_heading = "Schedule")]
     schedule_position: Option<SchedulePositionArg>,
@@ -317,13 +356,20 @@ struct StyleOverrides {
     schedule_order: Option<ScheduleOrderArg>,
 
     // --- Signatures ---
-
     /// Enable signature pages
-    #[arg(long = "enable-signatures", conflicts_with = "no_signatures", help_heading = "Signatures")]
+    #[arg(
+        long = "enable-signatures",
+        conflicts_with = "no_signatures",
+        help_heading = "Signatures"
+    )]
     enable_signatures: bool,
 
     /// Disable signature pages
-    #[arg(long = "no-signatures", conflicts_with = "enable_signatures", help_heading = "Signatures")]
+    #[arg(
+        long = "no-signatures",
+        conflicts_with = "enable_signatures",
+        help_heading = "Signatures"
+    )]
     no_signatures: bool,
 
     /// Signature pages heading text
@@ -342,23 +388,49 @@ struct StyleOverrides {
 impl StyleOverrides {
     fn apply(self, config: &mut lexicon_docx::style::StyleConfig) {
         // Typography
-        if let Some(v) = self.font_family { config.font_family = v; }
-        if let Some(v) = self.font_size { config.font_size = v; }
-        if let Some(v) = self.heading_font_family { config.heading_font_family = v; }
-        if let Some(v) = self.title_size { config.title_size = v; }
-        if let Some(v) = self.heading1_size { config.heading1_size = v; }
-        if let Some(v) = self.heading2_size { config.heading2_size = v; }
-        if let Some(v) = self.heading_space_before { config.heading_space_before = v; }
-        if let Some(v) = self.heading_space_after { config.heading_space_after = v; }
-        if let Some(v) = self.paragraph_space_before { config.paragraph_space_before = v; }
-        if let Some(v) = self.paragraph_space_after { config.paragraph_space_after = v; }
-        if let Some(v) = self.line_spacing { config.line_spacing = v; }
-        if let Some(v) = self.brand_color { config.brand_color = Some(v); }
+        if let Some(v) = self.font_family {
+            config.font_family = v;
+        }
+        if let Some(v) = self.font_size {
+            config.font_size = v;
+        }
+        if let Some(v) = self.heading_font_family {
+            config.heading_font_family = v;
+        }
+        if let Some(v) = self.title_size {
+            config.title_size = v;
+        }
+        if let Some(v) = self.heading1_size {
+            config.heading1_size = v;
+        }
+        if let Some(v) = self.heading2_size {
+            config.heading2_size = v;
+        }
+        if let Some(v) = self.heading_space_before {
+            config.heading_space_before = v;
+        }
+        if let Some(v) = self.heading_space_after {
+            config.heading_space_after = v;
+        }
+        if let Some(v) = self.paragraph_space_before {
+            config.paragraph_space_before = v;
+        }
+        if let Some(v) = self.paragraph_space_after {
+            config.paragraph_space_after = v;
+        }
+        if let Some(v) = self.line_spacing {
+            config.line_spacing = v;
+        }
+        if let Some(v) = self.brand_color {
+            config.brand_color = Some(v);
+        }
         if let Some(v) = self.defined_term_style {
             config.defined_term_style = match v {
                 DefinedTermStyleArg::Bold => lexicon_docx::style::DefinedTermStyle::Bold,
                 DefinedTermStyleArg::Quoted => lexicon_docx::style::DefinedTermStyle::Quoted,
-                DefinedTermStyleArg::BoldQuoted => lexicon_docx::style::DefinedTermStyle::BoldQuoted,
+                DefinedTermStyleArg::BoldQuoted => {
+                    lexicon_docx::style::DefinedTermStyle::BoldQuoted
+                }
             };
         }
 
@@ -369,26 +441,54 @@ impl StyleOverrides {
                 PageSizeArg::Letter => lexicon_docx::style::PageSize::Letter,
             };
         }
-        if let Some(v) = self.margin_top { config.margin_top_cm = v; }
-        if let Some(v) = self.margin_bottom { config.margin_bottom_cm = v; }
-        if let Some(v) = self.margin_left { config.margin_left_cm = v; }
-        if let Some(v) = self.margin_right { config.margin_right_cm = v; }
+        if let Some(v) = self.margin_top {
+            config.margin_top_cm = v;
+        }
+        if let Some(v) = self.margin_bottom {
+            config.margin_bottom_cm = v;
+        }
+        if let Some(v) = self.margin_left {
+            config.margin_left_cm = v;
+        }
+        if let Some(v) = self.margin_right {
+            config.margin_right_cm = v;
+        }
 
         // Clause Indentation
-        if let Some(v) = self.indent_per_level { config.indent_per_level_cm = v; }
-        if let Some(v) = self.hanging_indent { config.hanging_indent_cm = v; }
-        if self.body_align_first_level { config.body_align_first_level = true; }
-        if self.no_body_align_first_level { config.body_align_first_level = false; }
-        if self.recitals_align_first_level { config.recitals_align_first_level = true; }
-        if self.no_recitals_align_first_level { config.recitals_align_first_level = false; }
+        if let Some(v) = self.indent_per_level {
+            config.indent_per_level_cm = v;
+        }
+        if let Some(v) = self.hanging_indent {
+            config.hanging_indent_cm = v;
+        }
+        if self.body_align_first_level {
+            config.body_align_first_level = true;
+        }
+        if self.no_body_align_first_level {
+            config.body_align_first_level = false;
+        }
+        if self.recitals_align_first_level {
+            config.recitals_align_first_level = true;
+        }
+        if self.no_recitals_align_first_level {
+            config.recitals_align_first_level = false;
+        }
 
         // Formatting
-        if let Some(v) = self.date_format { config.date_format = v; }
+        if let Some(v) = self.date_format {
+            config.date_format = v;
+        }
 
         // Cover Page
-        if self.cover { config.cover.enabled = true; }
-        if self.no_cover { config.cover.enabled = false; }
-        if let Some(v) = self.cover_between_label { config.cover.between_label = v; }
+        if self.cover {
+            config.cover.enabled = true;
+        }
+        if self.no_cover {
+            config.cover.enabled = false;
+        }
+        if let Some(v) = self.cover_between_label {
+            config.cover.between_label = v;
+        }
         if let Some(v) = self.cover_party_format {
             config.cover.party_format = match v {
                 PartyFormatArg::NameSpecRole => lexicon_docx::style::PartyFormat::NameSpecRole,
@@ -396,29 +496,63 @@ impl StyleOverrides {
                 PartyFormatArg::NameOnly => lexicon_docx::style::PartyFormat::NameOnly,
             };
         }
-        if self.cover_ref { config.cover.show_ref = true; }
-        if self.no_cover_ref { config.cover.show_ref = false; }
-        if self.cover_author { config.cover.show_author = true; }
-        if self.no_cover_author { config.cover.show_author = false; }
-        if self.cover_status { config.cover.show_status = true; }
-        if self.no_cover_status { config.cover.show_status = false; }
+        if self.cover_ref {
+            config.cover.show_ref = true;
+        }
+        if self.no_cover_ref {
+            config.cover.show_ref = false;
+        }
+        if self.cover_author {
+            config.cover.show_author = true;
+        }
+        if self.no_cover_author {
+            config.cover.show_author = false;
+        }
+        if self.cover_status {
+            config.cover.show_status = true;
+        }
+        if self.no_cover_status {
+            config.cover.show_status = false;
+        }
 
         // Table of Contents
-        if self.toc { config.toc.enabled = true; }
-        if self.no_toc { config.toc.enabled = false; }
-        if let Some(v) = self.toc_heading { config.toc.heading = v; }
+        if self.toc {
+            config.toc.enabled = true;
+        }
+        if self.no_toc {
+            config.toc.enabled = false;
+        }
+        if let Some(v) = self.toc_heading {
+            config.toc.heading = v;
+        }
 
         // Footer
-        if self.footer_ref { config.footer.show_ref = true; }
-        if self.no_footer_ref { config.footer.show_ref = false; }
-        if self.footer_page_number { config.footer.show_page_number = true; }
-        if self.no_footer_page_number { config.footer.show_page_number = false; }
-        if self.footer_version { config.footer.show_version = true; }
-        if self.no_footer_version { config.footer.show_version = false; }
+        if self.footer_ref {
+            config.footer.show_ref = true;
+        }
+        if self.no_footer_ref {
+            config.footer.show_ref = false;
+        }
+        if self.footer_page_number {
+            config.footer.show_page_number = true;
+        }
+        if self.no_footer_page_number {
+            config.footer.show_page_number = false;
+        }
+        if self.footer_version {
+            config.footer.show_version = true;
+        }
+        if self.no_footer_version {
+            config.footer.show_version = false;
+        }
 
         // Preamble
-        if self.preamble { config.preamble.enabled = true; }
-        if self.no_preamble { config.preamble.enabled = false; }
+        if self.preamble {
+            config.preamble.enabled = true;
+        }
+        if self.no_preamble {
+            config.preamble.enabled = false;
+        }
         if let Some(v) = self.preamble_style {
             config.preamble.style = match v {
                 PreambleStyleArg::Simple => lexicon_docx::style::PreambleStyle::Simple,
@@ -442,11 +576,21 @@ impl StyleOverrides {
         }
 
         // Signatures
-        if self.enable_signatures { config.signatures.enabled = true; }
-        if self.no_signatures { config.signatures.enabled = false; }
-        if let Some(v) = self.signatures_heading { config.signatures.heading = Some(v); }
-        if let Some(v) = self.signatures_template { config.signatures.default_template = Some(v); }
-        if self.signatures_separate_pages { config.signatures.separate_pages = true; }
+        if self.enable_signatures {
+            config.signatures.enabled = true;
+        }
+        if self.no_signatures {
+            config.signatures.enabled = false;
+        }
+        if let Some(v) = self.signatures_heading {
+            config.signatures.heading = Some(v);
+        }
+        if let Some(v) = self.signatures_template {
+            config.signatures.default_template = Some(v);
+        }
+        if self.signatures_separate_pages {
+            config.signatures.separate_pages = true;
+        }
     }
 }
 
@@ -478,18 +622,16 @@ fn main() {
                         std::process::exit(1);
                     }
                 },
-                None => {
-                    match lexicon_docx::resolve_config_path("style.toml", input_dir) {
-                        Some(path) => match lexicon_docx::style::StyleConfig::load(&path) {
-                            Ok(c) => c,
-                            Err(e) => {
-                                eprintln!("Error loading style config from {}: {}", path.display(), e);
-                                std::process::exit(1);
-                            }
-                        },
-                        None => lexicon_docx::style::StyleConfig::default(),
-                    }
-                }
+                None => match lexicon_docx::resolve_config_path("style.toml", input_dir) {
+                    Some(path) => match lexicon_docx::style::StyleConfig::load(&path) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            eprintln!("Error loading style config from {}: {}", path.display(), e);
+                            std::process::exit(1);
+                        }
+                    },
+                    None => lexicon_docx::style::StyleConfig::default(),
+                },
             };
 
             // Apply CLI overrides (highest priority)
@@ -509,7 +651,12 @@ fn main() {
                 }
             };
 
-            match lexicon_docx::process(&input_text, &style_config, input_dir, signatures_path.as_deref()) {
+            match lexicon_docx::process(
+                &input_text,
+                &style_config,
+                input_dir,
+                signatures_path.as_deref(),
+            ) {
                 Ok((bytes, diagnostics)) => {
                     let has_errors = print_diagnostics(&diagnostics);
 

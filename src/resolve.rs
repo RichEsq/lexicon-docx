@@ -6,12 +6,12 @@ use std::sync::LazyLock;
 use crate::error::{DiagLevel, Diagnostic};
 use crate::model::*;
 
-static FORMAL_DEF_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^\s*means[\s:,]").unwrap()
-});
+static FORMAL_DEF_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^\s*means[\s:,]").unwrap());
 
 static FORMAL_DEF_ALT_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^\s*(has the meaning|shall have the same meaning|have the same meaning)").unwrap()
+    Regex::new(r"(?i)^\s*(has the meaning|shall have the same meaning|have the same meaning)")
+        .unwrap()
 });
 
 pub fn resolve(doc: &mut Document) {
@@ -104,7 +104,14 @@ fn assign_children_numbers(parent: &mut Clause, top: u32) {
                             _ => (0, 'a', "i".to_string(), 'A'),
                         };
                         let upper_roman = to_roman(i as u32 + 1).to_uppercase();
-                        ClauseNumber::SubParagraph(top, clause_num, letter, roman, upper, upper_roman)
+                        ClauseNumber::SubParagraph(
+                            top,
+                            clause_num,
+                            letter,
+                            roman,
+                            upper,
+                            upper_roman,
+                        )
                     }
                 };
                 child.number = Some(number);
@@ -174,14 +181,17 @@ fn resolve_clause_cross_refs(
     }
     for element in &mut clause.body {
         match element {
-            ClauseBody::Content(content) => {
-                match content {
-                    ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
-                        resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, clause_loc.as_deref());
-                    }
-                    _ => {}
+            ClauseBody::Content(content) => match content {
+                ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
+                    resolve_inlines_cross_refs(
+                        inlines,
+                        anchor_map,
+                        diagnostics,
+                        clause_loc.as_deref(),
+                    );
                 }
-            }
+                _ => {}
+            },
             ClauseBody::Children(kids) => {
                 for child in kids {
                     resolve_clause_cross_refs(child, anchor_map, diagnostics);
@@ -229,35 +239,19 @@ fn resolve_addendum_cross_refs(
     for content in &mut addendum.content {
         match content {
             AddendumContent::Paragraph(inlines) => {
-                resolve_inlines_cross_refs(
-                    inlines,
-                    anchor_map,
-                    diagnostics,
-                    Some(&loc),
-                );
+                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc));
             }
             AddendumContent::Heading(_, inlines) => {
-                resolve_inlines_cross_refs(
-                    inlines,
-                    anchor_map,
-                    diagnostics,
-                    Some(&loc),
-                );
+                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc));
             }
             AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
                     resolve_clause_cross_refs(clause, anchor_map, diagnostics);
                 }
             }
-            AddendumContent::NumberedList(items)
-            | AddendumContent::BulletList(items) => {
+            AddendumContent::NumberedList(items) | AddendumContent::BulletList(items) => {
                 for item_inlines in items {
-                    resolve_inlines_cross_refs(
-                        item_inlines,
-                        anchor_map,
-                        diagnostics,
-                        Some(&loc),
-                    );
+                    resolve_inlines_cross_refs(item_inlines, anchor_map, diagnostics, Some(&loc));
                 }
             }
             _ => {}
@@ -343,10 +337,10 @@ struct TermDefinition {
 
 #[derive(Debug, PartialEq)]
 enum TermKind {
-    FormalDefinition,       // **Term** means ...
-    InlineDefinition,       // ("**Term**")
+    FormalDefinition,          // **Term** means ...
+    InlineDefinition,          // ("**Term**")
     ScheduleDefinition(usize), // **Term** has the meaning given by the Schedule
-    FieldLabel,             // **Label**: structural label, not a term
+    FieldLabel,                // **Label**: structural label, not a term
 }
 
 fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, Regex)]) {
@@ -373,10 +367,21 @@ fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, R
         for element in &recitals.body {
             match element {
                 BodyElement::Clause(clause) => {
-                    collect_clause_terms(clause, &mut definitions, &mut schedule_items, schedule_patterns);
+                    collect_clause_terms(
+                        clause,
+                        &mut definitions,
+                        &mut schedule_items,
+                        schedule_patterns,
+                    );
                 }
                 BodyElement::Prose(inlines) => {
-                    collect_inline_terms(inlines, &mut definitions, &mut schedule_items, schedule_patterns, Some("recitals"));
+                    collect_inline_terms(
+                        inlines,
+                        &mut definitions,
+                        &mut schedule_items,
+                        schedule_patterns,
+                        Some("recitals"),
+                    );
                 }
             }
         }
@@ -384,15 +389,31 @@ fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, R
     for element in &doc.body {
         match element {
             BodyElement::Clause(clause) => {
-                collect_clause_terms(clause, &mut definitions, &mut schedule_items, schedule_patterns);
+                collect_clause_terms(
+                    clause,
+                    &mut definitions,
+                    &mut schedule_items,
+                    schedule_patterns,
+                );
             }
             BodyElement::Prose(inlines) => {
-                collect_inline_terms(inlines, &mut definitions, &mut schedule_items, schedule_patterns, None);
+                collect_inline_terms(
+                    inlines,
+                    &mut definitions,
+                    &mut schedule_items,
+                    schedule_patterns,
+                    None,
+                );
             }
         }
     }
     for addendum in &doc.addenda {
-        collect_addendum_terms(addendum, &mut definitions, &mut schedule_items, schedule_patterns);
+        collect_addendum_terms(
+            addendum,
+            &mut definitions,
+            &mut schedule_items,
+            schedule_patterns,
+        );
     }
 
     doc.schedule_items = schedule_items;
@@ -471,14 +492,18 @@ fn collect_clause_terms(
 
     for element in &clause.body {
         match element {
-            ClauseBody::Content(content) => {
-                match content {
-                    ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
-                        collect_inline_terms(inlines, defs, schedule_items, patterns, clause_loc.as_deref());
-                    }
-                    _ => {}
+            ClauseBody::Content(content) => match content {
+                ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
+                    collect_inline_terms(
+                        inlines,
+                        defs,
+                        schedule_items,
+                        patterns,
+                        clause_loc.as_deref(),
+                    );
                 }
-            }
+                _ => {}
+            },
             ClauseBody::Children(kids) => {
                 for child in kids {
                     collect_clause_terms(child, defs, schedule_items, patterns);
@@ -506,8 +531,7 @@ fn collect_addendum_terms(
                     collect_clause_terms(clause, defs, schedule_items, patterns);
                 }
             }
-            AddendumContent::NumberedList(items)
-            | AddendumContent::BulletList(items) => {
+            AddendumContent::NumberedList(items) | AddendumContent::BulletList(items) => {
                 for item_inlines in items {
                     collect_inline_terms(item_inlines, defs, schedule_items, patterns, loc);
                 }
@@ -565,14 +589,12 @@ fn collect_clause_text(clause: &Clause, out: &mut String) {
     }
     for element in &clause.body {
         match element {
-            ClauseBody::Content(content) => {
-                match content {
-                    ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
-                        collect_inlines_text(inlines, out);
-                    }
-                    _ => {}
+            ClauseBody::Content(content) => match content {
+                ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
+                    collect_inlines_text(inlines, out);
                 }
-            }
+                _ => {}
+            },
             ClauseBody::Children(kids) => {
                 for child in kids {
                     collect_clause_text(child, out);
@@ -593,8 +615,7 @@ fn collect_addendum_text(addendum: &Addendum, out: &mut String) {
                     collect_clause_text(clause, out);
                 }
             }
-            AddendumContent::NumberedList(items)
-            | AddendumContent::BulletList(items) => {
+            AddendumContent::NumberedList(items) | AddendumContent::BulletList(items) => {
                 for item in items {
                     collect_inlines_text(item, out);
                 }
@@ -615,7 +636,9 @@ fn collect_inlines_text(inlines: &[InlineContent], out: &mut String) {
                 out.push_str(t);
                 out.push(' ');
             }
-            InlineContent::CrossRef { display, resolved, .. } => {
+            InlineContent::CrossRef {
+                display, resolved, ..
+            } => {
                 out.push_str(resolved.as_ref().unwrap_or(display));
                 out.push(' ');
             }
@@ -644,12 +667,12 @@ fn term_variants(term: &str) -> Vec<String> {
 
     // Apply suffix rules, each producing a variant
     let suffix_rules: &[(&str, &str)] = &[
-        ("ies", "y"),       // Authorities → authority
-        ("ing", ""),        // Processing → process
-        ("ed", ""),         // Processed → process
-        ("es", "e"),        // Affiliates → affiliate
-        ("es", ""),         // Breaches → breach
-        ("s", ""),          // Members → member
+        ("ies", "y"), // Authorities → authority
+        ("ing", ""),  // Processing → process
+        ("ed", ""),   // Processed → process
+        ("es", "e"),  // Affiliates → affiliate
+        ("es", ""),   // Breaches → breach
+        ("s", ""),    // Members → member
     ];
 
     for &(suffix, replacement) in suffix_rules {
@@ -719,7 +742,8 @@ fn classify_term(
 }
 
 static GROUPED_DEF_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(shall have the same meaning|have the meaning given|shall be construed)").unwrap()
+    Regex::new(r"(?i)(shall have the same meaning|have the meaning given|shall be construed)")
+        .unwrap()
 });
 
 /// Check if any text in the inline sequence contains a phrase indicating
@@ -770,7 +794,9 @@ mod tests {
     fn make_schedule_patterns(titles: &[&str]) -> Vec<(usize, Regex)> {
         let decls: Vec<ScheduleDecl> = titles
             .iter()
-            .map(|t| ScheduleDecl { title: t.to_string() })
+            .map(|t| ScheduleDecl {
+                title: t.to_string(),
+            })
             .collect();
         build_schedule_phrase_patterns(&decls)
     }
@@ -957,6 +983,10 @@ schedule:
             .filter(|d| d.message.contains("Payment Schedule"))
             .collect();
         assert_eq!(warnings.len(), 1);
-        assert!(warnings[0].message.contains("declared but no terms reference it"));
+        assert!(
+            warnings[0]
+                .message
+                .contains("declared but no terms reference it")
+        );
     }
 }

@@ -1,8 +1,8 @@
 use std::io::{Cursor, Read, Write};
 
+use zip::ZipWriter;
 use zip::read::ZipArchive;
 use zip::write::FileOptions;
-use zip::ZipWriter;
 
 use crate::error::{LexiconError, Result};
 
@@ -220,9 +220,7 @@ pub fn inject_watermark(docx_bytes: Vec<u8>, text: &str) -> Result<Vec<u8>> {
 /// Add a `<w:headerReference>` to the `<w:sectPr>` in document.xml.
 fn add_header_reference(xml: &str, r_id: &str, header_type: &str) -> String {
     // Insert before the closing </w:sectPr> or before <w:titlePg/> if present
-    let reference = format!(
-        r#"<w:headerReference w:type="{header_type}" r:id="{r_id}"/>"#
-    );
+    let reference = format!(r#"<w:headerReference w:type="{header_type}" r:id="{r_id}"/>"#);
 
     // Try to insert before </w:sectPr>
     if let Some(pos) = xml.find("</w:sectPr>") {
@@ -238,9 +236,7 @@ fn add_header_reference(xml: &str, r_id: &str, header_type: &str) -> String {
 
 /// Add a `<Relationship>` to document.xml.rels.
 fn add_relationship(xml: &str, id: &str, rel_type: &str, target: &str) -> String {
-    let relationship = format!(
-        r#"<Relationship Id="{id}" Type="{rel_type}" Target="{target}"/>"#
-    );
+    let relationship = format!(r#"<Relationship Id="{id}" Type="{rel_type}" Target="{target}"/>"#);
 
     if let Some(pos) = xml.find("</Relationships>") {
         let mut result = String::with_capacity(xml.len() + relationship.len());

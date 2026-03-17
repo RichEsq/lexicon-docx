@@ -244,9 +244,8 @@ impl Default for StyleConfig {
 impl StyleConfig {
     pub fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        let config: StyleConfig = toml::from_str(&content).map_err(|e| {
-            LexiconError::Render(format!("Invalid style config: {}", e))
-        })?;
+        let config: StyleConfig = toml::from_str(&content)
+            .map_err(|e| LexiconError::Render(format!("Invalid style config: {}", e)))?;
         Ok(config)
     }
 
@@ -267,19 +266,21 @@ impl StyleConfig {
 
     /// Return the brand color as a 6-char hex string (no #), or None.
     pub fn brand_color_hex(&self) -> Option<String> {
-        self.brand_color.as_ref().map(|c| c.trim_start_matches('#').to_uppercase())
+        self.brand_color
+            .as_ref()
+            .map(|c| c.trim_start_matches('#').to_uppercase())
     }
 
     pub fn page_width_twips(&self) -> u32 {
         match self.page_size {
-            PageSize::A4 => 11906,    // 210mm
+            PageSize::A4 => 11906,     // 210mm
             PageSize::Letter => 12240, // 8.5in
         }
     }
 
     pub fn page_height_twips(&self) -> u32 {
         match self.page_size {
-            PageSize::A4 => 16838,    // 297mm
+            PageSize::A4 => 16838,     // 297mm
             PageSize::Letter => 15840, // 11in
         }
     }

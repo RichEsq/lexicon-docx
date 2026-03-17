@@ -1,4 +1,4 @@
-use crate::error::{Diagnostic, DiagLevel, LexiconError, Result};
+use crate::error::{DiagLevel, Diagnostic, LexiconError, Result};
 use crate::model::DocumentMeta;
 
 pub struct FrontMatterResult {
@@ -23,11 +23,12 @@ pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
 
     let yaml_str = &after_open[..close_pos];
     let body_start = close_pos + 4; // skip past \n---
-    let body = after_open[body_start..].trim_start_matches('\n').to_string();
+    let body = after_open[body_start..]
+        .trim_start_matches('\n')
+        .to_string();
 
-    let meta: DocumentMeta = serde_yaml::from_str(yaml_str).map_err(|e| {
-        LexiconError::FrontMatter(format!("Invalid YAML front-matter: {}", e))
-    })?;
+    let meta: DocumentMeta = serde_yaml::from_str(yaml_str)
+        .map_err(|e| LexiconError::FrontMatter(format!("Invalid YAML front-matter: {}", e)))?;
 
     let mut diagnostics = Vec::new();
 
@@ -35,10 +36,7 @@ pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
     if !is_valid_date(&meta.date) {
         diagnostics.push(Diagnostic {
             level: DiagLevel::Error,
-            message: format!(
-                "Date '{}' is not a valid YYYY-MM-DD date",
-                meta.date
-            ),
+            message: format!("Date '{}' is not a valid YYYY-MM-DD date", meta.date),
             location: Some("front-matter".to_string()),
         });
     }

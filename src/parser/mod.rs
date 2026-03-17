@@ -1,11 +1,11 @@
 pub mod anchors;
 pub mod clause;
 
-use comrak::{parse_document, Arena, Options};
+use comrak::{Arena, Options, parse_document};
 
 use crate::error::Result;
-use crate::model::Document;
 use crate::frontmatter::{self, FrontMatterResult};
+use crate::model::Document;
 
 pub fn parse(input: &str) -> Result<Document> {
     let FrontMatterResult {

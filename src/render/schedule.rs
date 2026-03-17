@@ -1,6 +1,5 @@
 use docx_rs::{
-    BreakType, Docx, Paragraph, Run, RunFonts, Table as DocxTable, TableCell, TableRow,
-    WidthType,
+    BreakType, Docx, Paragraph, Run, RunFonts, Table as DocxTable, TableCell, TableRow, WidthType,
 };
 
 use crate::model::{ScheduleDecl, ScheduleItem};
@@ -30,9 +29,7 @@ pub fn render_schedules(
         }
 
         // Page break before schedule
-        docx = docx.add_paragraph(
-            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-        );
+        docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
 
         // Schedule heading — styled as Heading1 (same as section headings)
         let heading_run = Run::new()
@@ -44,41 +41,36 @@ pub fn render_schedules(
                     .ascii(&style.heading_font_family)
                     .hi_ansi(&style.heading_font_family),
             );
-        docx = docx.add_paragraph(
-            Paragraph::new()
-                .style("Heading1")
-                .add_run(heading_run),
-        );
+        docx = docx.add_paragraph(Paragraph::new().style("Heading1").add_run(heading_run));
 
         // Schedule table: Item | Particulars
         let mut rows = Vec::new();
 
         // Header row
-        rows.push(TableRow::new(vec![
-            TableCell::new().add_paragraph(
-                Paragraph::new().add_run(
-                    Run::new().add_text("Item").bold().size(body_size),
+        rows.push(
+            TableRow::new(vec![
+                TableCell::new().add_paragraph(
+                    Paragraph::new().add_run(Run::new().add_text("Item").bold().size(body_size)),
                 ),
-            ),
-            TableCell::new().add_paragraph(
-                Paragraph::new().add_run(
-                    Run::new().add_text("Particulars").bold().size(body_size),
+                TableCell::new().add_paragraph(
+                    Paragraph::new()
+                        .add_run(Run::new().add_text("Particulars").bold().size(body_size)),
                 ),
-            ),
-        ]).cant_split());
+            ])
+            .cant_split(),
+        );
 
         // Data rows
         for item in &sched_items {
-            rows.push(TableRow::new(vec![
-                TableCell::new().add_paragraph(
-                    Paragraph::new().add_run(
-                        Run::new().add_text(&item.term).size(body_size),
+            rows.push(
+                TableRow::new(vec![
+                    TableCell::new().add_paragraph(
+                        Paragraph::new().add_run(Run::new().add_text(&item.term).size(body_size)),
                     ),
-                ),
-                TableCell::new().add_paragraph(
-                    Paragraph::new(),
-                ),
-            ]).cant_split());
+                    TableCell::new().add_paragraph(Paragraph::new()),
+                ])
+                .cant_split(),
+            );
         }
 
         docx = docx.add_table(DocxTable::new(rows).width(5000, WidthType::Pct));

@@ -22,7 +22,12 @@ pub fn resolve(doc: &mut Document) {
     resolve::resolve(doc);
 }
 
-pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock]) -> Result<Vec<u8>> {
+pub fn render_docx(
+    doc: &Document,
+    style: &StyleConfig,
+    input_dir: Option<&Path>,
+    signature_blocks: &[SignatureBlock],
+) -> Result<Vec<u8>> {
     render::docx::render_docx(doc, style, input_dir, signature_blocks)
 }
 

@@ -15,27 +15,21 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
     docx = docx.add_paragraph(Paragraph::new());
 
     // Title
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                {
-                    let mut run = Run::new()
-                        .add_text(&meta.title)
-                        .bold()
-                        .size(StyleConfig::pt_to_half_points(style.title_size))
-                        .fonts(
-                            RunFonts::new()
-                                .ascii(&style.heading_font_family)
-                                .hi_ansi(&style.heading_font_family),
-                        );
-                    if let Some(ref color) = style.brand_color_hex() {
-                        run = run.color(color);
-                    }
-                    run
-                },
-            ),
-    );
+    docx = docx.add_paragraph(Paragraph::new().align(AlignmentType::Center).add_run({
+        let mut run = Run::new()
+            .add_text(&meta.title)
+            .bold()
+            .size(StyleConfig::pt_to_half_points(style.title_size))
+            .fonts(
+                RunFonts::new()
+                    .ascii(&style.heading_font_family)
+                    .hi_ansi(&style.heading_font_family),
+            );
+        if let Some(ref color) = style.brand_color_hex() {
+            run = run.color(color);
+        }
+        run
+    }));
 
     // Spacer
     docx = docx.add_paragraph(Paragraph::new());
@@ -53,11 +47,7 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .align(AlignmentType::Center)
-                    .add_run(
-                        Run::new()
-                            .add_text(parts.join(" — "))
-                            .size(body_half_pts),
-                    ),
+                    .add_run(Run::new().add_text(parts.join(" — ")).size(body_half_pts)),
             );
         }
     }
@@ -67,11 +57,7 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text(&formatted_date)
-                    .size(body_half_pts),
-            ),
+            .add_run(Run::new().add_text(&formatted_date).size(body_half_pts)),
     );
 
     // Spacer
@@ -83,14 +69,12 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
         && let Some(ref ref_) = meta.ref_
     {
         docx = docx.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(format!("Ref: {}", ref_))
-                        .size(body_half_pts)
-                        .italic(),
-                ),
+            Paragraph::new().align(AlignmentType::Center).add_run(
+                Run::new()
+                    .add_text(format!("Ref: {}", ref_))
+                    .size(body_half_pts)
+                    .italic(),
+            ),
         );
     }
 
@@ -99,14 +83,12 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
         && let Some(ref author) = meta.author
     {
         docx = docx.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(
-                    Run::new()
-                        .add_text(author.as_str())
-                        .size(body_half_pts)
-                        .italic(),
-                ),
+            Paragraph::new().align(AlignmentType::Center).add_run(
+                Run::new()
+                    .add_text(author.as_str())
+                    .size(body_half_pts)
+                    .italic(),
+            ),
         );
     }
 
@@ -116,14 +98,12 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
 
     // "Between" heading
     docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(
-                Run::new()
-                    .add_text(&cover.between_label)
-                    .bold()
-                    .size(heading_half_pts),
-            ),
+        Paragraph::new().align(AlignmentType::Center).add_run(
+            Run::new()
+                .add_text(&cover.between_label)
+                .bold()
+                .size(heading_half_pts),
+        ),
     );
 
     docx = docx.add_paragraph(Paragraph::new());
@@ -132,12 +112,7 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
     for (i, party) in meta.parties.iter().enumerate() {
         let mut para = Paragraph::new().align(AlignmentType::Center);
 
-        para = para.add_run(
-            Run::new()
-                .add_text(&party.name)
-                .bold()
-                .size(body_half_pts),
-        );
+        para = para.add_run(Run::new().add_text(&party.name).bold().size(body_half_pts));
 
         match cover.party_format {
             PartyFormat::NameSpecRole => {
@@ -150,27 +125,23 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
                 }
                 docx = docx.add_paragraph(para);
                 docx = docx.add_paragraph(
-                    Paragraph::new()
-                        .align(AlignmentType::Center)
-                        .add_run(
-                            Run::new()
-                                .add_text(format!("(\"{}\")", party.role))
-                                .italic()
-                                .size(body_half_pts),
-                        ),
+                    Paragraph::new().align(AlignmentType::Center).add_run(
+                        Run::new()
+                            .add_text(format!("(\"{}\")", party.role))
+                            .italic()
+                            .size(body_half_pts),
+                    ),
                 );
             }
             PartyFormat::NameRole => {
                 docx = docx.add_paragraph(para);
                 docx = docx.add_paragraph(
-                    Paragraph::new()
-                        .align(AlignmentType::Center)
-                        .add_run(
-                            Run::new()
-                                .add_text(format!("(\"{}\")", party.role))
-                                .italic()
-                                .size(body_half_pts),
-                        ),
+                    Paragraph::new().align(AlignmentType::Center).add_run(
+                        Run::new()
+                            .add_text(format!("(\"{}\")", party.role))
+                            .italic()
+                            .size(body_half_pts),
+                    ),
                 );
             }
             PartyFormat::NameOnly => {
@@ -183,11 +154,7 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .align(AlignmentType::Center)
-                    .add_run(
-                        Run::new()
-                            .add_text("and")
-                            .size(body_half_pts),
-                    ),
+                    .add_run(Run::new().add_text("and").size(body_half_pts)),
             );
             docx = docx.add_paragraph(Paragraph::new());
         }

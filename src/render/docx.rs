@@ -2,21 +2,23 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use docx_rs::{
-    BreakType, Docx, Footer, Header, IndentLevel, LineSpacing, LineSpacingType, NumberingId,
-    NumPages, Numbering, PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, RunProperty, Style,
+    BreakType, Docx, Footer, Header, IndentLevel, LineSpacing, LineSpacingType, NumPages,
+    Numbering, NumberingId, PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, RunProperty, Style,
     StyleType, Tab, TabValueType, TableOfContents, TableOfContentsItem,
 };
 
 use crate::error::{LexiconError, Result};
 use crate::model::*;
 use crate::render::addendum::render_addendum;
-use crate::render::common::{add_inline_run, bookmark_name, render_inlines_paragraph, render_table};
+use crate::render::common::{
+    add_inline_run, bookmark_name, render_inlines_paragraph, render_table,
+};
 use crate::render::cover::{render_cover_page, render_inline_title};
 use crate::render::exhibit::{self as exhibit_loader};
 use crate::render::numbering::{
+    ABSTRACT_NUM_ID, BODY_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID, RECITAL_NUMBERING_ID,
     create_clause_numbering, create_recital_numbering, create_simple_list_numbering,
-    indent_for_level, numbering_level_for, outline_level_for, ABSTRACT_NUM_ID,
-    BODY_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID, RECITAL_NUMBERING_ID,
+    indent_for_level, numbering_level_for, outline_level_for,
 };
 use crate::render::preamble::render_preamble;
 use crate::render::schedule::render_schedules;
@@ -24,7 +26,12 @@ use crate::render::signatures as sig_renderer;
 use crate::signatures::SignatureBlock;
 use crate::style::{SchedulePosition, StyleConfig};
 
-pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>, signature_blocks: &[SignatureBlock]) -> Result<Vec<u8>> {
+pub fn render_docx(
+    doc: &Document,
+    style: &StyleConfig,
+    input_dir: Option<&Path>,
+    signature_blocks: &[SignatureBlock],
+) -> Result<Vec<u8>> {
     let mut docx = Docx::new();
 
     // Page setup
@@ -41,7 +48,11 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     // Default font and line spacing
     let line_spacing_val = (style.line_spacing * 240.0) as i32;
     docx = docx
-        .default_fonts(RunFonts::new().ascii(&style.font_family).hi_ansi(&style.font_family))
+        .default_fonts(
+            RunFonts::new()
+                .ascii(&style.font_family)
+                .hi_ansi(&style.font_family),
+        )
         .default_size(StyleConfig::pt_to_half_points(style.font_size))
         .default_line_spacing(
             LineSpacing::new()
@@ -55,7 +66,10 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         .add_abstract_numbering(create_clause_numbering(style))
         .add_numbering(Numbering::new(BODY_NUMBERING_ID, ABSTRACT_NUM_ID))
         .add_abstract_numbering(create_recital_numbering(style))
-        .add_numbering(Numbering::new(RECITAL_NUMBERING_ID, RECITAL_ABSTRACT_NUM_ID))
+        .add_numbering(Numbering::new(
+            RECITAL_NUMBERING_ID,
+            RECITAL_ABSTRACT_NUM_ID,
+        ))
         .add_abstract_numbering(create_simple_list_numbering(style));
 
     // Build bookmark ID map: anchor_id → unique integer ID for Word bookmarks
@@ -82,7 +96,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         let mut heading_style = Style::new(format!("Heading{}", i), StyleType::Paragraph)
             .name(format!("heading {}", i))
             .line_spacing(heading_spacing.clone());
-        if i == 1 && let Some(ref color) = style.brand_color_hex() {
+        if i == 1
+            && let Some(ref color) = style.brand_color_hex()
+        {
             heading_style = heading_style.color(color);
         }
         docx = docx.add_style(heading_style);
@@ -100,17 +116,15 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         docx = render_cover_page(docx, doc, style);
 
         // Page break after cover
-        docx = docx.add_paragraph(
-            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-        );
+        docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
     } else {
         // Inline title at top of first page
         docx = render_inline_title(docx, doc, style);
     }
 
     let has_schedule_items = !doc.schedule_items.is_empty();
-    let schedule_after_toc = matches!(style.schedule_position, SchedulePosition::AfterToc)
-        && has_schedule_items;
+    let schedule_after_toc =
+        matches!(style.schedule_position, SchedulePosition::AfterToc) && has_schedule_items;
 
     if style.toc.enabled {
         // TOC heading — same visual style as section headings (Heading1)
@@ -143,23 +157,16 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         // entities in cached TOC text. The field is still marked dirty="true"
         // so Word regenerates on open, but the cached items provide a
         // readable fallback if the user declines the update prompt.
-        let mut toc = TableOfContents::new()
-            .heading_styles_range(1, 3)
-            .dirty();
+        let mut toc = TableOfContents::new().heading_styles_range(1, 3).dirty();
         for (text, level) in collect_toc_entries(doc, style) {
-            toc = toc.add_item(
-                TableOfContentsItem::new()
-                    .text(&text)
-                    .level(level),
-            );
+            toc = toc.add_item(TableOfContentsItem::new().text(&text).level(level));
         }
         docx = docx.add_table_of_contents(toc);
 
         // Page break after TOC (skip if schedule follows — it has its own leading page break)
         if !schedule_after_toc {
-            docx = docx.add_paragraph(
-                Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-            );
+            docx =
+                docx.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
         }
     }
 
@@ -168,9 +175,7 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
         docx = render_schedules(docx, &doc.meta.schedule, &doc.schedule_items, style);
 
         // Page break before body
-        docx = docx.add_paragraph(
-            Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-        );
+        docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
     }
 
     // Parties preamble (before body, after cover/TOC/schedule)
@@ -187,7 +192,14 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                     docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
                 }
                 BodyElement::Clause(clause) => {
-                    docx = render_clause(docx, clause, style, RECITAL_NUMBERING_ID, style.recitals_align_first_level, &bookmark_ids);
+                    docx = render_clause(
+                        docx,
+                        clause,
+                        style,
+                        RECITAL_NUMBERING_ID,
+                        style.recitals_align_first_level,
+                        &bookmark_ids,
+                    );
                 }
             }
         }
@@ -205,14 +217,22 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
                 docx = docx.add_paragraph(render_inlines_paragraph(inlines, 0, style));
             }
             BodyElement::Clause(clause) => {
-                docx = render_clause(docx, clause, style, BODY_NUMBERING_ID, style.body_align_first_level, &bookmark_ids);
+                docx = render_clause(
+                    docx,
+                    clause,
+                    style,
+                    BODY_NUMBERING_ID,
+                    style.body_align_first_level,
+                    &bookmark_ids,
+                );
             }
         }
     }
 
     // Signature pages (after body clauses, before addenda)
     if style.signatures.enabled && !signature_blocks.is_empty() {
-        docx = sig_renderer::render_signature_pages(docx, signature_blocks, &doc.meta.parties, style);
+        docx =
+            sig_renderer::render_signature_pages(docx, signature_blocks, &doc.meta.parties, style);
     }
 
     // Addenda — each ClauseList/NumberedList gets its own numbering instance
@@ -235,9 +255,9 @@ pub fn render_docx(doc: &Document, style: &StyleConfig, input_dir: Option<&Path>
     // Build
     let buf = Vec::new();
     let mut cursor = std::io::Cursor::new(buf);
-    docx.build().pack(&mut cursor).map_err(|e| {
-        LexiconError::Render(format!("Failed to build DOCX: {}", e))
-    })?;
+    docx.build()
+        .pack(&mut cursor)
+        .map_err(|e| LexiconError::Render(format!("Failed to build DOCX: {}", e)))?;
 
     Ok(cursor.into_inner())
 }
@@ -256,8 +276,7 @@ fn render_footer(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
 
     // Right tab when we have content on both sides, or page number alone (right-aligned)
     if has_page {
-        footer_para = footer_para
-            .add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
+        footer_para = footer_para.add_tab(Tab::new().val(TabValueType::Right).pos(right_tab_pos));
     }
 
     // Left side: ref and/or version
@@ -270,9 +289,7 @@ fn render_footer(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
     }
     if has_version && let Some(ref version) = doc.meta.version {
         if has_ref {
-            footer_para = footer_para.add_run(
-                Run::new().add_text(" ").size(footer_size),
-            );
+            footer_para = footer_para.add_run(Run::new().add_text(" ").size(footer_size));
         }
         footer_para = footer_para.add_run(
             Run::new()
@@ -306,15 +323,18 @@ fn render_section_heading(mut docx: Docx, text: &str, style: &StyleConfig) -> Do
                 .ascii(&style.heading_font_family)
                 .hi_ansi(&style.heading_font_family),
         );
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .style("Heading1")
-            .add_run(heading_run),
-    );
+    docx = docx.add_paragraph(Paragraph::new().style("Heading1").add_run(heading_run));
     docx
 }
 
-pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbering_id: usize, align_first_level: bool, bookmark_ids: &HashMap<String, usize>) -> Docx {
+pub fn render_clause(
+    mut docx: Docx,
+    clause: &Clause,
+    style: &StyleConfig,
+    numbering_id: usize,
+    align_first_level: bool,
+    bookmark_ids: &HashMap<String, usize>,
+) -> Docx {
     let indent = indent_for_level(clause.level, style, align_first_level);
     let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
@@ -341,7 +361,9 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
             .run_property(RunProperty::new().bold().size(heading_size));
 
         // Place bookmark on the heading paragraph
-        if let Some(ref anchor_id) = clause.anchor && let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
+        if let Some(ref anchor_id) = clause.anchor
+            && let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str())
+        {
             para = para
                 .add_bookmark_start(bm_id, bookmark_name(anchor_id))
                 .add_bookmark_end(bm_id);
@@ -370,15 +392,20 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
                         let mut para = if clause.heading.is_none() && first_content {
                             // First content paragraph of a non-headed clause: attach numbering.
                             first_content = false;
-                            Paragraph::new()
-                                .numbering(NumberingId::new(numbering_id), IndentLevel::new(level_idx))
+                            Paragraph::new().numbering(
+                                NumberingId::new(numbering_id),
+                                IndentLevel::new(level_idx),
+                            )
                         } else {
                             // Continuation paragraph — align to text position past the number
                             Paragraph::new().indent(Some(indent + hanging), None, None, None)
                         };
 
                         // Place bookmark on first content paragraph if not already on heading
-                        if !bookmark_placed && let Some(ref anchor_id) = clause.anchor && let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str()) {
+                        if !bookmark_placed
+                            && let Some(ref anchor_id) = clause.anchor
+                            && let Some(&bm_id) = bookmark_ids.get(anchor_id.as_str())
+                        {
                             para = para
                                 .add_bookmark_start(bm_id, bookmark_name(anchor_id))
                                 .add_bookmark_end(bm_id);
@@ -394,8 +421,7 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
                     ClauseContent::Blockquote(inlines) => {
                         let body_size = StyleConfig::pt_to_half_points(style.font_size);
                         let bq_indent = indent + hanging + step;
-                        let mut para = Paragraph::new()
-                            .indent(Some(bq_indent), None, None, None);
+                        let mut para = Paragraph::new().indent(Some(bq_indent), None, None, None);
 
                         for inline in inlines {
                             para = add_inline_run(para, inline, false, body_size, style, None);
@@ -410,7 +436,14 @@ pub fn render_clause(mut docx: Docx, clause: &Clause, style: &StyleConfig, numbe
             }
             ClauseBody::Children(children) => {
                 for child in children {
-                    docx = render_clause(docx, child, style, numbering_id, align_first_level, bookmark_ids);
+                    docx = render_clause(
+                        docx,
+                        child,
+                        style,
+                        numbering_id,
+                        align_first_level,
+                        bookmark_ids,
+                    );
                 }
             }
         }
@@ -450,7 +483,11 @@ fn build_bookmark_map(doc: &Document) -> HashMap<String, usize> {
     map
 }
 
-fn collect_clause_anchors_from_body(body: &[BodyElement], map: &mut HashMap<String, usize>, next_id: &mut usize) {
+fn collect_clause_anchors_from_body(
+    body: &[BodyElement],
+    map: &mut HashMap<String, usize>,
+    next_id: &mut usize,
+) {
     for element in body {
         if let BodyElement::Clause(clause) = element {
             collect_clause_anchors(clause, map, next_id);
@@ -501,7 +538,10 @@ fn collect_toc_entries(doc: &Document, style: &StyleConfig) -> Vec<(String, usiz
     collect_clause_toc_entries(&doc.body, &mut entries);
 
     // Signature page heading (Heading1)
-    if style.signatures.enabled && !doc.meta.parties.is_empty() && let Some(ref heading) = style.signatures.heading {
+    if style.signatures.enabled
+        && !doc.meta.parties.is_empty()
+        && let Some(ref heading) = style.signatures.heading
+    {
         entries.push((heading.to_uppercase(), 1));
     }
 
@@ -566,9 +606,7 @@ fn render_exhibit(
     let heading_size = StyleConfig::pt_to_half_points(style.heading1_size);
 
     // Page break before exhibit
-    docx = docx.add_paragraph(
-        Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-    );
+    docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
 
     // Exhibit heading — styled as Heading1 (same as section headings)
     let heading_text = format!("EXHIBIT {} - {}", number, exhibit.title).to_uppercase();
@@ -581,11 +619,7 @@ fn render_exhibit(
                 .ascii(&style.heading_font_family)
                 .hi_ansi(&style.heading_font_family),
         );
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .style("Heading1")
-            .add_run(heading_run),
-    );
+    docx = docx.add_paragraph(Paragraph::new().style("Heading1").add_run(heading_run));
 
     // If path is set, load and embed the file; otherwise leave as placeholder
     if let Some(ref path) = exhibit.path {
@@ -606,8 +640,7 @@ fn render_exhibit(
             let pic = Pic::new_with_dimensions(img.png_bytes.clone(), img.width_px, img.height_px)
                 .size(fit_w, fit_h);
 
-            let mut para = Paragraph::new()
-                .align(docx_rs::AlignmentType::Center);
+            let mut para = Paragraph::new().align(docx_rs::AlignmentType::Center);
 
             // Page break before image (in same paragraph) for pages after the first
             if i > 0 {
