@@ -144,7 +144,7 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
                 if let Some(ref spec) = party.specifier {
                     para = para.add_run(
                         Run::new()
-                            .add_text(format!(" ({})", spec))
+                            .add_text(format!(" {}", spec))
                             .size(body_half_pts),
                     );
                 }
