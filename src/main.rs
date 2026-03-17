@@ -336,6 +336,10 @@ struct StyleOverrides {
     /// Default signature template key
     #[arg(long, help_heading = "Signatures")]
     signatures_template: Option<String>,
+
+    /// Each signature block on its own page
+    #[arg(long, help_heading = "Signatures")]
+    signatures_separate_pages: bool,
 }
 
 impl StyleOverrides {
@@ -445,6 +449,7 @@ impl StyleOverrides {
         if self.no_signatures { config.signatures.enabled = false; }
         if let Some(v) = self.signatures_heading { config.signatures.heading = Some(v); }
         if let Some(v) = self.signatures_template { config.signatures.default_template = Some(v); }
+        if self.signatures_separate_pages { config.signatures.separate_pages = true; }
     }
 }
 
