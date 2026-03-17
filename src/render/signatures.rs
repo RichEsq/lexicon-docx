@@ -57,9 +57,15 @@ pub fn render_signature_pages(
     // Render each party's signature block
     for (i, (block, party)) in blocks.iter().zip(parties.iter()).enumerate() {
         if i > 0 {
-            // Vertical spacing between blocks
-            docx = docx.add_paragraph(Paragraph::new());
-            docx = docx.add_paragraph(Paragraph::new());
+            if style.signatures.separate_pages {
+                docx = docx.add_paragraph(
+                    Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
+                );
+            } else {
+                // Vertical spacing between blocks
+                docx = docx.add_paragraph(Paragraph::new());
+                docx = docx.add_paragraph(Paragraph::new());
+            }
         }
 
         // Intro paragraph with **bold** markers (keep with table)

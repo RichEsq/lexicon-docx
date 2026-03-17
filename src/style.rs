@@ -44,6 +44,7 @@ pub struct SignaturesConfig {
     pub enabled: bool,
     pub heading: Option<String>,
     pub default_template: Option<String>,
+    pub separate_pages: bool,
     #[serde(default)]
     pub party: std::collections::HashMap<String, SignaturesPartyOverride>,
 }
@@ -54,6 +55,7 @@ impl Default for SignaturesConfig {
             enabled: false,
             heading: None,
             default_template: None,
+            separate_pages: false,
             party: std::collections::HashMap::new(),
         }
     }
