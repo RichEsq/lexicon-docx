@@ -1,7 +1,7 @@
 use docx_rs::{
     AlignmentType, BorderType, BreakType, Docx, Paragraph, Run, RunFonts,
     Table as DocxTable, TableCell, TableCellBorder, TableCellBorderPosition,
-    TableCellBorders, TableCellMargins, TableRow, WidthType,
+    TableCellBorders, TableCellContent, TableCellMargins, TableRow, TableRowChild, WidthType,
 };
 
 use crate::model::Party;
@@ -62,15 +62,15 @@ pub fn render_signature_pages(
             docx = docx.add_paragraph(Paragraph::new());
         }
 
-        // Intro paragraph with **bold** markers
+        // Intro paragraph with **bold** markers (keep with table)
         docx = docx.add_paragraph(render_intro_paragraph(
             &block.intro,
             body_half_pts,
             &style.defined_term_style,
-        ));
+        ).keep_next(true));
 
-        // Spacer between intro and table
-        docx = docx.add_paragraph(Paragraph::new());
+        // Spacer between intro and table (keep with table)
+        docx = docx.add_paragraph(Paragraph::new().keep_next(true));
 
         // Build the signature table
         // Content columns = signatories + optional witness
@@ -92,7 +92,7 @@ pub fn render_signature_pages(
             0
         });
 
-        let rows = match block.layout {
+        let mut rows = match block.layout {
             Layout::Short => build_short_rows(
                 block, party, max_fields, col_width, gap_width,
                 body_half_pts, label_half_pts, style,
@@ -102,6 +102,9 @@ pub fn render_signature_pages(
                 body_half_pts, label_half_pts,
             ),
         };
+
+        // Set keep_next on all cell paragraphs so the table stays on one page
+        set_keep_next_on_rows(&mut rows);
 
         // Single-column layouts match the width of one column in a two-column layout
         let table_width = if content_cols == 1 { 2400 } else { 5000 };
@@ -439,4 +442,19 @@ fn render_intro_paragraph(
     }
 
     para
+}
+
+/// Set keep_next on all paragraphs inside table rows so Word keeps the
+/// entire signature table on one page.
+fn set_keep_next_on_rows(rows: &mut [TableRow]) {
+    for row in rows.iter_mut() {
+        for cell_child in row.cells.iter_mut() {
+            let TableRowChild::TableCell(cell) = cell_child;
+            for content in cell.children.iter_mut() {
+                if let TableCellContent::Paragraph(para) = content {
+                    para.property.keep_next = Some(true);
+                }
+            }
+        }
+    }
 }
