@@ -4,7 +4,7 @@
 .SH NAME
 build \- Build a .docx from a Lexicon Markdown file
 .SH SYNOPSIS
-\fBbuild\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-s\fR|\fB\-\-style\fR] [\fB\-\-signatures\fR] [\fB\-\-pdf\-renderer\fR] [\fB\-\-strict\fR] [\fB\-\-font\-family\fR] [\fB\-\-font\-size\fR] [\fB\-\-heading\-font\-family\fR] [\fB\-\-title\-size\fR] [\fB\-\-heading1\-size\fR] [\fB\-\-heading2\-size\fR] [\fB\-\-line\-spacing\fR] [\fB\-\-defined\-term\-style\fR] [\fB\-\-brand\-color\fR] [\fB\-\-page\-size\fR] [\fB\-\-margin\-top\fR] [\fB\-\-margin\-bottom\fR] [\fB\-\-margin\-left\fR] [\fB\-\-margin\-right\fR] [\fB\-\-indent\-per\-level\fR] [\fB\-\-hanging\-indent\fR] [\fB\-\-body\-align\-first\-level\fR] [\fB\-\-no\-body\-align\-first\-level\fR] [\fB\-\-recitals\-align\-first\-level\fR] [\fB\-\-no\-recitals\-align\-first\-level\fR] [\fB\-\-date\-format\fR] [\fB\-\-cover\fR] [\fB\-\-no\-cover\fR] [\fB\-\-cover\-between\-label\fR] [\fB\-\-cover\-party\-format\fR] [\fB\-\-cover\-ref\fR] [\fB\-\-no\-cover\-ref\fR] [\fB\-\-cover\-author\fR] [\fB\-\-no\-cover\-author\fR] [\fB\-\-cover\-status\fR] [\fB\-\-no\-cover\-status\fR] [\fB\-\-toc\fR] [\fB\-\-no\-toc\fR] [\fB\-\-toc\-heading\fR] [\fB\-\-footer\-ref\fR] [\fB\-\-no\-footer\-ref\fR] [\fB\-\-footer\-page\-number\fR] [\fB\-\-no\-footer\-page\-number\fR] [\fB\-\-footer\-version\fR] [\fB\-\-no\-footer\-version\fR] [\fB\-\-preamble\fR] [\fB\-\-no\-preamble\fR] [\fB\-\-preamble\-style\fR] [\fB\-\-schedule\-position\fR] [\fB\-\-schedule\-order\fR] [\fB\-\-enable\-signatures\fR] [\fB\-\-no\-signatures\fR] [\fB\-\-signatures\-heading\fR] [\fB\-\-signatures\-template\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIINPUT\fR> 
+\fBbuild\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-s\fR|\fB\-\-style\fR] [\fB\-\-signatures\fR] [\fB\-\-pdf\-renderer\fR] [\fB\-\-strict\fR] [\fB\-\-font\-family\fR] [\fB\-\-font\-size\fR] [\fB\-\-heading\-font\-family\fR] [\fB\-\-title\-size\fR] [\fB\-\-heading1\-size\fR] [\fB\-\-heading2\-size\fR] [\fB\-\-heading\-space\-before\fR] [\fB\-\-heading\-space\-after\fR] [\fB\-\-paragraph\-space\-before\fR] [\fB\-\-paragraph\-space\-after\fR] [\fB\-\-line\-spacing\fR] [\fB\-\-defined\-term\-style\fR] [\fB\-\-brand\-color\fR] [\fB\-\-page\-size\fR] [\fB\-\-margin\-top\fR] [\fB\-\-margin\-bottom\fR] [\fB\-\-margin\-left\fR] [\fB\-\-margin\-right\fR] [\fB\-\-indent\-per\-level\fR] [\fB\-\-hanging\-indent\fR] [\fB\-\-body\-align\-first\-level\fR] [\fB\-\-no\-body\-align\-first\-level\fR] [\fB\-\-recitals\-align\-first\-level\fR] [\fB\-\-no\-recitals\-align\-first\-level\fR] [\fB\-\-date\-format\fR] [\fB\-\-cover\fR] [\fB\-\-no\-cover\fR] [\fB\-\-cover\-between\-label\fR] [\fB\-\-cover\-party\-format\fR] [\fB\-\-cover\-ref\fR] [\fB\-\-no\-cover\-ref\fR] [\fB\-\-cover\-author\fR] [\fB\-\-no\-cover\-author\fR] [\fB\-\-cover\-status\fR] [\fB\-\-no\-cover\-status\fR] [\fB\-\-toc\fR] [\fB\-\-no\-toc\fR] [\fB\-\-toc\-heading\fR] [\fB\-\-footer\-ref\fR] [\fB\-\-no\-footer\-ref\fR] [\fB\-\-footer\-page\-number\fR] [\fB\-\-no\-footer\-page\-number\fR] [\fB\-\-footer\-version\fR] [\fB\-\-no\-footer\-version\fR] [\fB\-\-preamble\fR] [\fB\-\-no\-preamble\fR] [\fB\-\-preamble\-style\fR] [\fB\-\-schedule\-position\fR] [\fB\-\-schedule\-order\fR] [\fB\-\-enable\-signatures\fR] [\fB\-\-no\-signatures\fR] [\fB\-\-signatures\-heading\fR] [\fB\-\-signatures\-template\fR] [\fB\-\-signatures\-separate\-pages\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIINPUT\fR> 
 .SH DESCRIPTION
 Build a .docx from a Lexicon Markdown file
 .SH OPTIONS
@@ -52,6 +52,18 @@ Level 1 heading size in points
 .TP
 \fB\-\-heading2\-size\fR \fI<HEADING2_SIZE>\fR
 Level 2 heading size in points
+.TP
+\fB\-\-heading\-space\-before\fR \fI<HEADING_SPACE_BEFORE>\fR
+Space before section headings in points
+.TP
+\fB\-\-heading\-space\-after\fR \fI<HEADING_SPACE_AFTER>\fR
+Space after section headings in points
+.TP
+\fB\-\-paragraph\-space\-before\fR \fI<PARAGRAPH_SPACE_BEFORE>\fR
+Space before paragraphs in points
+.TP
+\fB\-\-paragraph\-space\-after\fR \fI<PARAGRAPH_SPACE_AFTER>\fR
+Space after paragraphs in points
 .TP
 \fB\-\-line\-spacing\fR \fI<LINE_SPACING>\fR
 Line spacing multiplier
@@ -214,3 +226,6 @@ Signature pages heading text
 .TP
 \fB\-\-signatures\-template\fR \fI<SIGNATURES_TEMPLATE>\fR
 Default signature template key
+.TP
+\fB\-\-signatures\-separate\-pages\fR
+Each signature block on its own page
