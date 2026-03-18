@@ -1,6 +1,8 @@
 # lexicon-docx
 
-A Rust CLI that converts [Lexicon Markdown](../README.md) legal contracts into formatted Word (`.docx`) documents.
+A Rust CLI that converts [Lexicon Markdown](https://github.com/RichEsq/lexicon) legal contracts into formatted Word (`.docx`) documents.
+
+[Website](https://lexicon.esq) | [Playground](https://play.lexicon.esq) | [Specification](https://github.com/RichEsq/lexicon/blob/main/spec.md) | [Example Document](https://github.com/RichEsq/lexicon/blob/main/example.md?plain=1)
 
 ## Requirements
 
@@ -42,7 +44,6 @@ Options:
   -o, --output <FILE>         Output .docx path (default: <input>.docx)
   -s, --style <FILE>          Style configuration (TOML)
       --signatures <FILE>     Signature template definitions (TOML)
-      --pdf-renderer <MODE>   PDF renderer: "auto" (default) or "pdftoppm"
       --strict                Fail on warnings (exit code 1)
 ```
 
@@ -73,6 +74,10 @@ Every style.toml setting can also be set from the command line. This is useful f
 | `--title-size <PT>` | Document title size in points | 20 |
 | `--heading1-size <PT>` | Level 1 heading size in points | 14 |
 | `--heading2-size <PT>` | Level 2 heading size in points | 12 |
+| `--heading-space-before <PT>` | Space before section headings in points | 18 |
+| `--heading-space-after <PT>` | Space after section headings in points | 12 |
+| `--paragraph-space-before <PT>` | Space before paragraphs in points | 0 |
+| `--paragraph-space-after <PT>` | Space after paragraphs in points | 6 |
 | `--line-spacing <N>` | Line spacing multiplier | 1.5 |
 | `--defined-term-style <STYLE>` | `bold`, `quoted`, or `bold-quoted` | bold |
 | `--brand-color <HEX>` | Brand color (e.g. `"#2E5090"`) | none |
@@ -148,9 +153,10 @@ Every style.toml setting can also be set from the command line. This is useful f
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--enable-signatures` / `--no-signatures` | Enable/disable signature pages | off |
+| `--enable-signatures` / `--no-signatures` | Enable/disable signature pages | on |
 | `--signatures-heading <TEXT>` | Heading text for signature section | none |
 | `--signatures-template <KEY>` | Default signature template key | none |
+| `--signatures-separate-pages` | Each signature block on its own page | off |
 
 > **Note:** Preamble templates (`preamble.template`, `preamble.party_template`, `preamble.party_separator`) and per-party signature overrides (`signatures.party.*`) are TOML-only — they contain structured data that doesn't lend itself to CLI flags.
 
@@ -170,9 +176,10 @@ This creates `lexicon-docx.1`, `lexicon-docx-build.1`, and `lexicon-docx-validat
 |---------|-------------|
 | Cover page | Title, parties, date, status, version, author, reference |
 | Table of contents | Auto-generated from clause headings |
-| Legal numbering | Native Word numbering: `1.`, `1.1`, `(a)`, `(i)` |
-| Cross-references | `{#id}` anchors resolved to clause numbers |
+| Legal numbering | Native Word numbering: `1.`, `1.1`, `(a)`, `(i)`, `(A)`, `(I)` |
+| Cross-references | `{#id}` anchors resolved to clickable Word hyperlinks |
 | Defined terms | Bold terms validated for usage; warnings on unused terms |
+| Recitals / Background | Optional pre-body section with independent numbering |
 | Parties preamble | Configurable introductory block with party details |
 | Schedule pages | Terms referencing a schedule auto-collected into a completion table |
 | Signature pages | Template-based execution blocks with jurisdiction-aware defaults |
@@ -211,7 +218,8 @@ margin_right_cm = 2.54
 ```toml
 indent_per_level_cm = 1.27
 hanging_indent_cm = 1.27
-align_first_level = false     # true: levels 0 and 1 share the same indent
+body_align_first_level = false      # true: body levels 0 and 1 share the same indent
+recitals_align_first_level = false  # true: recitals levels 0 and 1 share the same indent
 ```
 
 ### Defined term rendering
@@ -281,6 +289,15 @@ show_version = false          # appends version to ref, e.g. "OK:RP:20260115v3"
 ```toml
 schedule_position = "end"     # "end" (after addenda/exhibits) or "after_toc"
 schedule_order = "document"   # "document" (source order) or "alphabetical"
+```
+
+### Spacing
+
+```toml
+heading_space_before = 18.0   # space before section headings (pt)
+heading_space_after = 12.0    # space after section headings (pt)
+paragraph_space_before = 0.0  # space before paragraphs (pt)
+paragraph_space_after = 6.0   # space after paragraphs (pt)
 ```
 
 ### Branding
@@ -364,15 +381,7 @@ exhibits:
   - title: Technical Specifications
 ```
 
-Supported file types: PNG, JPEG, and PDF (rendered to images). When `path` is omitted, a placeholder page is generated. Relative paths are resolved against the input file's directory.
-
-PDF rendering uses a built-in native renderer ([hayro](https://github.com/LaurenzV/hayro)) by default. If you encounter visual issues with a specific PDF, you can fall back to `pdftoppm`:
-
-```bash
-lexicon-docx build contract.md --pdf-renderer pdftoppm
-```
-
-This requires poppler-utils: `brew install poppler` (macOS) or `apt install poppler-utils` (Debian/Ubuntu).
+Supported file types: PNG, JPEG, and PDF (rendered to images via [hayro](https://github.com/LaurenzV/hayro), a native Rust PDF renderer — no external dependencies required). When `path` is omitted, a placeholder page is generated. Relative paths are resolved against the input file's directory.
 
 ## Diagnostics
 
