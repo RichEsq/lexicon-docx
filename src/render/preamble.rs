@@ -38,8 +38,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
                 "BETWEEN"
             };
             docx = docx.add_paragraph(
-                Paragraph::new()
-                    .add_run(Run::new().add_text(connector).bold().size(body_half_pts)),
+                Paragraph::new().add_run(Run::new().add_text(connector).bold().size(body_half_pts)),
             );
 
             // Parties with AND between each
