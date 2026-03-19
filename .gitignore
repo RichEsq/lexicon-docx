@@ -3,3 +3,6 @@ target/
 
 # Generated output
 *.docx
+
+# Planning docs (local only)
+planning/
