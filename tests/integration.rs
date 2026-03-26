@@ -32,11 +32,11 @@ fn parse_and_resolve(input: &str) -> Document {
 fn frontmatter_basic_fields() {
     let doc = parse_and_resolve(MINIMAL);
     assert_eq!(doc.meta.title, "Test Agreement");
-    assert_eq!(doc.meta.date, "2026-01-01");
+    assert_eq!(doc.meta.date, Some("2026-01-01".to_string()));
     assert_eq!(doc.meta.parties.len(), 2);
-    assert_eq!(doc.meta.parties[0].name, "Alice");
+    assert_eq!(doc.meta.parties[0].name, Some("Alice".to_string()));
     assert_eq!(doc.meta.parties[0].role, "Buyer");
-    assert_eq!(doc.meta.parties[1].name, "Bob");
+    assert_eq!(doc.meta.parties[1].name, Some("Bob".to_string()));
     assert_eq!(doc.meta.parties[1].role, "Seller");
 }
 

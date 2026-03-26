@@ -108,6 +108,7 @@ Every style.toml setting can also be set from the command line. This is useful f
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--date-format <FMT>` | chrono strftime format string | `%e %B %Y` |
+| `--name-placeholder <TEXT>` | Placeholder for missing party names | `[Name]` |
 
 **Cover page:**
 
@@ -232,6 +233,12 @@ defined_term_style = "bold"   # "bold", "quoted" (curly quotes), or "bold_quoted
 
 ```toml
 date_format = "%e %B %Y"     # chrono strftime format
+```
+
+### Placeholder text
+
+```toml
+name_placeholder = "[Name]"  # shown when a party has no name
 ```
 
 ### Cover page
@@ -391,7 +398,7 @@ The processor emits warnings and errors during validation:
 - Defined terms that are never used in the document
 - Declared schedules with no referencing terms
 - Missing signature definitions
-- Invalid front-matter (bad dates, empty parties)
+- Invalid front-matter (bad dates, missing party roles)
 
 Use `--strict` to treat warnings as errors:
 

@@ -53,7 +53,7 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
     }
 
     // Date
-    let formatted_date = format_date_with_format(&meta.date, &style.date_format);
+    let formatted_date = format_date_with_format(meta.date.as_deref(), &style.date_format);
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)
@@ -112,7 +112,8 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
     for (i, party) in meta.parties.iter().enumerate() {
         let mut para = Paragraph::new().align(AlignmentType::Center);
 
-        para = para.add_run(Run::new().add_text(&party.name).bold().size(body_half_pts));
+        let display_name = party.name.as_deref().unwrap_or(&style.name_placeholder);
+        para = para.add_run(Run::new().add_text(display_name).bold().size(body_half_pts));
 
         match cover.party_format {
             PartyFormat::NameSpecRole => {

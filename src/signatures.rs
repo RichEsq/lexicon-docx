@@ -140,10 +140,20 @@ pub fn resolve_signature_blocks(
     let execution = execution_method(doc_type);
     let config = &style.signatures;
 
+    let name_placeholder = &style.name_placeholder;
+
     parties
         .iter()
         .map(|party| {
-            resolve_party_block(party, execution, doc_type, config, definitions, diagnostics)
+            resolve_party_block(
+                party,
+                execution,
+                doc_type,
+                config,
+                definitions,
+                diagnostics,
+                name_placeholder,
+            )
         })
         .collect()
 }
@@ -155,6 +165,7 @@ fn resolve_party_block(
     config: &SignaturesConfig,
     definitions: &Option<DefinitionsFile>,
     diagnostics: &mut Vec<Diagnostic>,
+    name_placeholder: &str,
 ) -> SignatureBlock {
     // 1. Check for explicit template override in TOML
     let party_override = config.party.get(&party.role);
@@ -250,7 +261,7 @@ fn resolve_party_block(
         .unwrap_or(base_witness);
 
     // 5. Expand placeholders in intro
-    let intro = expand_placeholders(&base_intro, party, doc_type);
+    let intro = expand_placeholders(&base_intro, party, doc_type, name_placeholder);
 
     SignatureBlock {
         layout: base_layout,
@@ -333,9 +344,14 @@ fn default_witness_fields() -> Vec<SignatureField> {
 }
 
 /// Expand `{name}`, `{specifier}`, `{role}`, `{type}` in a template string.
-fn expand_placeholders(template: &str, party: &Party, doc_type: Option<&str>) -> String {
+fn expand_placeholders(
+    template: &str,
+    party: &Party,
+    doc_type: Option<&str>,
+    name_placeholder: &str,
+) -> String {
     let result = template
-        .replace("{name}", &party.name)
+        .replace("{name}", party.name.as_deref().unwrap_or(name_placeholder))
         .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
         .replace("{role}", &party.role)
         .replace("{type}", doc_type.unwrap_or("Agreement"));
@@ -344,10 +360,18 @@ fn expand_placeholders(template: &str, party: &Party, doc_type: Option<&str>) ->
 }
 
 /// Expand `{title}`, `{name}` etc. within a field value, using signatory + party data.
-pub fn expand_field_value(value: &str, party: &Party, signatory: &Signatory) -> String {
+pub fn expand_field_value(
+    value: &str,
+    party: &Party,
+    signatory: &Signatory,
+    name_placeholder: &str,
+) -> String {
     value
         .replace("{title}", signatory.title.as_deref().unwrap_or(""))
-        .replace("{name}", &party.name)
+        .replace(
+            "{name}",
+            party.name.as_deref().unwrap_or(name_placeholder),
+        )
         .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
         .replace("{role}", &party.role)
 }

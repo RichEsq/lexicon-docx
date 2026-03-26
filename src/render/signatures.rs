@@ -108,6 +108,7 @@ pub fn render_signature_pages(
                 gap_width,
                 body_half_pts,
                 label_half_pts,
+                &style.name_placeholder,
             ),
         };
 
@@ -195,6 +196,7 @@ fn build_long_rows(
     gap_width: usize,
     body_half_pts: usize,
     label_half_pts: usize,
+    name_placeholder: &str,
 ) -> Vec<TableRow> {
     let mut rows = Vec::new();
 
@@ -217,6 +219,7 @@ fn build_long_rows(
                     signatory,
                     body_half_pts,
                     col_width,
+                    name_placeholder,
                 ));
                 label_cells.push(render_long_label_cell(
                     field,
@@ -224,6 +227,7 @@ fn build_long_rows(
                     signatory,
                     label_half_pts,
                     col_width,
+                    name_placeholder,
                 ));
             } else {
                 space_cells.push(empty_cell(col_width));
@@ -243,6 +247,7 @@ fn build_long_rows(
                     &witness_sig,
                     body_half_pts,
                     col_width,
+                    name_placeholder,
                 ));
                 label_cells.push(render_long_label_cell(
                     field,
@@ -250,6 +255,7 @@ fn build_long_rows(
                     &witness_sig,
                     label_half_pts,
                     col_width,
+                    name_placeholder,
                 ));
             } else {
                 space_cells.push(empty_cell(col_width));
@@ -272,6 +278,7 @@ fn render_long_space_cell(
     signatory: &Signatory,
     body_half_pts: usize,
     col_width: usize,
+    name_placeholder: &str,
 ) -> TableCell {
     let height = match field.field_type {
         FieldType::Line => LONG_LINE_HEIGHT_HALF_PTS,
@@ -284,7 +291,7 @@ fn render_long_space_cell(
     let display_value = field
         .value
         .as_ref()
-        .map(|v| expand_field_value(v, party, signatory))
+        .map(|v| expand_field_value(v, party, signatory, name_placeholder))
         .unwrap_or_default();
 
     if display_value.is_empty() {
@@ -317,11 +324,12 @@ fn render_long_label_cell(
     signatory: &Signatory,
     label_half_pts: usize,
     col_width: usize,
+    name_placeholder: &str,
 ) -> TableCell {
     let mut cell = TableCell::new().width(col_width, WidthType::Pct);
 
     if let Some(ref label) = field.label {
-        let expanded = expand_field_value(label, party, signatory);
+        let expanded = expand_field_value(label, party, signatory, name_placeholder);
         cell = cell.add_paragraph(
             Paragraph::new().add_run(
                 Run::new()
@@ -345,7 +353,7 @@ fn render_short_field_cell(
     body_size: usize,
     label_size: usize,
     col_width: usize,
-    _style: &StyleConfig,
+    style: &StyleConfig,
 ) -> TableCell {
     let mut cell = TableCell::new().width(col_width, WidthType::Pct);
 
@@ -376,7 +384,7 @@ fn render_short_field_cell(
             let display_value = field
                 .value
                 .as_ref()
-                .map(|v| expand_field_value(v, party, signatory))
+                .map(|v| expand_field_value(v, party, signatory, &style.name_placeholder))
                 .unwrap_or_default();
 
             if let Some(ref label) = field.label {

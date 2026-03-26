@@ -34,6 +34,9 @@ defined_term_style = "bold"   # "bold", "quoted" (curly quotes), or "bold_quoted
 # Date formatting
 date_format = "%e %B %Y"     # chrono format string (e.g. "%d/%m/%Y", "%B %d, %Y")
 
+# Placeholder text
+name_placeholder = "[Name]"  # shown in preamble/cover/signatures when a party has no name
+
 # Branding
 # brand_color = "#2E5090"     # web colour for title and ## heading text
 

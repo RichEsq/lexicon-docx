@@ -32,13 +32,15 @@ pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
 
     let mut diagnostics = Vec::new();
 
-    // Validate date format
-    if !is_valid_date(&meta.date) {
-        diagnostics.push(Diagnostic {
-            level: DiagLevel::Error,
-            message: format!("Date '{}' is not a valid YYYY-MM-DD date", meta.date),
-            location: Some("front-matter".to_string()),
-        });
+    // Validate date format (only when present)
+    if let Some(ref date) = meta.date {
+        if !is_valid_date(date) {
+            diagnostics.push(Diagnostic {
+                level: DiagLevel::Error,
+                message: format!("Date '{}' is not a valid YYYY-MM-DD date", date),
+                location: Some("front-matter".to_string()),
+            });
+        }
     }
 
     // Validate parties
@@ -51,13 +53,6 @@ pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
     }
 
     for (i, party) in meta.parties.iter().enumerate() {
-        if party.name.is_empty() {
-            diagnostics.push(Diagnostic {
-                level: DiagLevel::Error,
-                message: format!("Party {} has empty name", i + 1),
-                location: Some("front-matter".to_string()),
-            });
-        }
         if party.role.is_empty() {
             diagnostics.push(Diagnostic {
                 level: DiagLevel::Error,

@@ -45,7 +45,7 @@ pub struct DocumentMeta {
     pub title: String,
     #[serde(rename = "type")]
     pub doc_type: Option<String>,
-    pub date: String,
+    pub date: Option<String>,
     #[serde(rename = "ref")]
     pub ref_: Option<String>,
     pub author: Option<String>,
@@ -90,7 +90,7 @@ impl std::fmt::Display for Status {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Party {
-    pub name: String,
+    pub name: Option<String>,
     pub specifier: Option<String>,
     pub role: String,
     pub entity_type: Option<String>,

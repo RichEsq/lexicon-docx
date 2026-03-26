@@ -221,9 +221,12 @@ pub fn bookmark_name(anchor_id: &str) -> String {
     name
 }
 
-pub fn format_date_with_format(date_str: &str, fmt: &str) -> String {
-    match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-        Ok(date) => date.format(fmt).to_string().trim().to_string(),
-        Err(_) => date_str.to_string(),
+pub fn format_date_with_format(date_str: Option<&str>, fmt: &str) -> String {
+    match date_str {
+        Some(s) => match chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+            Ok(date) => date.format(fmt).to_string().trim().to_string(),
+            Err(_) => s.to_string(),
+        },
+        None => "_______________".to_string(),
     }
 }

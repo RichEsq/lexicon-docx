@@ -10,7 +10,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
     let meta = &doc.meta;
     let body_half_pts = StyleConfig::pt_to_half_points(style.font_size);
     let doc_type = meta.doc_type.as_deref().unwrap_or("Agreement");
-    let formatted_date = format_date_with_format(&meta.date, &style.date_format);
+    let formatted_date = format_date_with_format(meta.date.as_deref(), &style.date_format);
 
     match style.preamble.style {
         PreambleStyle::Simple => {
@@ -45,7 +45,8 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             let party_count = meta.parties.len();
             for (i, party) in meta.parties.iter().enumerate() {
                 let mut para = Paragraph::new();
-                para = para.add_run(Run::new().add_text(&party.name).size(body_half_pts));
+                let display_name = party.name.as_deref().unwrap_or(&style.name_placeholder);
+                para = para.add_run(Run::new().add_text(display_name).size(body_half_pts));
                 if let Some(ref spec) = party.specifier {
                     para = para.add_run(
                         Run::new()
@@ -99,7 +100,8 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             // Parties
             let party_count = meta.parties.len();
             for (i, party) in meta.parties.iter().enumerate() {
-                para = para.add_run(Run::new().add_text(&party.name).size(body_half_pts));
+                let display_name = party.name.as_deref().unwrap_or(&style.name_placeholder);
+                para = para.add_run(Run::new().add_text(display_name).size(body_half_pts));
                 if let Some(ref spec) = party.specifier {
                     para = para.add_run(
                         Run::new()
@@ -156,9 +158,10 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             // Render each party
             let party_count = meta.parties.len();
             for (i, party) in meta.parties.iter().enumerate() {
+                let display_name = party.name.as_deref().unwrap_or(&style.name_placeholder);
                 let expanded_party = preamble
                     .party_template
-                    .replace("{name}", &party.name)
+                    .replace("{name}", display_name)
                     .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
                     .replace("{role}", &party.role);
                 let cleaned = clean_empty_parens(&expanded_party);

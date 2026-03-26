@@ -226,6 +226,10 @@ struct StyleOverrides {
     #[arg(long, help_heading = "Formatting")]
     date_format: Option<String>,
 
+    /// Placeholder text for missing party names (default: "[Name]")
+    #[arg(long, help_heading = "Formatting")]
+    name_placeholder: Option<String>,
+
     // --- Cover Page ---
     /// Enable cover page
     #[arg(
@@ -477,6 +481,9 @@ impl StyleOverrides {
         // Formatting
         if let Some(v) = self.date_format {
             config.date_format = v;
+        }
+        if let Some(v) = self.name_placeholder {
+            config.name_placeholder = v;
         }
 
         // Cover Page
