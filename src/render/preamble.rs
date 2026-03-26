@@ -49,7 +49,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
                 if let Some(ref spec) = party.specifier {
                     para = para.add_run(
                         Run::new()
-                            .add_text(format!(" ({})", spec))
+                            .add_text(format!(" {}", spec))
                             .size(body_half_pts),
                     );
                 }
