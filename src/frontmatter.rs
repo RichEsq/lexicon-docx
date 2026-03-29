@@ -33,14 +33,14 @@ pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
     let mut diagnostics = Vec::new();
 
     // Validate date format (only when present)
-    if let Some(ref date) = meta.date {
-        if !is_valid_date(date) {
-            diagnostics.push(Diagnostic {
-                level: DiagLevel::Error,
-                message: format!("Date '{}' is not a valid YYYY-MM-DD date", date),
-                location: Some("front-matter".to_string()),
-            });
-        }
+    if let Some(ref date) = meta.date
+        && !is_valid_date(date)
+    {
+        diagnostics.push(Diagnostic {
+            level: DiagLevel::Error,
+            message: format!("Date '{}' is not a valid YYYY-MM-DD date", date),
+            location: Some("front-matter".to_string()),
+        });
     }
 
     // Validate parties

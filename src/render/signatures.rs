@@ -188,6 +188,7 @@ fn build_short_rows(
 }
 
 /// Build rows for "long" layout — each field produces two rows (space + label).
+#[allow(clippy::too_many_arguments)]
 fn build_long_rows(
     block: &SignatureBlock,
     party: &Party,
