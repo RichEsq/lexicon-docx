@@ -368,10 +368,7 @@ pub fn expand_field_value(
 ) -> String {
     value
         .replace("{title}", signatory.title.as_deref().unwrap_or(""))
-        .replace(
-            "{name}",
-            party.name.as_deref().unwrap_or(name_placeholder),
-        )
+        .replace("{name}", party.name.as_deref().unwrap_or(name_placeholder))
         .replace("{specifier}", party.specifier.as_deref().unwrap_or(""))
         .replace("{role}", &party.role)
 }
