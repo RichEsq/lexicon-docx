@@ -140,10 +140,10 @@ pub struct ClauseHeading {
 pub enum ClauseNumber {
     TopLevel(u32),
     Clause(u32, u32),
-    SubClause(u32, u32, char),
-    SubSubClause(u32, u32, char, String),
-    Paragraph(u32, u32, char, String, char),
-    SubParagraph(u32, u32, char, String, char, String),
+    SubClause(u32, u32, u32),
+    SubSubClause(u32, u32, u32, u32),
+    Paragraph(u32, u32, u32, u32, u32),
+    SubParagraph(u32, u32, u32, u32, u32, u32),
 }
 
 impl std::fmt::Display for ClauseNumber {
@@ -151,32 +151,164 @@ impl std::fmt::Display for ClauseNumber {
         match self {
             ClauseNumber::TopLevel(a) => write!(f, "{}.", a),
             ClauseNumber::Clause(a, b) => write!(f, "{}.{}", a, b),
-            ClauseNumber::SubClause(_, _, c) => write!(f, "({})", c),
-            ClauseNumber::SubSubClause(_, _, _, r) => write!(f, "({})", r),
-            ClauseNumber::Paragraph(_, _, _, _, p) => write!(f, "({})", p),
-            ClauseNumber::SubParagraph(_, _, _, _, _, r) => write!(f, "({})", r),
+            ClauseNumber::SubClause(a, b, c) => write!(f, "{}.{}.{}", a, b, c),
+            ClauseNumber::SubSubClause(a, b, c, d) => write!(f, "{}.{}.{}.{}", a, b, c, d),
+            ClauseNumber::Paragraph(a, b, c, d, e) => {
+                write!(f, "{}.{}.{}.{}.{}", a, b, c, d, e)
+            }
+            ClauseNumber::SubParagraph(a, b, c, d, e, g) => {
+                write!(f, "{}.{}.{}.{}.{}.{}", a, b, c, d, e, g)
+            }
         }
     }
 }
 
+use crate::style::NumberingConvention;
+
 impl ClauseNumber {
-    pub fn full_reference(&self, prefix: &str) -> String {
-        let num = match self {
-            ClauseNumber::TopLevel(a) => format!("{}", a),
-            ClauseNumber::Clause(a, b) => format!("{}.{}", a, b),
-            ClauseNumber::SubClause(a, b, c) => format!("{}.{}({})", a, b, c),
-            ClauseNumber::SubSubClause(a, b, c, r) => {
-                format!("{}.{}({})({})", a, b, c, r)
-            }
-            ClauseNumber::Paragraph(a, b, c, r, p) => {
-                format!("{}.{}({})({})({})", a, b, c, r, p)
-            }
-            ClauseNumber::SubParagraph(a, b, c, r, p, sr) => {
-                format!("{}.{}({})({})({})({})", a, b, c, r, p, sr)
-            }
+    pub fn full_reference(&self, prefix: &str, convention: NumberingConvention) -> String {
+        let num = match convention {
+            NumberingConvention::Commonwealth => self.format_commonwealth(),
+            NumberingConvention::Decimal => self.format_decimal(),
+            NumberingConvention::UsTraditional => self.format_us_traditional(),
         };
         format!("{} {}", prefix, num)
     }
+
+    fn format_commonwealth(&self) -> String {
+        match self {
+            ClauseNumber::TopLevel(a) => format!("{}", a),
+            ClauseNumber::Clause(a, b) => format!("{}.{}", a, b),
+            ClauseNumber::SubClause(a, b, c) => {
+                format!("{}.{}({})", a, b, to_lower_letter(*c))
+            }
+            ClauseNumber::SubSubClause(a, b, c, d) => {
+                format!(
+                    "{}.{}({})({})",
+                    a,
+                    b,
+                    to_lower_letter(*c),
+                    to_lower_roman(*d)
+                )
+            }
+            ClauseNumber::Paragraph(a, b, c, d, e) => {
+                format!(
+                    "{}.{}({})({})({})",
+                    a,
+                    b,
+                    to_lower_letter(*c),
+                    to_lower_roman(*d),
+                    to_upper_letter(*e)
+                )
+            }
+            ClauseNumber::SubParagraph(a, b, c, d, e, g) => {
+                format!(
+                    "{}.{}({})({})({})({})",
+                    a,
+                    b,
+                    to_lower_letter(*c),
+                    to_lower_roman(*d),
+                    to_upper_letter(*e),
+                    to_upper_roman(*g)
+                )
+            }
+        }
+    }
+
+    fn format_decimal(&self) -> String {
+        match self {
+            ClauseNumber::TopLevel(a) => format!("{}", a),
+            ClauseNumber::Clause(a, b) => format!("{}.{}", a, b),
+            ClauseNumber::SubClause(a, b, c) => format!("{}.{}.{}", a, b, c),
+            ClauseNumber::SubSubClause(a, b, c, d) => format!("{}.{}.{}.{}", a, b, c, d),
+            ClauseNumber::Paragraph(a, b, c, d, e) => {
+                format!("{}.{}.{}.{}.{}", a, b, c, d, e)
+            }
+            ClauseNumber::SubParagraph(a, b, c, d, e, g) => {
+                format!("{}.{}.{}.{}.{}.{}", a, b, c, d, e, g)
+            }
+        }
+    }
+
+    fn format_us_traditional(&self) -> String {
+        match self {
+            ClauseNumber::TopLevel(a) => format!("{}", to_upper_roman(*a)),
+            ClauseNumber::Clause(a, b) => {
+                format!("{}.{}", to_upper_roman(*a), to_upper_letter(*b))
+            }
+            ClauseNumber::SubClause(a, b, c) => {
+                format!("{}.{}.{}", to_upper_roman(*a), to_upper_letter(*b), c)
+            }
+            ClauseNumber::SubSubClause(a, b, c, d) => {
+                format!(
+                    "{}.{}.{}.{}",
+                    to_upper_roman(*a),
+                    to_upper_letter(*b),
+                    c,
+                    to_lower_letter(*d)
+                )
+            }
+            ClauseNumber::Paragraph(a, b, c, d, e) => {
+                format!(
+                    "{}.{}.{}.{}({})",
+                    to_upper_roman(*a),
+                    to_upper_letter(*b),
+                    c,
+                    to_lower_letter(*d),
+                    e
+                )
+            }
+            ClauseNumber::SubParagraph(a, b, c, d, e, g) => {
+                format!(
+                    "{}.{}.{}.{}({})({})",
+                    to_upper_roman(*a),
+                    to_upper_letter(*b),
+                    c,
+                    to_lower_letter(*d),
+                    e,
+                    to_lower_letter(*g)
+                )
+            }
+        }
+    }
+}
+
+fn to_lower_letter(n: u32) -> char {
+    (b'a' + (n - 1) as u8) as char
+}
+
+fn to_upper_letter(n: u32) -> char {
+    (b'A' + (n - 1) as u8) as char
+}
+
+pub(crate) fn to_lower_roman(mut n: u32) -> String {
+    let table = [
+        (1000, "m"),
+        (900, "cm"),
+        (500, "d"),
+        (400, "cd"),
+        (100, "c"),
+        (90, "xc"),
+        (50, "l"),
+        (40, "xl"),
+        (10, "x"),
+        (9, "ix"),
+        (5, "v"),
+        (4, "iv"),
+        (1, "i"),
+    ];
+    let mut result = String::new();
+    for &(value, numeral) in &table {
+        while n >= value {
+            result.push_str(numeral);
+            n -= value;
+        }
+    }
+    result
+}
+
+fn to_upper_roman(n: u32) -> String {
+    to_lower_roman(n).to_uppercase()
 }
 
 #[derive(Debug)]

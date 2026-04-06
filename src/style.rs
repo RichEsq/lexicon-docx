@@ -36,6 +36,7 @@ pub struct StyleConfig {
     pub preamble: PreambleConfig,
     pub schedule_position: SchedulePosition,
     pub schedule_order: ScheduleOrder,
+    pub numbering_convention: NumberingConvention,
     pub signatures: SignaturesConfig,
 }
 
@@ -205,6 +206,15 @@ pub enum DefinedTermStyle {
     BoldQuoted,
 }
 
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum NumberingConvention {
+    #[default]
+    Commonwealth,
+    Decimal,
+    UsTraditional,
+}
+
 impl Default for StyleConfig {
     fn default() -> Self {
         StyleConfig {
@@ -238,6 +248,7 @@ impl Default for StyleConfig {
             preamble: PreambleConfig::default(),
             schedule_position: SchedulePosition::default(),
             schedule_order: ScheduleOrder::default(),
+            numbering_convention: NumberingConvention::default(),
             signatures: SignaturesConfig::default(),
         }
     }

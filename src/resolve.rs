@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 
 use crate::error::{DiagLevel, Diagnostic};
 use crate::model::*;
+use crate::style::NumberingConvention;
 
 static FORMAL_DEF_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^\s*means[\s:,]").unwrap());
@@ -14,8 +15,8 @@ static FORMAL_DEF_ALT_RE: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
-pub fn resolve(doc: &mut Document) {
-    // Number recitals and body clauses (both use the same scheme: 1., 1.1, (a), etc.)
+pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
+    // Number recitals and body clauses
     if let Some(ref mut recitals) = doc.recitals {
         assign_clause_numbers(&mut recitals.body);
     }
@@ -24,9 +25,9 @@ pub fn resolve(doc: &mut Document) {
     // Build anchor → reference text map (from both recitals and body)
     let mut anchor_map: HashMap<String, String> = HashMap::new();
     if let Some(ref recitals) = doc.recitals {
-        collect_body_anchors(&recitals.body, &mut anchor_map, "Recital");
+        collect_body_anchors(&recitals.body, &mut anchor_map, "Recital", convention);
     }
-    collect_body_anchors(&doc.body, &mut anchor_map, "clause");
+    collect_body_anchors(&doc.body, &mut anchor_map, "clause", convention);
 
     // Register addendum heading anchors
     for addendum in &doc.addenda {
@@ -37,18 +38,23 @@ pub fn resolve(doc: &mut Document) {
 
     // Resolve cross-references and validate
     if let Some(ref mut recitals) = doc.recitals {
-        resolve_cross_refs(&mut recitals.body, &anchor_map, &mut doc.diagnostics);
+        resolve_cross_refs(
+            &mut recitals.body,
+            &anchor_map,
+            &mut doc.diagnostics,
+            convention,
+        );
     }
-    resolve_cross_refs(&mut doc.body, &anchor_map, &mut doc.diagnostics);
+    resolve_cross_refs(&mut doc.body, &anchor_map, &mut doc.diagnostics, convention);
     for addendum in &mut doc.addenda {
-        resolve_addendum_cross_refs(addendum, &anchor_map, &mut doc.diagnostics);
+        resolve_addendum_cross_refs(addendum, &anchor_map, &mut doc.diagnostics, convention);
     }
 
     // Build schedule phrase patterns from front-matter
     let schedule_patterns = build_schedule_phrase_patterns(&doc.meta.schedule);
 
     // Collect schedule items and validate defined terms (single pass)
-    collect_and_validate_terms(doc, &schedule_patterns);
+    collect_and_validate_terms(doc, &schedule_patterns, convention);
 }
 
 // --- Clause numbering ---
@@ -66,51 +72,43 @@ fn assign_clause_numbers(body: &mut [BodyElement]) {
 
 fn assign_children_numbers(parent: &mut Clause, top: u32) {
     let parent_number = parent.number.clone();
-    let mut i = 0usize;
+    let mut i = 0u32;
 
     for element in &mut parent.body {
         if let ClauseBody::Children(kids) = element {
             for child in kids.iter_mut() {
+                let idx = i + 1;
                 let number = match child.level {
-                    ClauseLevel::TopLevel => ClauseNumber::TopLevel(i as u32 + 1),
-                    ClauseLevel::Clause => ClauseNumber::Clause(top, i as u32 + 1),
+                    ClauseLevel::TopLevel => ClauseNumber::TopLevel(idx),
+                    ClauseLevel::Clause => ClauseNumber::Clause(top, idx),
                     ClauseLevel::SubClause => {
                         let clause_num = match &parent_number {
                             Some(ClauseNumber::Clause(_, c)) => *c,
                             _ => 0,
                         };
-                        let letter = (b'a' + i as u8) as char;
-                        ClauseNumber::SubClause(top, clause_num, letter)
+                        ClauseNumber::SubClause(top, clause_num, idx)
                     }
                     ClauseLevel::SubSubClause => {
-                        let (clause_num, letter) = match &parent_number {
-                            Some(ClauseNumber::SubClause(_, c, l)) => (*c, *l),
-                            _ => (0, 'a'),
+                        let (clause_num, sub_idx) = match &parent_number {
+                            Some(ClauseNumber::SubClause(_, c, s)) => (*c, *s),
+                            _ => (0, 1),
                         };
-                        let roman = to_roman(i as u32 + 1);
-                        ClauseNumber::SubSubClause(top, clause_num, letter, roman)
+                        ClauseNumber::SubSubClause(top, clause_num, sub_idx, idx)
                     }
                     ClauseLevel::Paragraph => {
-                        let (clause_num, letter, roman) = match &parent_number {
-                            Some(ClauseNumber::SubSubClause(_, c, l, r)) => (*c, *l, r.clone()),
-                            _ => (0, 'a', "i".to_string()),
+                        let (clause_num, sub_idx, subsub_idx) = match &parent_number {
+                            Some(ClauseNumber::SubSubClause(_, c, s, ss)) => (*c, *s, *ss),
+                            _ => (0, 1, 1),
                         };
-                        let upper = (b'A' + i as u8) as char;
-                        ClauseNumber::Paragraph(top, clause_num, letter, roman, upper)
+                        ClauseNumber::Paragraph(top, clause_num, sub_idx, subsub_idx, idx)
                     }
                     ClauseLevel::SubParagraph => {
-                        let (clause_num, letter, roman, upper) = match &parent_number {
-                            Some(ClauseNumber::Paragraph(_, c, l, r, u)) => (*c, *l, r.clone(), *u),
-                            _ => (0, 'a', "i".to_string(), 'A'),
+                        let (clause_num, sub_idx, subsub_idx, para_idx) = match &parent_number {
+                            Some(ClauseNumber::Paragraph(_, c, s, ss, p)) => (*c, *s, *ss, *p),
+                            _ => (0, 1, 1, 1),
                         };
-                        let upper_roman = to_roman(i as u32 + 1).to_uppercase();
                         ClauseNumber::SubParagraph(
-                            top,
-                            clause_num,
-                            letter,
-                            roman,
-                            upper,
-                            upper_roman,
+                            top, clause_num, sub_idx, subsub_idx, para_idx, idx,
                         )
                     }
                 };
@@ -124,22 +122,32 @@ fn assign_children_numbers(parent: &mut Clause, top: u32) {
 
 // --- Anchor map ---
 
-fn collect_body_anchors(body: &[BodyElement], map: &mut HashMap<String, String>, prefix: &str) {
+fn collect_body_anchors(
+    body: &[BodyElement],
+    map: &mut HashMap<String, String>,
+    prefix: &str,
+    convention: NumberingConvention,
+) {
     for element in body {
         if let BodyElement::Clause(clause) = element {
-            collect_anchors(clause, map, prefix);
+            collect_anchors(clause, map, prefix, convention);
         }
     }
 }
 
-fn collect_anchors(clause: &Clause, map: &mut HashMap<String, String>, prefix: &str) {
+fn collect_anchors(
+    clause: &Clause,
+    map: &mut HashMap<String, String>,
+    prefix: &str,
+    convention: NumberingConvention,
+) {
     if let (Some(anchor), Some(number)) = (&clause.anchor, &clause.number) {
-        map.insert(anchor.clone(), number.full_reference(prefix));
+        map.insert(anchor.clone(), number.full_reference(prefix, convention));
     }
     for element in &clause.body {
         if let ClauseBody::Children(kids) = element {
             for child in kids {
-                collect_anchors(child, map, prefix);
+                collect_anchors(child, map, prefix, convention);
             }
         }
     }
@@ -151,11 +159,12 @@ fn resolve_cross_refs(
     body: &mut [BodyElement],
     anchor_map: &HashMap<String, String>,
     diagnostics: &mut Vec<Diagnostic>,
+    convention: NumberingConvention,
 ) {
     for element in body.iter_mut() {
         match element {
             BodyElement::Clause(clause) => {
-                resolve_clause_cross_refs(clause, anchor_map, diagnostics);
+                resolve_clause_cross_refs(clause, anchor_map, diagnostics, convention);
             }
             BodyElement::Prose(inlines) => {
                 resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, None);
@@ -168,8 +177,12 @@ fn resolve_clause_cross_refs(
     clause: &mut Clause,
     anchor_map: &HashMap<String, String>,
     diagnostics: &mut Vec<Diagnostic>,
+    convention: NumberingConvention,
 ) {
-    let clause_loc = clause.number.as_ref().map(|n| n.full_reference("clause"));
+    let clause_loc = clause
+        .number
+        .as_ref()
+        .map(|n| n.full_reference("clause", convention));
 
     if let Some(ref mut heading) = clause.heading {
         resolve_inlines_cross_refs(
@@ -194,7 +207,7 @@ fn resolve_clause_cross_refs(
             },
             ClauseBody::Children(kids) => {
                 for child in kids {
-                    resolve_clause_cross_refs(child, anchor_map, diagnostics);
+                    resolve_clause_cross_refs(child, anchor_map, diagnostics, convention);
                 }
             }
         }
@@ -234,6 +247,7 @@ fn resolve_addendum_cross_refs(
     addendum: &mut Addendum,
     anchor_map: &HashMap<String, String>,
     diagnostics: &mut Vec<Diagnostic>,
+    convention: NumberingConvention,
 ) {
     let loc = addendum.heading();
     for content in &mut addendum.content {
@@ -246,7 +260,7 @@ fn resolve_addendum_cross_refs(
             }
             AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
-                    resolve_clause_cross_refs(clause, anchor_map, diagnostics);
+                    resolve_clause_cross_refs(clause, anchor_map, diagnostics, convention);
                 }
             }
             AddendumContent::NumberedList(items) | AddendumContent::BulletList(items) => {
@@ -343,7 +357,11 @@ enum TermKind {
     FieldLabel,                // **Label**: structural label, not a term
 }
 
-fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, Regex)]) {
+fn collect_and_validate_terms(
+    doc: &mut Document,
+    schedule_patterns: &[(usize, Regex)],
+    convention: NumberingConvention,
+) {
     let mut definitions: Vec<TermDefinition> = Vec::new();
     let mut schedule_items: Vec<ScheduleItem> = Vec::new();
 
@@ -372,6 +390,7 @@ fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, R
                         &mut definitions,
                         &mut schedule_items,
                         schedule_patterns,
+                        convention,
                     );
                 }
                 BodyElement::Prose(inlines) => {
@@ -394,6 +413,7 @@ fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, R
                     &mut definitions,
                     &mut schedule_items,
                     schedule_patterns,
+                    convention,
                 );
             }
             BodyElement::Prose(inlines) => {
@@ -413,6 +433,7 @@ fn collect_and_validate_terms(doc: &mut Document, schedule_patterns: &[(usize, R
             &mut definitions,
             &mut schedule_items,
             schedule_patterns,
+            convention,
         );
     }
 
@@ -487,8 +508,12 @@ fn collect_clause_terms(
     defs: &mut Vec<TermDefinition>,
     schedule_items: &mut Vec<ScheduleItem>,
     patterns: &[(usize, Regex)],
+    convention: NumberingConvention,
 ) {
-    let clause_loc = clause.number.as_ref().map(|n| n.full_reference("clause"));
+    let clause_loc = clause
+        .number
+        .as_ref()
+        .map(|n| n.full_reference("clause", convention));
 
     for element in &clause.body {
         match element {
@@ -506,7 +531,7 @@ fn collect_clause_terms(
             },
             ClauseBody::Children(kids) => {
                 for child in kids {
-                    collect_clause_terms(child, defs, schedule_items, patterns);
+                    collect_clause_terms(child, defs, schedule_items, patterns, convention);
                 }
             }
         }
@@ -518,6 +543,7 @@ fn collect_addendum_terms(
     defs: &mut Vec<TermDefinition>,
     schedule_items: &mut Vec<ScheduleItem>,
     patterns: &[(usize, Regex)],
+    convention: NumberingConvention,
 ) {
     let heading = addendum.heading();
     let loc = Some(heading.as_str());
@@ -528,7 +554,7 @@ fn collect_addendum_terms(
             }
             AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
-                    collect_clause_terms(clause, defs, schedule_items, patterns);
+                    collect_clause_terms(clause, defs, schedule_items, patterns, convention);
                 }
             }
             AddendumContent::NumberedList(items) | AddendumContent::BulletList(items) => {
@@ -788,34 +814,6 @@ fn inlines_contain_meaning_phrase(inlines: &[InlineContent]) -> bool {
     false
 }
 
-// --- Roman numerals ---
-
-fn to_roman(mut n: u32) -> String {
-    let table = [
-        (1000, "m"),
-        (900, "cm"),
-        (500, "d"),
-        (400, "cd"),
-        (100, "c"),
-        (90, "xc"),
-        (50, "l"),
-        (40, "xl"),
-        (10, "x"),
-        (9, "ix"),
-        (5, "v"),
-        (4, "iv"),
-        (1, "i"),
-    ];
-    let mut result = String::new();
-    for &(value, numeral) in &table {
-        while n >= value {
-            result.push_str(numeral);
-            n -= value;
-        }
-    }
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -976,7 +974,7 @@ schedule:
     1. The Seller shall deliver the goods by the Delivery Date.
 "#;
         let mut doc = crate::parse(input).unwrap();
-        crate::resolve(&mut doc);
+        crate::resolve(&mut doc, NumberingConvention::Commonwealth);
 
         assert_eq!(doc.schedule_items.len(), 2);
         assert_eq!(doc.schedule_items[0].term, "Payment Amount");
@@ -1003,7 +1001,7 @@ schedule:
     1. **Amount** has the meaning given by the Schedule.
 "#;
         let mut doc = crate::parse(input).unwrap();
-        crate::resolve(&mut doc);
+        crate::resolve(&mut doc, NumberingConvention::Commonwealth);
 
         // "Payment Schedule" is declared but no terms reference it
         let warnings: Vec<_> = doc

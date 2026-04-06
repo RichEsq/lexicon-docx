@@ -100,6 +100,13 @@ enum ScheduleOrderArg {
     Alphabetical,
 }
 
+#[derive(Clone, ValueEnum)]
+enum NumberingConventionArg {
+    Commonwealth,
+    Decimal,
+    UsTraditional,
+}
+
 // ---------------------------------------------------------------------------
 // Style override flags — highest priority, applied on top of TOML config
 // ---------------------------------------------------------------------------
@@ -220,6 +227,10 @@ struct StyleOverrides {
         help_heading = "Clause Indentation"
     )]
     no_recitals_align_first_level: bool,
+
+    /// Numbering convention for clause hierarchy
+    #[arg(long, value_enum, help_heading = "Clause Indentation")]
+    numbering_convention: Option<NumberingConventionArg>,
 
     // --- Formatting ---
     /// Date format string (chrono strftime syntax)
@@ -477,6 +488,19 @@ impl StyleOverrides {
         if self.no_recitals_align_first_level {
             config.recitals_align_first_level = false;
         }
+        if let Some(v) = self.numbering_convention {
+            config.numbering_convention = match v {
+                NumberingConventionArg::Commonwealth => {
+                    lexicon_docx::style::NumberingConvention::Commonwealth
+                }
+                NumberingConventionArg::Decimal => {
+                    lexicon_docx::style::NumberingConvention::Decimal
+                }
+                NumberingConventionArg::UsTraditional => {
+                    lexicon_docx::style::NumberingConvention::UsTraditional
+                }
+            };
+        }
 
         // Formatting
         if let Some(v) = self.date_format {
@@ -700,7 +724,10 @@ fn main() {
 
             match lexicon_docx::parse(&input_text) {
                 Ok(mut doc) => {
-                    lexicon_docx::resolve(&mut doc);
+                    lexicon_docx::resolve(
+                        &mut doc,
+                        lexicon_docx::style::NumberingConvention::Commonwealth,
+                    );
                     let has_errors = print_diagnostics(&doc.diagnostics);
 
                     if has_errors {

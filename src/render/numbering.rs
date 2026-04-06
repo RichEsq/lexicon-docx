@@ -3,7 +3,7 @@ use docx_rs::{
 };
 
 use crate::model::ClauseLevel;
-use crate::style::StyleConfig;
+use crate::style::{NumberingConvention, StyleConfig};
 
 // Word numbering engine IDs (start at 2 to avoid docx-rs default abstractNum at ID 1)
 pub const ABSTRACT_NUM_ID: usize = 2;
@@ -26,121 +26,131 @@ pub fn create_recital_numbering(style: &StyleConfig) -> AbstractNumbering {
     )
 }
 
+struct LevelDef {
+    format: &'static str,
+    text: &'static str,
+}
+
+fn level_defs(convention: NumberingConvention) -> [LevelDef; 6] {
+    match convention {
+        NumberingConvention::Commonwealth => [
+            LevelDef {
+                format: "decimal",
+                text: "%1.",
+            },
+            LevelDef {
+                format: "decimal",
+                text: "%1.%2",
+            },
+            LevelDef {
+                format: "lowerLetter",
+                text: "(%3)",
+            },
+            LevelDef {
+                format: "lowerRoman",
+                text: "(%4)",
+            },
+            LevelDef {
+                format: "upperLetter",
+                text: "(%5)",
+            },
+            LevelDef {
+                format: "upperRoman",
+                text: "(%6)",
+            },
+        ],
+        NumberingConvention::Decimal => [
+            LevelDef {
+                format: "decimal",
+                text: "%1.",
+            },
+            LevelDef {
+                format: "decimal",
+                text: "%1.%2",
+            },
+            LevelDef {
+                format: "decimal",
+                text: "%1.%2.%3",
+            },
+            LevelDef {
+                format: "decimal",
+                text: "%1.%2.%3.%4",
+            },
+            LevelDef {
+                format: "decimal",
+                text: "%1.%2.%3.%4.%5",
+            },
+            LevelDef {
+                format: "decimal",
+                text: "%1.%2.%3.%4.%5.%6",
+            },
+        ],
+        NumberingConvention::UsTraditional => [
+            LevelDef {
+                format: "upperRoman",
+                text: "%1.",
+            },
+            LevelDef {
+                format: "upperLetter",
+                text: "%2.",
+            },
+            LevelDef {
+                format: "decimal",
+                text: "%3.",
+            },
+            LevelDef {
+                format: "lowerLetter",
+                text: "%4.",
+            },
+            LevelDef {
+                format: "decimal",
+                text: "(%5)",
+            },
+            LevelDef {
+                format: "lowerLetter",
+                text: "(%6)",
+            },
+        ],
+    }
+}
+
 fn create_clause_numbering_with(style: &StyleConfig, id: usize, align: bool) -> AbstractNumbering {
     let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
     let hanging = StyleConfig::cm_to_twips(style.hanging_indent_cm);
+    let defs = level_defs(style.numbering_convention);
 
-    let level_indent = |level: usize| -> i32 {
+    let mut numbering = AbstractNumbering::new(id);
+    numbering.multi_level_type = Some("multilevel".to_string());
+
+    for (i, def) in defs.iter().enumerate() {
         let num_steps = if align {
-            match level {
+            match i {
                 0 | 1 => 0,
                 n => n - 1,
             }
         } else {
-            level
+            i
         };
-        num_steps as i32 * step + hanging
-    };
+        let indent = num_steps as i32 * step + hanging;
 
-    let mut numbering = AbstractNumbering::new(id);
-    numbering.multi_level_type = Some("multilevel".to_string());
-    let level0 = Level::new(
-        0,
-        Start::new(1),
-        NumberFormat::new("decimal"),
-        LevelText::new("%1."),
-        LevelJc::new("left"),
-    )
-    .indent(
-        Some(level_indent(0)),
-        Some(SpecialIndentType::Hanging(hanging)),
-        None,
-        None,
-    );
+        numbering = numbering.add_level(
+            Level::new(
+                i,
+                Start::new(1),
+                NumberFormat::new(def.format),
+                LevelText::new(def.text),
+                LevelJc::new("left"),
+            )
+            .indent(
+                Some(indent),
+                Some(SpecialIndentType::Hanging(hanging)),
+                None,
+                None,
+            ),
+        );
+    }
 
     numbering
-        // Level 0: TopLevel — "1."
-        .add_level(level0)
-        // Level 1: Clause — "1.1"
-        .add_level(
-            Level::new(
-                1,
-                Start::new(1),
-                NumberFormat::new("decimal"),
-                LevelText::new("%1.%2"),
-                LevelJc::new("left"),
-            )
-            .indent(
-                Some(level_indent(1)),
-                Some(SpecialIndentType::Hanging(hanging)),
-                None,
-                None,
-            ),
-        )
-        // Level 2: SubClause — "(a)"
-        .add_level(
-            Level::new(
-                2,
-                Start::new(1),
-                NumberFormat::new("lowerLetter"),
-                LevelText::new("(%3)"),
-                LevelJc::new("left"),
-            )
-            .indent(
-                Some(level_indent(2)),
-                Some(SpecialIndentType::Hanging(hanging)),
-                None,
-                None,
-            ),
-        )
-        // Level 3: SubSubClause — "(i)"
-        .add_level(
-            Level::new(
-                3,
-                Start::new(1),
-                NumberFormat::new("lowerRoman"),
-                LevelText::new("(%4)"),
-                LevelJc::new("left"),
-            )
-            .indent(
-                Some(level_indent(3)),
-                Some(SpecialIndentType::Hanging(hanging)),
-                None,
-                None,
-            ),
-        )
-        // Level 4: Paragraph — "(A)"
-        .add_level(
-            Level::new(
-                4,
-                Start::new(1),
-                NumberFormat::new("upperLetter"),
-                LevelText::new("(%5)"),
-                LevelJc::new("left"),
-            )
-            .indent(
-                Some(level_indent(4)),
-                Some(SpecialIndentType::Hanging(hanging)),
-                None,
-                None,
-            ),
-        )
-        // Level 5: SubParagraph — "(I)"
-        .add_level(
-            Level::new(
-                5,
-                Start::new(1),
-                NumberFormat::new("upperRoman"),
-                LevelText::new("(%6)"),
-                LevelJc::new("left"),
-            )
-            .indent(
-                Some(level_indent(5)),
-                Some(SpecialIndentType::Hanging(hanging)),
-                None,
-                None,
-            ),
-        )
 }
 
 pub fn create_simple_list_numbering(style: &StyleConfig) -> AbstractNumbering {

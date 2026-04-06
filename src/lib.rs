@@ -12,14 +12,14 @@ use std::path::{Path, PathBuf};
 use error::{Diagnostic, Result};
 use model::{Document, Status};
 use signatures::SignatureBlock;
-use style::StyleConfig;
+use style::{NumberingConvention, StyleConfig};
 
 pub fn parse(input: &str) -> Result<Document> {
     parser::parse(input)
 }
 
-pub fn resolve(doc: &mut Document) {
-    resolve::resolve(doc);
+pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
+    resolve::resolve(doc, convention);
 }
 
 pub fn render_docx(
@@ -69,7 +69,7 @@ pub fn process(
     signatures_path: Option<&Path>,
 ) -> Result<(Vec<u8>, Vec<Diagnostic>)> {
     let mut doc = parse(input)?;
-    resolve(&mut doc);
+    resolve(&mut doc, style.numbering_convention);
 
     // Resolve signature blocks if enabled
     let mut sig_diagnostics = Vec::new();

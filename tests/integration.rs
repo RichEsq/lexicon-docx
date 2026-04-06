@@ -1,5 +1,5 @@
 use lexicon_docx::model::*;
-use lexicon_docx::style::StyleConfig;
+use lexicon_docx::style::{NumberingConvention, StyleConfig};
 
 // ---------------------------------------------------------------------------
 // Helper: minimal valid front-matter
@@ -17,10 +17,10 @@ parties:
 ---
 "#;
 
-/// Helper to parse + resolve in one step.
+/// Helper to parse + resolve in one step (using Commonwealth convention by default).
 fn parse_and_resolve(input: &str) -> Document {
     let mut doc = lexicon_docx::parse(input).unwrap();
-    lexicon_docx::resolve(&mut doc);
+    lexicon_docx::resolve(&mut doc, NumberingConvention::Commonwealth);
     doc
 }
 
@@ -207,16 +207,13 @@ fn nested_clause_numbering() {
     assert!(matches!(child.number, Some(ClauseNumber::Clause(1, 1))));
 
     let sub = first_child_clause(child).expect("Expected sub-clause");
-    assert!(matches!(
-        sub.number,
-        Some(ClauseNumber::SubClause(1, 1, 'a'))
-    ));
+    assert!(matches!(sub.number, Some(ClauseNumber::SubClause(1, 1, 1))));
 
     let subsub = first_child_clause(sub).expect("Expected sub-sub-clause");
-    match &subsub.number {
-        Some(ClauseNumber::SubSubClause(1, 1, 'a', r)) => assert_eq!(r, "i"),
-        other => panic!("Expected SubSubClause(1,1,a,i), got {:?}", other),
-    }
+    assert!(matches!(
+        subsub.number,
+        Some(ClauseNumber::SubSubClause(1, 1, 1, 1))
+    ));
 }
 
 #[test]
@@ -238,22 +235,81 @@ fn multiple_top_level_clauses_numbered_sequentially() {
 }
 
 #[test]
-fn clause_number_full_reference() {
+fn clause_number_full_reference_commonwealth() {
+    let c = NumberingConvention::Commonwealth;
     assert_eq!(
-        ClauseNumber::TopLevel(3).full_reference("clause"),
+        ClauseNumber::TopLevel(3).full_reference("clause", c),
         "clause 3"
     );
     assert_eq!(
-        ClauseNumber::Clause(2, 5).full_reference("clause"),
+        ClauseNumber::Clause(2, 5).full_reference("clause", c),
         "clause 2.5"
     );
     assert_eq!(
-        ClauseNumber::SubClause(1, 2, 'c').full_reference("clause"),
+        ClauseNumber::SubClause(1, 2, 3).full_reference("clause", c),
         "clause 1.2(c)"
     );
     assert_eq!(
-        ClauseNumber::SubSubClause(1, 2, 'a', "ii".to_string()).full_reference("clause"),
+        ClauseNumber::SubSubClause(1, 2, 1, 2).full_reference("clause", c),
         "clause 1.2(a)(ii)"
+    );
+}
+
+#[test]
+fn clause_number_full_reference_decimal() {
+    let c = NumberingConvention::Decimal;
+    assert_eq!(
+        ClauseNumber::TopLevel(3).full_reference("clause", c),
+        "clause 3"
+    );
+    assert_eq!(
+        ClauseNumber::Clause(2, 5).full_reference("clause", c),
+        "clause 2.5"
+    );
+    assert_eq!(
+        ClauseNumber::SubClause(1, 2, 3).full_reference("clause", c),
+        "clause 1.2.3"
+    );
+    assert_eq!(
+        ClauseNumber::SubSubClause(1, 2, 1, 2).full_reference("clause", c),
+        "clause 1.2.1.2"
+    );
+    assert_eq!(
+        ClauseNumber::Paragraph(1, 2, 1, 2, 3).full_reference("clause", c),
+        "clause 1.2.1.2.3"
+    );
+    assert_eq!(
+        ClauseNumber::SubParagraph(1, 2, 1, 2, 3, 4).full_reference("clause", c),
+        "clause 1.2.1.2.3.4"
+    );
+}
+
+#[test]
+fn clause_number_full_reference_us_traditional() {
+    let c = NumberingConvention::UsTraditional;
+    assert_eq!(
+        ClauseNumber::TopLevel(3).full_reference("clause", c),
+        "clause III"
+    );
+    assert_eq!(
+        ClauseNumber::Clause(2, 5).full_reference("clause", c),
+        "clause II.E"
+    );
+    assert_eq!(
+        ClauseNumber::SubClause(1, 2, 3).full_reference("clause", c),
+        "clause I.B.3"
+    );
+    assert_eq!(
+        ClauseNumber::SubSubClause(1, 2, 1, 2).full_reference("clause", c),
+        "clause I.B.1.b"
+    );
+    assert_eq!(
+        ClauseNumber::Paragraph(1, 2, 1, 2, 3).full_reference("clause", c),
+        "clause I.B.1.b(3)"
+    );
+    assert_eq!(
+        ClauseNumber::SubParagraph(1, 2, 1, 2, 3, 4).full_reference("clause", c),
+        "clause I.B.1.b(3)(d)"
     );
 }
 
@@ -584,7 +640,7 @@ fn full_pipeline_produces_docx_bytes() {
         MINIMAL
     );
     let mut doc = lexicon_docx::parse(&input).unwrap();
-    lexicon_docx::resolve(&mut doc);
+    lexicon_docx::resolve(&mut doc, NumberingConvention::Commonwealth);
 
     let style = StyleConfig::default();
     let bytes = lexicon_docx::render_docx(&doc, &style, None, &[]).unwrap();
@@ -1126,15 +1182,15 @@ fn multiple_sub_clauses_lettered_correctly() {
     assert_eq!(sub_clauses.len(), 3, "Expected 3 sub-clauses");
     assert!(matches!(
         sub_clauses[0].number,
-        Some(ClauseNumber::SubClause(1, 1, 'a'))
+        Some(ClauseNumber::SubClause(1, 1, 1))
     ));
     assert!(matches!(
         sub_clauses[1].number,
-        Some(ClauseNumber::SubClause(1, 1, 'b'))
+        Some(ClauseNumber::SubClause(1, 1, 2))
     ));
     assert!(matches!(
         sub_clauses[2].number,
-        Some(ClauseNumber::SubClause(1, 1, 'c'))
+        Some(ClauseNumber::SubClause(1, 1, 3))
     ));
 }
 
@@ -1187,26 +1243,26 @@ fn sub_clause_numbering_resets_per_parent() {
     assert_eq!(subs_1.len(), 2);
     assert!(matches!(
         subs_1[0].number,
-        Some(ClauseNumber::SubClause(1, 1, 'a'))
+        Some(ClauseNumber::SubClause(1, 1, 1))
     ));
     assert!(matches!(
         subs_1[1].number,
-        Some(ClauseNumber::SubClause(1, 1, 'b'))
+        Some(ClauseNumber::SubClause(1, 1, 2))
     ));
 
     let subs_2 = collect_children(clauses[1]);
     assert_eq!(subs_2.len(), 3);
     assert!(matches!(
         subs_2[0].number,
-        Some(ClauseNumber::SubClause(1, 2, 'a'))
+        Some(ClauseNumber::SubClause(1, 2, 1))
     ));
     assert!(matches!(
         subs_2[1].number,
-        Some(ClauseNumber::SubClause(1, 2, 'b'))
+        Some(ClauseNumber::SubClause(1, 2, 2))
     ));
     assert!(matches!(
         subs_2[2].number,
-        Some(ClauseNumber::SubClause(1, 2, 'c'))
+        Some(ClauseNumber::SubClause(1, 2, 3))
     ));
 }
 
