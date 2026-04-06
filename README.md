@@ -98,6 +98,7 @@ Every style.toml setting can also be set from the command line. This is useful f
 |------|-------------|---------|
 | `--indent-per-level <CM>` | Indent per clause level in cm | 1.27 |
 | `--hanging-indent <CM>` | Hanging indent for numbers in cm | 1.27 |
+| `--numbering-convention <CONV>` | `commonwealth`, `decimal`, or `us-traditional` | commonwealth |
 | `--body-align-first-level` | Align first-level body clauses with second level | off |
 | `--no-body-align-first-level` | (opposite of above) | |
 | `--recitals-align-first-level` | Align first-level recital clauses with second level | off |
@@ -177,7 +178,7 @@ This creates `lexicon-docx.1`, `lexicon-docx-build.1`, and `lexicon-docx-validat
 |---------|-------------|
 | Cover page | Title, parties, date, status, version, author, reference |
 | Table of contents | Auto-generated from clause headings |
-| Legal numbering | Native Word numbering: `1.`, `1.1`, `(a)`, `(i)`, `(A)`, `(I)` |
+| Legal numbering | Native Word numbering with three conventions: Commonwealth (`1.1`, `(a)`, `(i)`), Decimal (`1.1.1`), US Traditional (`I.`, `A.`, `1.`) |
 | Cross-references | `{#id}` anchors resolved to clickable Word hyperlinks |
 | Defined terms | Bold terms validated for usage; warnings on unused terms |
 | Recitals / Background | Optional pre-body section with independent numbering |
@@ -221,6 +222,7 @@ indent_per_level_cm = 1.27
 hanging_indent_cm = 1.27
 body_align_first_level = false      # true: body levels 0 and 1 share the same indent
 recitals_align_first_level = false  # true: recitals levels 0 and 1 share the same indent
+numbering_convention = "commonwealth"  # "commonwealth", "decimal", or "us_traditional"
 ```
 
 ### Defined term rendering
