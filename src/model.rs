@@ -177,7 +177,7 @@ impl ClauseNumber {
 
     fn format_commonwealth(&self) -> String {
         match self {
-            ClauseNumber::TopLevel(a) => format!("{}", a),
+            ClauseNumber::TopLevel(a) => a.to_string(),
             ClauseNumber::Clause(a, b) => format!("{}.{}", a, b),
             ClauseNumber::SubClause(a, b, c) => {
                 format!("{}.{}({})", a, b, to_lower_letter(*c))
@@ -217,7 +217,7 @@ impl ClauseNumber {
 
     fn format_decimal(&self) -> String {
         match self {
-            ClauseNumber::TopLevel(a) => format!("{}", a),
+            ClauseNumber::TopLevel(a) => a.to_string(),
             ClauseNumber::Clause(a, b) => format!("{}.{}", a, b),
             ClauseNumber::SubClause(a, b, c) => format!("{}.{}.{}", a, b, c),
             ClauseNumber::SubSubClause(a, b, c, d) => format!("{}.{}.{}.{}", a, b, c, d),
@@ -232,7 +232,7 @@ impl ClauseNumber {
 
     fn format_us_traditional(&self) -> String {
         match self {
-            ClauseNumber::TopLevel(a) => format!("{}", to_upper_roman(*a)),
+            ClauseNumber::TopLevel(a) => to_upper_roman(*a),
             ClauseNumber::Clause(a, b) => {
                 format!("{}.{}", to_upper_roman(*a), to_upper_letter(*b))
             }
