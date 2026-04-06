@@ -685,6 +685,35 @@ fn term_variants(term: &str) -> Vec<String> {
         }
     }
 
+    // Generate forward plural forms (spec 4.4.3) so the defined term
+    // matches its plural in the document text.
+    let last_word = lower.rsplit_once(' ').map_or(lower.as_str(), |(_, w)| w);
+    if last_word.len() > 2 {
+        let plural = if last_word.ends_with('y')
+            && !last_word.ends_with("ay")
+            && !last_word.ends_with("ey")
+            && !last_word.ends_with("oy")
+            && !last_word.ends_with("uy")
+        {
+            // consonant + y → ies (Party → Parties, Authority → Authorities)
+            format!("{}ies", &lower[..lower.len() - 1])
+        } else if last_word.ends_with('s')
+            || last_word.ends_with('x')
+            || last_word.ends_with('z')
+            || last_word.ends_with("sh")
+            || last_word.ends_with("ch")
+        {
+            // sibilant endings → +es (Business → Businesses)
+            format!("{}es", lower)
+        } else {
+            // default → +s (Agreement → Agreements)
+            format!("{}s", lower)
+        };
+        if plural != lower {
+            variants.push(plural);
+        }
+    }
+
     variants
 }
 
