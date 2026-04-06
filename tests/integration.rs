@@ -647,6 +647,221 @@ parties:
 }
 
 // ===========================================================================
+// DOCX structural verification
+// ===========================================================================
+
+/// Helper: build a DOCX from input + style, return document.xml as a String.
+fn build_and_read_document_xml(input: &str, style: &StyleConfig) -> String {
+    let (bytes, _) = lexicon_docx::process(input, style, None, None).unwrap();
+    let cursor = std::io::Cursor::new(bytes);
+    let mut archive = zip::ZipArchive::new(cursor).unwrap();
+    let mut xml = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("word/document.xml").unwrap(), &mut xml)
+        .unwrap();
+    xml
+}
+
+#[test]
+fn docx_contains_clause_text() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Service** means the hosted platform.\n",
+        MINIMAL
+    );
+    let xml = build_and_read_document_xml(&input, &StyleConfig::default());
+    assert!(
+        xml.contains("Service"),
+        "document.xml should contain clause text"
+    );
+    assert!(
+        xml.contains("hosted platform"),
+        "document.xml should contain definition text"
+    );
+}
+
+#[test]
+fn docx_contains_title() {
+    let xml = build_and_read_document_xml(MINIMAL, &StyleConfig::default());
+    assert!(
+        xml.contains("Test Agreement"),
+        "document.xml should contain the document title"
+    );
+}
+
+#[test]
+fn docx_cover_page_present_by_default() {
+    let input = format!("{}\n1. ## Clause\n\n    1. Text.\n", MINIMAL);
+    let xml = build_and_read_document_xml(&input, &StyleConfig::default());
+    // Cover page renders party names and "between" label
+    assert!(xml.contains("Alice"), "Cover page should contain party name");
+    assert!(xml.contains("Bob"), "Cover page should contain party name");
+}
+
+#[test]
+fn docx_cover_page_absent_when_disabled() {
+    let input = format!("{}\n1. ## Clause\n\n    1. Text.\n", MINIMAL);
+    let mut style = StyleConfig::default();
+    style.cover.enabled = false;
+    let xml = build_and_read_document_xml(&input, &style);
+    // Title should still appear (inline title), but no "between" label
+    assert!(
+        xml.contains("Test Agreement"),
+        "Title should still appear inline"
+    );
+    assert!(
+        !xml.contains(&style.cover.between_label),
+        "Between label should not appear when cover is disabled"
+    );
+}
+
+#[test]
+fn docx_toc_contains_heading_text() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. Text.\n\n1. ## Obligations\n\n    1. Text.\n",
+        MINIMAL
+    );
+    let xml = build_and_read_document_xml(&input, &StyleConfig::default());
+    // TOC items should contain the heading text
+    assert!(
+        xml.contains("Definitions"),
+        "TOC should include 'Definitions' heading"
+    );
+    assert!(
+        xml.contains("Obligations"),
+        "TOC should include 'Obligations' heading"
+    );
+}
+
+#[test]
+fn docx_toc_absent_when_disabled() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. Text.\n",
+        MINIMAL
+    );
+    let mut style = StyleConfig::default();
+    style.toc.enabled = false;
+    let xml = build_and_read_document_xml(&input, &style);
+    // When TOC is disabled, there should be no TOC instruction field
+    assert!(
+        !xml.contains("w:instrText"),
+        "No TOC field instruction when TOC is disabled"
+    );
+}
+
+#[test]
+fn docx_cross_reference_creates_bookmark() {
+    let input = format!(
+        "{}\n1. ## Terms {{#terms}}\n\n    1. See [clause 2](#obligations).\n\n1. ## Obligations {{#obligations}}\n\n    1. The Buyer shall pay.\n",
+        MINIMAL
+    );
+    let xml = build_and_read_document_xml(&input, &StyleConfig::default());
+    // Bookmarks for anchors
+    assert!(
+        xml.contains("w:bookmarkStart"),
+        "Should contain bookmark start elements"
+    );
+    assert!(
+        xml.contains("lx_obligations"),
+        "Should contain bookmark for #obligations anchor"
+    );
+}
+
+#[test]
+fn docx_cross_reference_creates_hyperlink() {
+    let input = format!(
+        "{}\n1. ## Terms {{#terms}}\n\n    1. See [clause 2](#obligations).\n\n1. ## Obligations {{#obligations}}\n\n    1. The Buyer shall pay.\n",
+        MINIMAL
+    );
+    let xml = build_and_read_document_xml(&input, &StyleConfig::default());
+    // Internal hyperlink to the bookmark
+    assert!(
+        xml.contains("w:hyperlink") && xml.contains("lx_obligations"),
+        "Should contain hyperlink to bookmark"
+    );
+}
+
+#[test]
+fn docx_numbering_references_present() {
+    let input = format!(
+        "{}\n1. ## Clause\n\n    1. Text.\n",
+        MINIMAL
+    );
+    let xml = build_and_read_document_xml(&input, &StyleConfig::default());
+    // Clauses should reference a numbering ID
+    assert!(
+        xml.contains("w:numId"),
+        "Clause paragraphs should reference Word numbering"
+    );
+}
+
+#[test]
+fn docx_schedule_renders_at_end_by_default() {
+    let input = r#"---
+title: Test
+date: 2026-01-01
+parties:
+  - name: A
+    role: R
+schedule:
+  - title: Schedule
+---
+
+1. ## Definitions
+
+    1. **Payment** has the meaning given by the Schedule.
+
+1. ## Body
+
+    1. Body clause content here.
+"#;
+    let xml = build_and_read_document_xml(input, &StyleConfig::default());
+    // Schedule heading should appear
+    assert!(
+        xml.contains("SCHEDULE"),
+        "Schedule heading should appear in output"
+    );
+    // "Payment" should appear as a schedule item
+    assert!(
+        xml.contains("Payment"),
+        "Schedule item 'Payment' should appear"
+    );
+    // Schedule table (with "Particulars" header) should come after body text.
+    // We check for the table header rather than "SCHEDULE" because the heading
+    // also appears in the TOC (before the body).
+    let body_pos = xml
+        .find("Body clause content here")
+        .expect("Body text should appear in document.xml");
+    let schedule_table_pos = xml
+        .find("Particulars")
+        .expect("Schedule table header should appear in document.xml");
+    assert!(
+        schedule_table_pos > body_pos,
+        "Schedule table should appear after body clauses (default: end)"
+    );
+}
+
+#[test]
+fn docx_addendum_renders_with_heading() {
+    let input = format!(
+        "{}# ADDENDUM - Processing Details\n\nAddendum content here.\n",
+        MINIMAL
+    );
+    let xml = build_and_read_document_xml(&input, &StyleConfig::default());
+    // Heading is fully uppercased by the renderer
+    assert!(
+        xml.contains("ADDENDUM 1"),
+        "Addendum heading should appear with number"
+    );
+    assert!(
+        xml.contains("PROCESSING DETAILS"),
+        "Addendum title should appear (uppercased)"
+    );
+    assert!(
+        xml.contains("Addendum content here"),
+        "Addendum body should appear"
+    );
+}
+
+// ===========================================================================
 // Helpers
 // ===========================================================================
 
@@ -674,6 +889,565 @@ fn first_clause_paragraph_inlines(doc: &Document) -> &[InlineContent] {
         }
     }
     panic!("No paragraph found in first child clause");
+}
+
+// ===========================================================================
+// Defined term plural matching (spec 4.4.3)
+// ===========================================================================
+
+#[test]
+fn plural_s_suffix_no_warning() {
+    // "Member" defined, "Members" used — "member" is a substring of "members"
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Member** means any person who has joined.\n\n1. ## Scope\n\n    1. All Members must comply with the rules.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Member") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "'Member' should be found as substring of 'Members': {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn plural_s_substring_match() {
+    // "Agreement" is a substring of "Agreements" — simple plurals work via substring matching
+    let input = format!(
+        "{}\n1. ## Scope\n\n    1. All prior Agreements are superseded.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Agreement") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "'Agreement' should be found as substring of 'Agreements': {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn plural_ies_suffix_no_warning() {
+    // "Authority" → "Authorities" matched via forward plural generation
+    // (consonant + y → ies, per spec 4.4.3)
+    let input = r#"---
+title: Test
+date: 2026-01-01
+parties:
+  - name: Alice
+    role: Authority
+  - name: Bob
+    role: Buyer
+---
+
+1. ## Scope
+
+    1. All relevant Authorities must approve the transaction.
+"#;
+    let doc = parse_and_resolve(input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Authority") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "'Authorities' should match 'Authority' via ies plural rule: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn plural_es_suffix_no_warning() {
+    // "Business" → "Businesses" (es suffix)
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Business** means the company's operations.\n\n1. ## Scope\n\n    1. The Buyer shall manage all Businesses.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Business") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "'Businesses' should match 'Business' via es suffix: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn possessive_form_no_warning() {
+    // "Employer" used as "Employer's" — possessive should still match
+    let input = r#"---
+title: Test
+date: 2026-01-01
+parties:
+  - name: Alice
+    role: Employer
+  - name: Bob
+    role: Employee
+---
+
+1. ## Scope
+
+    1. The Employee shall follow the Employer's instructions.
+"#;
+    let doc = parse_and_resolve(input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Employer") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "Possessive form should match: {:?}",
+        warnings
+    );
+}
+
+// ===========================================================================
+// Defined term longest match (spec 4.4.2)
+// ===========================================================================
+
+#[test]
+fn longest_match_both_terms_found() {
+    // Both "Merchant" and "Merchant Data" defined; text uses both.
+    // Neither should produce an "unused" warning.
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Merchant** means the retailer.\n\n    1. **Merchant Data** means data belonging to the Merchant.\n\n1. ## Scope\n\n    1. The Buyer shall protect all Merchant Data received from the Merchant.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let merchant_warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Merchant") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        merchant_warnings.is_empty(),
+        "Both 'Merchant' and 'Merchant Data' should be found in text: {:?}",
+        merchant_warnings
+    );
+}
+
+#[test]
+fn prefix_term_not_consumed_by_longer_term() {
+    // "Merchant Data" appears but "Merchant" alone does not (outside of "Merchant Data").
+    // The substring matching means "merchant" IS found inside "merchant data", so no warning.
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Merchant** means the retailer.\n\n    1. **Merchant Data** means data belonging to the Merchant.\n\n1. ## Scope\n\n    1. The Buyer shall protect all Merchant Data.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    // With substring matching, "merchant" appears inside "merchant data" — no warning
+    let merchant_warning: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("'Merchant'") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        merchant_warning.is_empty(),
+        "'Merchant' substring is present within 'Merchant Data': {:?}",
+        merchant_warning
+    );
+}
+
+// ===========================================================================
+// Inline definitions (spec 4.3)
+// ===========================================================================
+
+#[test]
+fn inline_definition_parenthetical() {
+    // ("**Term**") pattern
+    let input = format!(
+        "{}\n1. ## Scope\n\n    1. The Buyer agrees to pay (the \"**Payment**\") to the Seller.\n\n1. ## Terms\n\n    1. The Payment shall be made in full.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Payment") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "Inline definition should be recognised and 'Payment' found in usage: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn inline_definition_without_the() {
+    // ("**Term**") without "the"
+    let input = format!(
+        "{}\n1. ## Scope\n\n    1. The parties to this agreement (\"**Parties**\") agree as follows.\n\n1. ## Terms\n\n    1. The Parties shall cooperate.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Parties") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "Inline definition without 'the' should be recognised: {:?}",
+        warnings
+    );
+}
+
+// ===========================================================================
+// Multiple siblings at same level
+// ===========================================================================
+
+#[test]
+fn multiple_sub_clauses_lettered_correctly() {
+    let input = format!(
+        "{}\n1. ## Termination\n\n    1. A party may terminate if:\n\n        1. the other party breaches; or\n\n        2. the other party is insolvent; or\n\n        3. mutual agreement.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let child = first_child_clause(top).expect("Expected child clause");
+    let sub_clauses = collect_children(child);
+
+    assert_eq!(sub_clauses.len(), 3, "Expected 3 sub-clauses");
+    assert!(matches!(sub_clauses[0].number, Some(ClauseNumber::SubClause(1, 1, 'a'))));
+    assert!(matches!(sub_clauses[1].number, Some(ClauseNumber::SubClause(1, 1, 'b'))));
+    assert!(matches!(sub_clauses[2].number, Some(ClauseNumber::SubClause(1, 1, 'c'))));
+}
+
+#[test]
+fn multiple_clause_level_siblings() {
+    let input = format!(
+        "{}\n1. ## Obligations\n\n    1. First obligation.\n\n    2. Second obligation.\n\n    3. Third obligation.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let children = collect_children(top);
+
+    assert_eq!(children.len(), 3, "Expected 3 clause-level children");
+    assert!(matches!(children[0].number, Some(ClauseNumber::Clause(1, 1))));
+    assert!(matches!(children[1].number, Some(ClauseNumber::Clause(1, 2))));
+    assert!(matches!(children[2].number, Some(ClauseNumber::Clause(1, 3))));
+}
+
+#[test]
+fn sub_clause_numbering_resets_per_parent() {
+    // Two clause-level siblings each with sub-clauses — lettering should restart
+    let input = format!(
+        "{}\n1. ## Terms\n\n    1. First clause:\n\n        1. sub a;\n\n        2. sub b.\n\n    2. Second clause:\n\n        1. sub a;\n\n        2. sub b;\n\n        3. sub c.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let clauses = collect_children(top);
+    assert_eq!(clauses.len(), 2);
+
+    let subs_1 = collect_children(clauses[0]);
+    assert_eq!(subs_1.len(), 2);
+    assert!(matches!(subs_1[0].number, Some(ClauseNumber::SubClause(1, 1, 'a'))));
+    assert!(matches!(subs_1[1].number, Some(ClauseNumber::SubClause(1, 1, 'b'))));
+
+    let subs_2 = collect_children(clauses[1]);
+    assert_eq!(subs_2.len(), 3);
+    assert!(matches!(subs_2[0].number, Some(ClauseNumber::SubClause(1, 2, 'a'))));
+    assert!(matches!(subs_2[1].number, Some(ClauseNumber::SubClause(1, 2, 'b'))));
+    assert!(matches!(subs_2[2].number, Some(ClauseNumber::SubClause(1, 2, 'c'))));
+}
+
+// ===========================================================================
+// Continuation paragraphs in clauses
+// ===========================================================================
+
+#[test]
+fn continuation_paragraph_after_sub_clauses() {
+    let input = format!(
+        "{}\n1. ## Terms\n\n    1. The Buyer must:\n\n        1. deliver the goods; and\n\n        2. pay the invoice.\n\n       Nothing in this clause limits liability.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let child = first_child_clause(top).expect("Expected child clause");
+
+    // Should have content (intro paragraph), children (sub-clauses), and content (continuation)
+    let mut has_children = false;
+    let mut content_count = 0;
+    for element in &child.body {
+        match element {
+            ClauseBody::Content(_) => content_count += 1,
+            ClauseBody::Children(_) => has_children = true,
+        }
+    }
+    assert!(has_children, "Should have children (sub-clauses)");
+    assert!(
+        content_count >= 2,
+        "Should have at least 2 content blocks (intro + continuation), got {}",
+        content_count
+    );
+}
+
+#[test]
+fn multiple_paragraphs_in_clause() {
+    let input = format!(
+        "{}\n1. ## Terms\n\n    1. First paragraph of the clause.\n\n       Second paragraph of the clause.\n\n       Third paragraph of the clause.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let child = first_child_clause(top).expect("Expected child clause");
+
+    let para_count = child
+        .body
+        .iter()
+        .filter(|e| matches!(e, ClauseBody::Content(ClauseContent::Paragraph(_))))
+        .count();
+    assert_eq!(para_count, 3, "Expected 3 paragraphs in the clause");
+}
+
+// ===========================================================================
+// Tables inside clauses
+// ===========================================================================
+
+#[test]
+fn table_inside_clause() {
+    let input = format!(
+        "{}\n1. ## Fees\n\n    1. The following fees apply:\n\n       | Service | Rate |\n       |---------|------|\n       | Basic   | $100 |\n       | Premium | $200 |\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let child = first_child_clause(top).expect("Expected child clause");
+
+    let has_table = child
+        .body
+        .iter()
+        .any(|e| matches!(e, ClauseBody::Content(ClauseContent::Table(_))));
+    assert!(has_table, "Expected a table inside the clause body");
+}
+
+#[test]
+fn table_inside_clause_has_correct_structure() {
+    let input = format!(
+        "{}\n1. ## Fees\n\n    1. Rates:\n\n       | Item | Cost |\n       |------|------|\n       | A    | $10  |\n       | B    | $20  |\n       | C    | $30  |\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let child = first_child_clause(top).unwrap();
+
+    let table = child.body.iter().find_map(|e| {
+        if let ClauseBody::Content(ClauseContent::Table(t)) = e {
+            Some(t)
+        } else {
+            None
+        }
+    });
+    let table = table.expect("Expected table in clause");
+    assert_eq!(table.headers.len(), 2, "Expected 2 header columns");
+    assert_eq!(table.rows.len(), 3, "Expected 3 data rows");
+}
+
+// ===========================================================================
+// Blockquotes inside clauses
+// ===========================================================================
+
+#[test]
+fn blockquote_inside_clause() {
+    let input = format!(
+        "{}\n1. ## Fees\n\n    1. The fee is calculated as follows:\n\n       > (2 x A) - C\n       >\n       > Where A = monthly rent\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let child = first_child_clause(top).expect("Expected child clause");
+
+    let has_blockquote = child
+        .body
+        .iter()
+        .any(|e| matches!(e, ClauseBody::Content(ClauseContent::Blockquote(_))));
+    assert!(has_blockquote, "Expected a blockquote inside the clause");
+}
+
+#[test]
+fn blockquote_content_extracted() {
+    let input = format!(
+        "{}\n1. ## Formula\n\n    1. Calculate as:\n\n       > Total = X + Y\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let top = match &doc.body[0] {
+        BodyElement::Clause(c) => c,
+        _ => panic!("Expected top-level clause"),
+    };
+    let child = first_child_clause(top).unwrap();
+
+    let bq_text: String = child
+        .body
+        .iter()
+        .filter_map(|e| {
+            if let ClauseBody::Content(ClauseContent::Blockquote(inlines)) = e {
+                Some(
+                    inlines
+                        .iter()
+                        .map(|i| i.as_plain_text())
+                        .collect::<String>(),
+                )
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        bq_text.contains("Total = X + Y"),
+        "Blockquote should contain formula text, got: {:?}",
+        bq_text
+    );
+}
+
+// ===========================================================================
+// doc_type as auto-defined term
+// ===========================================================================
+
+#[test]
+fn doc_type_as_defined_term_no_warning() {
+    let input = r#"---
+title: Deed of Release
+type: Deed
+date: 2026-01-01
+parties:
+  - name: Alice
+    role: Buyer
+  - name: Bob
+    role: Seller
+---
+
+1. ## Scope
+
+    1. This Deed is entered into by the Buyer and the Seller.
+"#;
+    let doc = parse_and_resolve(input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Deed") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "'Deed' from type field should be auto-defined and found in text: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn default_agreement_type_auto_defined() {
+    // When type is omitted, "Agreement" is the default auto-defined term
+    let input = format!(
+        "{}\n1. ## Scope\n\n    1. This Agreement is binding on both the Buyer and the Seller.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Agreement") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "Default 'Agreement' type should be auto-defined: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn unused_doc_type_produces_warning() {
+    // If the doc type is never used in the body, it should warn
+    let input = r#"---
+title: Release
+type: Deed
+date: 2026-01-01
+parties:
+  - name: Alice
+    role: Buyer
+  - name: Bob
+    role: Seller
+---
+
+1. ## Scope
+
+    1. The Buyer shall pay the Seller.
+"#;
+    let doc = parse_and_resolve(input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Deed") && d.message.contains("never used"))
+        .collect();
+    assert!(
+        !warnings.is_empty(),
+        "'Deed' type is defined but never used — should warn: {:?}",
+        doc.diagnostics
+    );
+}
+
+// ===========================================================================
+// Helpers
+// ===========================================================================
+
+/// Collect all direct child clauses from a parent clause.
+fn collect_children(clause: &Clause) -> Vec<&Clause> {
+    let mut children = Vec::new();
+    for element in &clause.body {
+        if let ClauseBody::Children(kids) = element {
+            children.extend(kids.iter());
+        }
+    }
+    children
 }
 
 // ===========================================================================
