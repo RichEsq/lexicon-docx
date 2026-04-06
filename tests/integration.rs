@@ -692,7 +692,10 @@ fn docx_cover_page_present_by_default() {
     let input = format!("{}\n1. ## Clause\n\n    1. Text.\n", MINIMAL);
     let xml = build_and_read_document_xml(&input, &StyleConfig::default());
     // Cover page renders party names and "between" label
-    assert!(xml.contains("Alice"), "Cover page should contain party name");
+    assert!(
+        xml.contains("Alice"),
+        "Cover page should contain party name"
+    );
     assert!(xml.contains("Bob"), "Cover page should contain party name");
 }
 
@@ -733,10 +736,7 @@ fn docx_toc_contains_heading_text() {
 
 #[test]
 fn docx_toc_absent_when_disabled() {
-    let input = format!(
-        "{}\n1. ## Definitions\n\n    1. Text.\n",
-        MINIMAL
-    );
+    let input = format!("{}\n1. ## Definitions\n\n    1. Text.\n", MINIMAL);
     let mut style = StyleConfig::default();
     style.toc.enabled = false;
     let xml = build_and_read_document_xml(&input, &style);
@@ -781,10 +781,7 @@ fn docx_cross_reference_creates_hyperlink() {
 
 #[test]
 fn docx_numbering_references_present() {
-    let input = format!(
-        "{}\n1. ## Clause\n\n    1. Text.\n",
-        MINIMAL
-    );
+    let input = format!("{}\n1. ## Clause\n\n    1. Text.\n", MINIMAL);
     let xml = build_and_read_document_xml(&input, &StyleConfig::default());
     // Clauses should reference a numbering ID
     assert!(
@@ -1127,9 +1124,18 @@ fn multiple_sub_clauses_lettered_correctly() {
     let sub_clauses = collect_children(child);
 
     assert_eq!(sub_clauses.len(), 3, "Expected 3 sub-clauses");
-    assert!(matches!(sub_clauses[0].number, Some(ClauseNumber::SubClause(1, 1, 'a'))));
-    assert!(matches!(sub_clauses[1].number, Some(ClauseNumber::SubClause(1, 1, 'b'))));
-    assert!(matches!(sub_clauses[2].number, Some(ClauseNumber::SubClause(1, 1, 'c'))));
+    assert!(matches!(
+        sub_clauses[0].number,
+        Some(ClauseNumber::SubClause(1, 1, 'a'))
+    ));
+    assert!(matches!(
+        sub_clauses[1].number,
+        Some(ClauseNumber::SubClause(1, 1, 'b'))
+    ));
+    assert!(matches!(
+        sub_clauses[2].number,
+        Some(ClauseNumber::SubClause(1, 1, 'c'))
+    ));
 }
 
 #[test]
@@ -1147,9 +1153,18 @@ fn multiple_clause_level_siblings() {
     let children = collect_children(top);
 
     assert_eq!(children.len(), 3, "Expected 3 clause-level children");
-    assert!(matches!(children[0].number, Some(ClauseNumber::Clause(1, 1))));
-    assert!(matches!(children[1].number, Some(ClauseNumber::Clause(1, 2))));
-    assert!(matches!(children[2].number, Some(ClauseNumber::Clause(1, 3))));
+    assert!(matches!(
+        children[0].number,
+        Some(ClauseNumber::Clause(1, 1))
+    ));
+    assert!(matches!(
+        children[1].number,
+        Some(ClauseNumber::Clause(1, 2))
+    ));
+    assert!(matches!(
+        children[2].number,
+        Some(ClauseNumber::Clause(1, 3))
+    ));
 }
 
 #[test]
@@ -1170,14 +1185,29 @@ fn sub_clause_numbering_resets_per_parent() {
 
     let subs_1 = collect_children(clauses[0]);
     assert_eq!(subs_1.len(), 2);
-    assert!(matches!(subs_1[0].number, Some(ClauseNumber::SubClause(1, 1, 'a'))));
-    assert!(matches!(subs_1[1].number, Some(ClauseNumber::SubClause(1, 1, 'b'))));
+    assert!(matches!(
+        subs_1[0].number,
+        Some(ClauseNumber::SubClause(1, 1, 'a'))
+    ));
+    assert!(matches!(
+        subs_1[1].number,
+        Some(ClauseNumber::SubClause(1, 1, 'b'))
+    ));
 
     let subs_2 = collect_children(clauses[1]);
     assert_eq!(subs_2.len(), 3);
-    assert!(matches!(subs_2[0].number, Some(ClauseNumber::SubClause(1, 2, 'a'))));
-    assert!(matches!(subs_2[1].number, Some(ClauseNumber::SubClause(1, 2, 'b'))));
-    assert!(matches!(subs_2[2].number, Some(ClauseNumber::SubClause(1, 2, 'c'))));
+    assert!(matches!(
+        subs_2[0].number,
+        Some(ClauseNumber::SubClause(1, 2, 'a'))
+    ));
+    assert!(matches!(
+        subs_2[1].number,
+        Some(ClauseNumber::SubClause(1, 2, 'b'))
+    ));
+    assert!(matches!(
+        subs_2[2].number,
+        Some(ClauseNumber::SubClause(1, 2, 'c'))
+    ));
 }
 
 // ===========================================================================
