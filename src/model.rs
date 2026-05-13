@@ -100,6 +100,7 @@ pub struct Party {
 pub enum BodyElement {
     Clause(Clause),
     Prose(Vec<InlineContent>),
+    BulletList(Vec<Vec<InlineContent>>),
 }
 
 #[derive(Debug)]
@@ -316,6 +317,7 @@ pub enum ClauseContent {
     Paragraph(Vec<InlineContent>),
     Blockquote(Vec<InlineContent>),
     Table(Table),
+    BulletList(Vec<Vec<InlineContent>>),
 }
 
 #[derive(Debug, Clone)]

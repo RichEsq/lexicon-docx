@@ -104,7 +104,11 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
             NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Ordered => {
                 if let Some(ref mut add) = in_addendum {
                     if is_clause_list(child) {
-                        let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
+                        let clauses = extract_clauses_from_list(
+                            child,
+                            ClauseLevel::TopLevel,
+                            &mut diagnostics,
+                        );
                         add.content.push(AddendumContent::ClauseList(clauses));
                     } else {
                         let items = extract_bullet_list(child);
@@ -112,13 +116,21 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                     }
                 } else if in_recitals {
                     if let Some(ref mut rec) = recitals {
-                        let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
+                        let clauses = extract_clauses_from_list(
+                            child,
+                            ClauseLevel::TopLevel,
+                            &mut diagnostics,
+                        );
                         for clause in clauses {
                             rec.body.push(BodyElement::Clause(clause));
                         }
                     }
                 } else {
-                    let clauses = extract_clauses_from_list(child, ClauseLevel::TopLevel);
+                    let clauses = extract_clauses_from_list(
+                        child,
+                        ClauseLevel::TopLevel,
+                        &mut diagnostics,
+                    );
                     for clause in clauses {
                         body.push(BodyElement::Clause(clause));
                     }
@@ -157,11 +169,30 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                 }
             }
 
-            // Bullet lists in addenda
+            // Bullet lists — permitted as ordinary content in prose sections and
+            // addendum content (spec 3.10). Outside those, they fall through the
+            // clause hierarchy at the source-implied indentation level, without
+            // a clause number, and produce a warning.
             NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Bullet => {
+                let items = extract_bullet_list(child);
                 if let Some(ref mut add) = in_addendum {
-                    let items = extract_bullet_list(child);
                     add.content.push(AddendumContent::BulletList(items));
+                } else if in_recitals {
+                    if let Some(ref mut rec) = recitals {
+                        diagnostics.push(Diagnostic {
+                            level: DiagLevel::Warning,
+                            message: "Bullet point in recitals — bullets are not part of the structured outline and will not be numbered.".to_string(),
+                            location: Some("recitals".to_string()),
+                        });
+                        rec.body.push(BodyElement::BulletList(items));
+                    }
+                } else {
+                    diagnostics.push(Diagnostic {
+                        level: DiagLevel::Warning,
+                        message: "Bullet point at top level of document body — bullets are not part of the structured outline and will not be numbered.".to_string(),
+                        location: Some("document body".to_string()),
+                    });
+                    body.push(BodyElement::BulletList(items));
                 }
             }
 
@@ -211,7 +242,11 @@ fn is_clause_list<'a>(list_node: &'a AstNode<'a>) -> bool {
 }
 
 /// Extract clauses from an ordered List node.
-fn extract_clauses_from_list<'a>(list_node: &'a AstNode<'a>, level: ClauseLevel) -> Vec<Clause> {
+fn extract_clauses_from_list<'a>(
+    list_node: &'a AstNode<'a>,
+    level: ClauseLevel,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<Clause> {
     let mut clauses = Vec::new();
 
     for item in list_node.children() {
@@ -221,7 +256,7 @@ fn extract_clauses_from_list<'a>(list_node: &'a AstNode<'a>, level: ClauseLevel)
         }
         drop(item_data);
 
-        let clause = extract_clause_from_item(item, level);
+        let clause = extract_clause_from_item(item, level, diagnostics);
         clauses.push(clause);
     }
 
@@ -229,7 +264,11 @@ fn extract_clauses_from_list<'a>(list_node: &'a AstNode<'a>, level: ClauseLevel)
 }
 
 /// Extract a single Clause from a list Item node.
-fn extract_clause_from_item<'a>(item: &'a AstNode<'a>, level: ClauseLevel) -> Clause {
+fn extract_clause_from_item<'a>(
+    item: &'a AstNode<'a>,
+    level: ClauseLevel,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Clause {
     let mut heading = None;
     let mut anchor = None;
     let mut body: Vec<ClauseBody> = Vec::new();
@@ -287,8 +326,22 @@ fn extract_clause_from_item<'a>(item: &'a AstNode<'a>, level: ClauseLevel) -> Cl
             NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Ordered => {
                 drop(data);
                 let child_level = next_level(level);
-                let child_clauses = extract_clauses_from_list(child, child_level);
+                let child_clauses = extract_clauses_from_list(child, child_level, diagnostics);
                 body.push(ClauseBody::Children(child_clauses));
+            }
+
+            // Bullet list nested inside a clause body — captured with no
+            // clause number, at the source-implied indentation level.
+            NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Bullet => {
+                drop(data);
+                let items = extract_bullet_list(child);
+                let location = clause_location_hint(&heading, &body);
+                diagnostics.push(Diagnostic {
+                    level: DiagLevel::Warning,
+                    message: "Bullet point inside clause body — bullets are not part of the structured outline, will not be numbered, and cannot be cross-referenced.".to_string(),
+                    location: Some(location),
+                });
+                body.push(ClauseBody::Content(ClauseContent::BulletList(items)));
             }
 
             NodeValue::BlockQuote => {
@@ -316,6 +369,30 @@ fn extract_clause_from_item<'a>(item: &'a AstNode<'a>, level: ClauseLevel) -> Cl
         number: None,
         body,
     }
+}
+
+/// Best-effort location hint for diagnostics emitted before clause numbering.
+/// Uses the clause heading if present, otherwise a snippet of the first
+/// paragraph, otherwise a generic "clause body" label.
+fn clause_location_hint(heading: &Option<ClauseHeading>, body: &[ClauseBody]) -> String {
+    if let Some(h) = heading {
+        let text = inlines_to_plain_text(&h.text);
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            return format!("clause '{}'", trimmed);
+        }
+    }
+    for element in body {
+        if let ClauseBody::Content(ClauseContent::Paragraph(inlines)) = element {
+            let text = inlines_to_plain_text(inlines);
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                let snippet: String = trimmed.chars().take(40).collect();
+                return format!("clause starting '{}…'", snippet);
+            }
+        }
+    }
+    "clause body".to_string()
 }
 
 fn next_level(level: ClauseLevel) -> ClauseLevel {

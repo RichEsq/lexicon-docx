@@ -1673,3 +1673,169 @@ fn recitals_defined_terms_validated() {
         "Principal Agreement should be found in body text"
     );
 }
+
+// ===========================================================================
+// Bullet point fallback (spec 3.10)
+// ===========================================================================
+
+#[test]
+fn bullet_at_top_of_body_captured_with_warning() {
+    let input = format!(
+        "{}* first bullet\n* second bullet\n\n1. ## Clause One\n\n    1. Text.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    // First body element should be the bullet list, second the clause.
+    assert!(matches!(doc.body[0], BodyElement::BulletList(_)));
+    if let BodyElement::BulletList(items) = &doc.body[0] {
+        assert_eq!(items.len(), 2);
+    }
+    assert!(matches!(doc.body[1], BodyElement::Clause(_)));
+
+    // Warning emitted with body location.
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Bullet point"))
+        .collect();
+    assert_eq!(warnings.len(), 1);
+    assert_eq!(warnings[0].location.as_deref(), Some("document body"));
+
+    // Bullet list does not consume a clause number — the following clause is 1.
+    if let BodyElement::Clause(c) = &doc.body[1] {
+        assert!(matches!(c.number, Some(ClauseNumber::TopLevel(1))));
+    }
+}
+
+#[test]
+fn bullet_inside_clause_captured_as_clause_content() {
+    let input = format!(
+        "{}1. ## Definitions\n\n    1. The list of accepted methods includes:\n\n        * email\n        * post\n        * fax\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    // Find the bullet list inside the clause hierarchy.
+    let mut found = false;
+    if let BodyElement::Clause(top) = &doc.body[0] {
+        for element in &top.body {
+            if let ClauseBody::Children(kids) = element {
+                for kid in kids {
+                    for inner in &kid.body {
+                        if let ClauseBody::Content(ClauseContent::BulletList(items)) = inner {
+                            assert_eq!(items.len(), 3);
+                            found = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(found, "Expected a ClauseContent::BulletList inside the clause body");
+
+    // Warning emitted with a clause-context location.
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Bullet point inside clause body"))
+        .collect();
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0]
+        .location
+        .as_deref()
+        .map(|s| s.starts_with("clause"))
+        .unwrap_or(false));
+}
+
+#[test]
+fn bullet_in_recitals_captured_with_warning() {
+    let input = format!(
+        "{}# Background\n\n* this bullet is in recitals\n\n# Operative Provisions\n\n1. ## Clause\n\n    1. Some text.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let recitals = doc.recitals.as_ref().expect("recitals should be present");
+    assert!(recitals
+        .body
+        .iter()
+        .any(|e| matches!(e, BodyElement::BulletList(_))));
+
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Bullet point in recitals"))
+        .collect();
+    assert_eq!(warnings.len(), 1);
+    assert_eq!(warnings[0].location.as_deref(), Some("recitals"));
+}
+
+#[test]
+fn bullet_inside_clause_does_not_break_sibling_numbering() {
+    let input = format!(
+        "{}1. ## First Clause\n\n    1. Intro text:\n\n        * a bullet\n        * another bullet\n\n    1. Following sub-clause text.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    // The clause numbering for the second sub-clause should still be 1.2.
+    if let BodyElement::Clause(top) = &doc.body[0] {
+        let mut subs = Vec::new();
+        for element in &top.body {
+            if let ClauseBody::Children(kids) = element {
+                for kid in kids {
+                    subs.push(kid);
+                }
+            }
+        }
+        assert_eq!(subs.len(), 2, "Two sub-clauses expected");
+        assert!(matches!(subs[0].number, Some(ClauseNumber::Clause(1, 1))));
+        assert!(matches!(subs[1].number, Some(ClauseNumber::Clause(1, 2))));
+    } else {
+        panic!("Expected a clause at body[0]");
+    }
+}
+
+#[test]
+fn bullet_in_addenda_still_works_as_addendum_content() {
+    let input = format!(
+        "{}1. ## Body Clause\n\n    1. Some text.\n\n# Addendum 1 - Notes\n\n* alpha\n* beta\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert_eq!(doc.addenda.len(), 1);
+    let has_bullet = doc.addenda[0]
+        .content
+        .iter()
+        .any(|c| matches!(c, AddendumContent::BulletList(_)));
+    assert!(has_bullet, "Addendum should still hold its bullet list");
+
+    // No "Bullet point" warning should be emitted for addendum bullets.
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Bullet point"))
+        .collect();
+    assert!(
+        warnings.is_empty(),
+        "Bullets inside addenda should not warn: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn bullet_with_dash_marker_handled_the_same_as_asterisk() {
+    let input = format!(
+        "{}- dash bullet one\n- dash bullet two\n\n1. ## Clause\n\n    1. Text.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(matches!(doc.body[0], BodyElement::BulletList(_)));
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Bullet point"))
+        .collect();
+    assert_eq!(warnings.len(), 1);
+}
