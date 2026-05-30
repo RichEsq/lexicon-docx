@@ -1732,7 +1732,10 @@ fn bullet_inside_clause_captured_as_clause_content() {
             }
         }
     }
-    assert!(found, "Expected a ClauseContent::BulletList inside the clause body");
+    assert!(
+        found,
+        "Expected a ClauseContent::BulletList inside the clause body"
+    );
 
     // Warning emitted with a clause-context location.
     let warnings: Vec<_> = doc
@@ -1741,11 +1744,13 @@ fn bullet_inside_clause_captured_as_clause_content() {
         .filter(|d| d.message.contains("Bullet point inside clause body"))
         .collect();
     assert_eq!(warnings.len(), 1);
-    assert!(warnings[0]
-        .location
-        .as_deref()
-        .map(|s| s.starts_with("clause"))
-        .unwrap_or(false));
+    assert!(
+        warnings[0]
+            .location
+            .as_deref()
+            .map(|s| s.starts_with("clause"))
+            .unwrap_or(false)
+    );
 }
 
 #[test]
@@ -1757,10 +1762,12 @@ fn bullet_in_recitals_captured_with_warning() {
     let doc = parse_and_resolve(&input);
 
     let recitals = doc.recitals.as_ref().expect("recitals should be present");
-    assert!(recitals
-        .body
-        .iter()
-        .any(|e| matches!(e, BodyElement::BulletList(_))));
+    assert!(
+        recitals
+            .body
+            .iter()
+            .any(|e| matches!(e, BodyElement::BulletList(_)))
+    );
 
     let warnings: Vec<_> = doc
         .diagnostics

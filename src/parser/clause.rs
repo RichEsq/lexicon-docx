@@ -126,11 +126,8 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                         }
                     }
                 } else {
-                    let clauses = extract_clauses_from_list(
-                        child,
-                        ClauseLevel::TopLevel,
-                        &mut diagnostics,
-                    );
+                    let clauses =
+                        extract_clauses_from_list(child, ClauseLevel::TopLevel, &mut diagnostics);
                     for clause in clauses {
                         body.push(BodyElement::Clause(clause));
                     }
