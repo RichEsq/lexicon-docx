@@ -201,6 +201,10 @@ pub fn render_docx(
                         &bookmark_ids,
                     );
                 }
+                BodyElement::BulletList(items) => {
+                    let indent = StyleConfig::cm_to_twips(style.indent_per_level_cm);
+                    docx = render_bullet_list(docx, items, indent, style);
+                }
             }
         }
     }
@@ -225,6 +229,10 @@ pub fn render_docx(
                     style.body_align_first_level,
                     &bookmark_ids,
                 );
+            }
+            BodyElement::BulletList(items) => {
+                let indent = StyleConfig::cm_to_twips(style.indent_per_level_cm);
+                docx = render_bullet_list(docx, items, indent, style);
             }
         }
     }
@@ -309,6 +317,27 @@ fn render_footer(mut docx: Docx, doc: &Document, style: &StyleConfig) -> Docx {
 
     default_footer = default_footer.add_paragraph(footer_para);
     docx = docx.footer(default_footer);
+    docx
+}
+
+/// Render a free-form bullet list (spec 3.10). Each item is a paragraph with
+/// a literal bullet glyph and a tab, indented by `indent` twips. Bullets get
+/// no clause number and are not addressable by anchors or cross-references.
+fn render_bullet_list(
+    mut docx: Docx,
+    items: &[Vec<InlineContent>],
+    indent: i32,
+    style: &StyleConfig,
+) -> Docx {
+    let body_size = StyleConfig::pt_to_half_points(style.font_size);
+    for item in items {
+        let mut para = Paragraph::new().indent(Some(indent), None, None, None);
+        para = para.add_run(Run::new().add_text("• \t").size(body_size));
+        for inline in item {
+            para = add_inline_run(para, inline, false, body_size, style, None);
+        }
+        docx = docx.add_paragraph(para);
+    }
     docx
 }
 
@@ -431,6 +460,14 @@ pub fn render_clause(
                     }
                     ClauseContent::Table(table) => {
                         docx = render_table(docx, table, style);
+                    }
+                    ClauseContent::BulletList(items) => {
+                        // Indent bullets one level deeper than the parent clause
+                        // (spec 3.10.1: bullet inside a level-2 clause renders at
+                        // the indentation a level-3 clause would have).
+                        let step = StyleConfig::cm_to_twips(style.indent_per_level_cm);
+                        let bullet_indent = indent + step;
+                        docx = render_bullet_list(docx, items, bullet_indent, style);
                     }
                 }
             }

@@ -169,6 +169,11 @@ fn resolve_cross_refs(
             BodyElement::Prose(inlines) => {
                 resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, None);
             }
+            BodyElement::BulletList(items) => {
+                for item_inlines in items.iter_mut() {
+                    resolve_inlines_cross_refs(item_inlines, anchor_map, diagnostics, None);
+                }
+            }
         }
     }
 }
@@ -203,7 +208,17 @@ fn resolve_clause_cross_refs(
                         clause_loc.as_deref(),
                     );
                 }
-                _ => {}
+                ClauseContent::BulletList(items) => {
+                    for item_inlines in items {
+                        resolve_inlines_cross_refs(
+                            item_inlines,
+                            anchor_map,
+                            diagnostics,
+                            clause_loc.as_deref(),
+                        );
+                    }
+                }
+                ClauseContent::Table(_) => {}
             },
             ClauseBody::Children(kids) => {
                 for child in kids {
@@ -402,6 +417,17 @@ fn collect_and_validate_terms(
                         Some("recitals"),
                     );
                 }
+                BodyElement::BulletList(items) => {
+                    for item_inlines in items {
+                        collect_inline_terms(
+                            item_inlines,
+                            &mut definitions,
+                            &mut schedule_items,
+                            schedule_patterns,
+                            Some("recitals"),
+                        );
+                    }
+                }
             }
         }
     }
@@ -424,6 +450,17 @@ fn collect_and_validate_terms(
                     schedule_patterns,
                     None,
                 );
+            }
+            BodyElement::BulletList(items) => {
+                for item_inlines in items {
+                    collect_inline_terms(
+                        item_inlines,
+                        &mut definitions,
+                        &mut schedule_items,
+                        schedule_patterns,
+                        None,
+                    );
+                }
             }
         }
     }
@@ -527,7 +564,18 @@ fn collect_clause_terms(
                         clause_loc.as_deref(),
                     );
                 }
-                _ => {}
+                ClauseContent::BulletList(items) => {
+                    for item_inlines in items {
+                        collect_inline_terms(
+                            item_inlines,
+                            defs,
+                            schedule_items,
+                            patterns,
+                            clause_loc.as_deref(),
+                        );
+                    }
+                }
+                ClauseContent::Table(_) => {}
             },
             ClauseBody::Children(kids) => {
                 for child in kids {
@@ -606,6 +654,11 @@ fn collect_element_text(element: &BodyElement, out: &mut String) {
     match element {
         BodyElement::Clause(clause) => collect_clause_text(clause, out),
         BodyElement::Prose(inlines) => collect_inlines_text(inlines, out),
+        BodyElement::BulletList(items) => {
+            for item in items {
+                collect_inlines_text(item, out);
+            }
+        }
     }
 }
 
@@ -619,7 +672,12 @@ fn collect_clause_text(clause: &Clause, out: &mut String) {
                 ClauseContent::Paragraph(inlines) | ClauseContent::Blockquote(inlines) => {
                     collect_inlines_text(inlines, out);
                 }
-                _ => {}
+                ClauseContent::BulletList(items) => {
+                    for item in items {
+                        collect_inlines_text(item, out);
+                    }
+                }
+                ClauseContent::Table(_) => {}
             },
             ClauseBody::Children(kids) => {
                 for child in kids {

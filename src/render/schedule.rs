@@ -25,7 +25,7 @@ pub fn render_schedules(
         }
 
         if matches!(style.schedule_order, ScheduleOrder::Alphabetical) {
-            sched_items.sort_by(|a, b| a.term.to_lowercase().cmp(&b.term.to_lowercase()));
+            sched_items.sort_by_key(|a| a.term.to_lowercase());
         }
 
         // Page break before schedule
