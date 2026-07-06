@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use docx_rs::{
-    BreakType, Docx, IndentLevel, LevelOverride, Numbering, NumberingId, Paragraph, Run, RunFonts,
+    BreakType, Docx, IndentLevel, LevelOverride, LineSpacing, Numbering, NumberingId, Paragraph,
+    Run, RunFonts,
 };
 
 use crate::model::*;
@@ -60,12 +61,22 @@ pub fn render_addendum(
                     2 => StyleConfig::pt_to_half_points(style.heading1_size),
                     _ => StyleConfig::pt_to_half_points(style.heading2_size),
                 };
-                let mut para = Paragraph::new().keep_next(true);
+                // Give the sub-heading Word-native heading spacing (space before to
+                // separate it from preceding content, space after to bind it to its
+                // own content) instead of a trailing blank paragraph, which produced
+                // a large, lopsided gap. Applied as direct formatting rather than a
+                // `Heading2`/`Heading3` style so these item labels stay out of the TOC
+                // (mirrors the TOC-heading treatment in render/docx.rs). `keep_next`
+                // keeps the heading on the same page as the content that follows it.
+                let mut para = Paragraph::new().keep_next(true).line_spacing(
+                    LineSpacing::new()
+                        .before(StyleConfig::pt_to_twips(style.heading_space_before))
+                        .after(StyleConfig::pt_to_twips(style.heading_space_after)),
+                );
                 for inline in inlines {
                     para = add_inline_run(para, inline, true, size, style, None);
                 }
                 docx = docx.add_paragraph(para);
-                docx = docx.add_paragraph(Paragraph::new());
             }
             AddendumContent::ClauseList(clauses) => {
                 // Create a new numbering instance for this addendum's clauses
