@@ -914,6 +914,45 @@ fn docx_addendum_renders_with_heading() {
     );
 }
 
+#[test]
+fn docx_addendum_subheading_uses_native_spacing_not_blank_paragraph() {
+    // An addendum sub-heading (## Item) should carry Word-native heading spacing
+    // (space before to separate it from preceding content, space after to bind it
+    // to its own content) instead of a trailing blank paragraph, which produced a
+    // large, lopsided gap. See render/addendum.rs.
+    let input = format!(
+        "{}# ADDENDUM - Intellectual Property\n\n## Item 1 — Trade marks\n\nNone.\n",
+        MINIMAL
+    );
+    let mut style = StyleConfig::default();
+    // Isolate the addendum sub-heading: the TOC heading also carries heading
+    // spacing, and the cover page emits its own blank layout paragraphs.
+    style.toc.enabled = false;
+    style.cover.enabled = false;
+    let xml = build_and_read_document_xml(&input, &style);
+
+    let before = StyleConfig::pt_to_twips(style.heading_space_before);
+    let after = StyleConfig::pt_to_twips(style.heading_space_after);
+    let spacing = format!("w:before=\"{}\" w:after=\"{}\"", before, after);
+    assert!(
+        xml.contains(&spacing),
+        "Addendum sub-heading should carry Word-native heading spacing ({spacing})"
+    );
+
+    // Regression: no blank spacer paragraph should sit between the sub-heading and
+    // its content. Checked region-locally so unrelated blank paragraphs elsewhere
+    // (e.g. signature blocks) don't mask the result.
+    let heading_pos = xml
+        .find("Item 1 — Trade marks")
+        .expect("sub-heading present");
+    let content_pos = xml.find("None.").expect("content present");
+    let between = &xml[heading_pos..content_pos];
+    assert!(
+        !between.contains("<w:pPr><w:rPr /></w:pPr></w:p>"),
+        "No blank paragraph should sit between the addendum sub-heading and its content"
+    );
+}
+
 // ===========================================================================
 // Helpers
 // ===========================================================================
