@@ -1,9 +1,12 @@
-use crate::error::{DiagLevel, Diagnostic, LexiconError, Result};
+use crate::error::{Diagnostic, LexiconError, Result};
 use crate::model::DocumentMeta;
 
 pub struct FrontMatterResult {
     pub meta: DocumentMeta,
     pub body: String,
+    /// Number of source lines preceding the body (front-matter + delimiters),
+    /// so body-relative line numbers can be mapped back to the input file.
+    pub body_line_offset: usize,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -27,6 +30,11 @@ pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
         .trim_start_matches('\n')
         .to_string();
 
+    // The body is a suffix of the input; everything before it (front-matter,
+    // delimiters, leading blank lines) contributes to the line offset.
+    let consumed = input.len() - body.len();
+    let body_line_offset = input[..consumed].matches('\n').count();
+
     let meta: DocumentMeta = serde_yaml::from_str(yaml_str)
         .map_err(|e| LexiconError::FrontMatter(format!("Invalid YAML front-matter: {}", e)))?;
 
@@ -36,35 +44,39 @@ pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
     if let Some(ref date) = meta.date
         && !is_valid_date(date)
     {
-        diagnostics.push(Diagnostic {
-            level: DiagLevel::Error,
-            message: format!("Date '{}' is not a valid YYYY-MM-DD date", date),
-            location: Some("front-matter".to_string()),
-        });
+        diagnostics.push(
+            Diagnostic::error(
+                "invalid-date",
+                format!("Date '{}' is not a valid YYYY-MM-DD date", date),
+            )
+            .at("front-matter"),
+        );
     }
 
     // Validate parties
     if meta.parties.is_empty() {
-        diagnostics.push(Diagnostic {
-            level: DiagLevel::Error,
-            message: "No parties defined in front-matter".to_string(),
-            location: Some("front-matter".to_string()),
-        });
+        diagnostics.push(
+            Diagnostic::error("missing-parties", "No parties defined in front-matter")
+                .at("front-matter"),
+        );
     }
 
     for (i, party) in meta.parties.iter().enumerate() {
         if party.role.is_empty() {
-            diagnostics.push(Diagnostic {
-                level: DiagLevel::Error,
-                message: format!("Party {} has empty role", i + 1),
-                location: Some("front-matter".to_string()),
-            });
+            diagnostics.push(
+                Diagnostic::error(
+                    "missing-party-role",
+                    format!("Party {} has empty role", i + 1),
+                )
+                .at("front-matter"),
+            );
         }
     }
 
     Ok(FrontMatterResult {
         meta,
         body,
+        body_line_offset,
         diagnostics,
     })
 }

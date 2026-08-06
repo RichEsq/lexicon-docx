@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::error::{DiagLevel, Diagnostic};
+use crate::error::Diagnostic;
 use crate::model::Party;
 use crate::style::{SignaturesConfig, StyleConfig};
 
@@ -85,20 +85,21 @@ pub fn load_definitions(path: &Path, diagnostics: &mut Vec<Diagnostic>) -> Optio
         Ok(content) => match toml::from_str(&content) {
             Ok(defs) => Some(defs),
             Err(e) => {
-                diagnostics.push(Diagnostic {
-                    level: DiagLevel::Warning,
-                    message: format!("Failed to parse signatures definitions file: {}", e),
-                    location: Some(path.display().to_string()),
-                });
+                diagnostics.push(
+                    Diagnostic::warning(
+                        "signatures-definitions-invalid",
+                        format!("Failed to parse signatures definitions file: {}", e),
+                    )
+                    .at(path.display().to_string()),
+                );
                 None
             }
         },
         Err(_) => {
-            diagnostics.push(Diagnostic {
-                level: DiagLevel::Warning,
-                message: format!("Signatures definitions file not found: {}", path.display()),
-                location: None,
-            });
+            diagnostics.push(Diagnostic::warning(
+                "signatures-definitions-missing",
+                format!("Signatures definitions file not found: {}", path.display()),
+            ));
             None
         }
     }
@@ -192,30 +193,31 @@ fn resolve_party_block(
             .and_then(|defs| lookup_definition(defs, entity_type, execution))
     } else {
         // No entity_type — warn and use fallback
-        diagnostics.push(Diagnostic {
-            level: DiagLevel::Warning,
-            message: format!(
-                "Party '{}' has no entity_type; using generic signature block",
-                party.role
-            ),
-            location: Some("front-matter".to_string()),
-        });
+        diagnostics.push(
+            Diagnostic::warning(
+                "signature-missing-entity-type",
+                format!(
+                    "Party '{}' has no entity_type; using generic signature block",
+                    party.role
+                ),
+            )
+            .at("front-matter"),
+        );
         None
     };
 
     // If no template found from definitions, try us-individual fallback
     let template = template.or_else(|| {
         if party.entity_type.is_some() || template_key.is_some() {
-            diagnostics.push(Diagnostic {
-                level: DiagLevel::Warning,
-                message: format!(
+            diagnostics.push(Diagnostic::warning(
+                "signature-template-missing",
+                format!(
                     "No signature template found for party '{}' (entity_type: {}, execution: {}); using fallback",
                     party.role,
                     party.entity_type.as_deref().unwrap_or("none"),
                     execution
                 ),
-                location: None,
-            });
+            ));
         }
         // Try us-individual from definitions as fallback
         definitions

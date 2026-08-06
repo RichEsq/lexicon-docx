@@ -42,10 +42,34 @@ enum Commands {
         overrides: Box<StyleOverrides>,
     },
 
-    /// Validate a Lexicon Markdown file without generating output
+    /// Lint a Lexicon Markdown file — checks spec compliance and common
+    /// drafting errors (unused defined terms, duplicate definitions, broken
+    /// cross-references, missing exhibit files, ...) without generating output
+    Lint {
+        /// Input Lexicon Markdown file
+        input: PathBuf,
+
+        /// Output format: human-readable text or JSON (for editors, CI, and AI agents)
+        #[arg(long, value_enum, default_value = "text")]
+        format: LintFormatArg,
+
+        /// Fail on warnings as well as errors (exit code 1)
+        #[arg(long)]
+        strict: bool,
+
+        /// Numbering convention used when formatting clause references in messages
+        #[arg(long, value_enum)]
+        numbering_convention: Option<NumberingConventionArg>,
+    },
+
+    /// Validate a Lexicon Markdown file without generating output (alias for lint)
     Validate {
         /// Input Lexicon Markdown file
         input: PathBuf,
+
+        /// Fail on warnings as well as errors (exit code 1)
+        #[arg(long)]
+        strict: bool,
     },
 
     /// Generate man pages to a directory
@@ -105,6 +129,28 @@ enum NumberingConventionArg {
     Commonwealth,
     Decimal,
     UsTraditional,
+}
+
+impl NumberingConventionArg {
+    fn to_style(&self) -> lexicon_docx::style::NumberingConvention {
+        match self {
+            NumberingConventionArg::Commonwealth => {
+                lexicon_docx::style::NumberingConvention::Commonwealth
+            }
+            NumberingConventionArg::Decimal => lexicon_docx::style::NumberingConvention::Decimal,
+            NumberingConventionArg::UsTraditional => {
+                lexicon_docx::style::NumberingConvention::UsTraditional
+            }
+        }
+    }
+}
+
+#[derive(Clone, ValueEnum)]
+enum LintFormatArg {
+    /// Human-readable diagnostics, one per line
+    Text,
+    /// Structured JSON report on stdout
+    Json,
 }
 
 // ---------------------------------------------------------------------------
@@ -489,17 +535,7 @@ impl StyleOverrides {
             config.recitals_align_first_level = false;
         }
         if let Some(v) = self.numbering_convention {
-            config.numbering_convention = match v {
-                NumberingConventionArg::Commonwealth => {
-                    lexicon_docx::style::NumberingConvention::Commonwealth
-                }
-                NumberingConventionArg::Decimal => {
-                    lexicon_docx::style::NumberingConvention::Decimal
-                }
-                NumberingConventionArg::UsTraditional => {
-                    lexicon_docx::style::NumberingConvention::UsTraditional
-                }
-            };
+            config.numbering_convention = v.to_style();
         }
 
         // Formatting
@@ -713,34 +749,25 @@ fn main() {
             }
         }
 
-        Commands::Validate { input } => {
-            let input_text = match std::fs::read_to_string(&input) {
-                Ok(t) => t,
-                Err(e) => {
-                    eprintln!("Error reading {}: {}", input.display(), e);
-                    std::process::exit(1);
-                }
-            };
+        Commands::Lint {
+            input,
+            format,
+            strict,
+            numbering_convention,
+        } => {
+            let convention = numbering_convention
+                .map(|c| c.to_style())
+                .unwrap_or(lexicon_docx::style::NumberingConvention::Commonwealth);
+            run_lint(&input, &format, strict, convention);
+        }
 
-            match lexicon_docx::parse(&input_text) {
-                Ok(mut doc) => {
-                    lexicon_docx::resolve(
-                        &mut doc,
-                        lexicon_docx::style::NumberingConvention::Commonwealth,
-                    );
-                    let has_errors = print_diagnostics(&doc.diagnostics);
-
-                    if has_errors {
-                        std::process::exit(1);
-                    } else if doc.diagnostics.is_empty() {
-                        eprintln!("Valid.");
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
-            }
+        Commands::Validate { input, strict } => {
+            run_lint(
+                &input,
+                &LintFormatArg::Text,
+                strict,
+                lexicon_docx::style::NumberingConvention::Commonwealth,
+            );
         }
 
         Commands::Man { dir } => {
@@ -749,15 +776,65 @@ fn main() {
     }
 }
 
+/// Print build diagnostics to stderr. Info-level diagnostics are lint-only
+/// and skipped here — run `lexicon-docx lint` to see them.
 fn print_diagnostics(diagnostics: &[lexicon_docx::error::Diagnostic]) -> bool {
     let mut has_errors = false;
     for d in diagnostics {
+        if matches!(d.level, lexicon_docx::error::DiagLevel::Info) {
+            continue;
+        }
         eprintln!("{}", d);
         if matches!(d.level, lexicon_docx::error::DiagLevel::Error) {
             has_errors = true;
         }
     }
     has_errors
+}
+
+/// Run the linter on a file and exit with an appropriate status code:
+/// 0 = clean (or warnings without --strict), 1 = errors (or warnings with
+/// --strict), 2 = the input file could not be read.
+fn run_lint(
+    input: &std::path::Path,
+    format: &LintFormatArg,
+    strict: bool,
+    convention: lexicon_docx::style::NumberingConvention,
+) -> ! {
+    let file_label = input.display().to_string();
+
+    let input_text = match std::fs::read_to_string(input) {
+        Ok(t) => t,
+        Err(e) => {
+            match format {
+                LintFormatArg::Json => {
+                    let report = lexicon_docx::lint::LintReport {
+                        diagnostics: vec![lexicon_docx::error::Diagnostic::error(
+                            "io-error",
+                            format!("Error reading {}: {}", file_label, e),
+                        )],
+                    };
+                    println!("{}", report.to_json(&file_label));
+                }
+                LintFormatArg::Text => {
+                    eprintln!("Error reading {}: {}", file_label, e);
+                }
+            }
+            std::process::exit(2);
+        }
+    };
+
+    let report = lexicon_docx::lint::lint(&input_text, input.parent(), convention);
+
+    match format {
+        LintFormatArg::Text => print!("{}", report.to_text(&file_label)),
+        LintFormatArg::Json => println!("{}", report.to_json(&file_label)),
+    }
+
+    if report.has_errors() || (strict && report.has_warnings()) {
+        std::process::exit(1);
+    }
+    std::process::exit(0);
 }
 
 fn generate_man_pages(dir: &std::path::Path) {

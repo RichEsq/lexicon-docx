@@ -40,7 +40,12 @@ cargo build
 # Build a .docx from a Lexicon contract
 cargo run -- build lexicon/example.md -o output.docx
 
-# Validate a contract without generating output
+# Lint a contract (spec compliance + drafting checks, no output file)
+cargo run -- lint lexicon/example.md
+cargo run -- lint lexicon/example.md --format json   # machine-readable report
+cargo run -- lint lexicon/example.md --strict        # warnings fail too
+
+# Validate a contract without generating output (alias for lint, text output)
 cargo run -- validate lexicon/example.md
 
 # Build with a custom style config
@@ -80,7 +85,8 @@ cargo test
 
 | File | Purpose |
 |------|---------|
-| `src/main.rs` | CLI entry point (clap). Style override flags, man page generation |
+| `src/main.rs` | CLI entry point (clap). Style override flags, man page generation, lint/validate runner |
+| `src/lint.rs` | Linter — runs parse+resolve, adds lint-only checks (metadata completeness, exhibit files), renders text/JSON reports |
 | `src/lib.rs` | Public API: `parse()`, `resolve()`, `render_docx()`, `process()` |
 | `src/model.rs` | Intermediate representation — Document, Clause, InlineContent, etc. |
 | `src/frontmatter.rs` | YAML front-matter parsing with serde_yaml |
@@ -108,6 +114,7 @@ cargo test
 | `comrak` | CommonMark + GFM Markdown → AST |
 | `docx-rs` 0.4 | .docx file generation |
 | `serde` + `serde_yaml` | YAML front-matter deserialization |
+| `serde_json` | JSON lint report output |
 | `toml` | Style config file parsing |
 | `regex` | Anchor pattern matching |
 | `chrono` | Date validation |
@@ -125,6 +132,7 @@ cargo test
 - **Draft watermark via ZIP post-processing** — docx-rs doesn't expose VML/watermark APIs, so `render/watermark.rs` post-processes the .docx ZIP to inject VML WordArt shapes into header XML parts. Triggered when `status: draft`.
 - **Signature pages via external template definitions** — templates defined in `signatures.toml` (loaded from disk), keyed by `{jurisdiction}.{entity_type}.{execution_method}`. Two-layer templates: prose intro with `{placeholder}` substitution + structured field layout. Rendered as borderless tables with cell-border signature lines. `entity_type` on parties is a compound `{jurisdiction}-{type}` string (e.g. `au-company`). Execution method inferred from `type`.
 - **Numbering conventions** — `ClauseNumber` stores only u32 indices (convention-agnostic). Formatting is applied at `full_reference()` time via a `NumberingConvention` enum (Commonwealth, Decimal, UsTraditional). Word numbering levels (`render/numbering.rs`) are built from a convention-specific data table. The convention is configurable via `numbering_convention` in style TOML and `--numbering-convention` CLI flag.
+- **Linter architecture** — spec-compliance checks live in the parse/resolve pipeline (so `build` sees them too); lint-only checks that would be noise during a build (metadata completeness info, exhibit file existence) live in `src/lint.rs`. Every `Diagnostic` carries a severity (`Error`/`Warning`/`Info`), a stable kebab-case rule code (e.g. `unused-term`), a human-readable location, and a 1-based source line where known (comrak `sourcepos` + front-matter line offset threaded through the parser as `Clause.source_line`/`Addendum.source_line`). `Info` diagnostics are lint-only: `print_diagnostics` in `main.rs` skips them during `build`. `lint --format json` emits a stable JSON report (`file`/`valid`/`summary`/`diagnostics`) for editors, CI, and AI agents; the `validate` command is an alias for text-format lint. Exit codes: 0 clean, 1 findings, 2 unreadable input. The usage scan for `unused-term` excludes bold text (bold marks definition sites, not references, per spec 4.1) and treats terms with 2+ definition sites as used (the `duplicate-definition` warning covers those).
 
 ### docx-rs Pitfalls
 
@@ -154,7 +162,7 @@ Future work and design notes are in `planning/`:
 
 ## Implementation Status
 
-Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer), signature pages (template-based, external definitions file, short/long layout modes, separate_pages toggle, default enabled), recitals/background section (numbered 1./1.1/(a)/(i) same as body, body heading requirement), native Word cross-references (bookmarks + internal hyperlinks, Ctrl+click navigation), CLI style override flags (all style.toml options as --flags, priority: CLI > local TOML > XDG TOML > defaults), man page generation (`lexicon-docx man`), TOC fixes (manual TOC item building to avoid docx-rs double-escaping, black TOC text via style), consistent Heading1 styling (section headings, addendum, exhibit, schedule, execution headings all use Heading1 with brand colour via style), heading/paragraph spacing config (heading_space_before/after, paragraph_space_before/after replacing blank paragraphs with Word native spacing), table layout (cantSplit on all table rows, keep_next on signature block cells), optional date and party name fields (date omitted → underscore placeholder, name omitted → configurable placeholder text via `name_placeholder` TOML/CLI option), numbering conventions (Commonwealth/Decimal/US Traditional per spec 10.5, configurable via `numbering_convention` TOML/CLI option, convention-aware Word numbering and cross-reference formatting), bullet point fallback handling (spec 3.10) — unordered list items inside body, recitals, or clause hierarchy are rendered as unnumbered bullets at the source-implied indent level with a warning diagnostic identifying their location, addendum sub-heading spacing (`## Item` headings inside addenda now use Word-native heading spacing via `heading_space_before`/`heading_space_after` applied as direct formatting — with `keep_next` so they stay out of the TOC — instead of a trailing blank paragraph that produced a large, lopsided gap)).
+Phases 1-5 are complete (cover page, clause parsing, legal numbering, cross-references, defined term validation, schedules (phrase-based detection), TOC, headers/footers, native Word numbering, draft watermark, cover page/TOC toggles, configurable cover page, footer config, schedule position config, parties preamble, type field, defined term style, custom preamble templates, attachment terminology refactor (addenda + exhibits), exhibit file import (PNG/JPEG/PDF with native hayro renderer), signature pages (template-based, external definitions file, short/long layout modes, separate_pages toggle, default enabled), recitals/background section (numbered 1./1.1/(a)/(i) same as body, body heading requirement), native Word cross-references (bookmarks + internal hyperlinks, Ctrl+click navigation), CLI style override flags (all style.toml options as --flags, priority: CLI > local TOML > XDG TOML > defaults), man page generation (`lexicon-docx man`), TOC fixes (manual TOC item building to avoid docx-rs double-escaping, black TOC text via style), consistent Heading1 styling (section headings, addendum, exhibit, schedule, execution headings all use Heading1 with brand colour via style), heading/paragraph spacing config (heading_space_before/after, paragraph_space_before/after replacing blank paragraphs with Word native spacing), table layout (cantSplit on all table rows, keep_next on signature block cells), optional date and party name fields (date omitted → underscore placeholder, name omitted → configurable placeholder text via `name_placeholder` TOML/CLI option), numbering conventions (Commonwealth/Decimal/US Traditional per spec 10.5, configurable via `numbering_convention` TOML/CLI option, convention-aware Word numbering and cross-reference formatting), bullet point fallback handling (spec 3.10) — unordered list items inside body, recitals, or clause hierarchy are rendered as unnumbered bullets at the source-implied indent level with a warning diagnostic identifying their location, addendum sub-heading spacing (`## Item` headings inside addenda now use Word-native heading spacing via `heading_space_before`/`heading_space_after` applied as direct formatting — with `keep_next` so they stay out of the TOC — instead of a trailing blank paragraph that produced a large, lopsided gap), linter mode (`lexicon-docx lint` — rule codes on all diagnostics, `Info` severity, source line numbers via comrak sourcepos, text/JSON output formats, `--strict`, drafting checks: duplicate definitions, duplicate/unused anchors, undeclared schedule references, exhibit file existence, metadata completeness; `validate` is now an alias for text-format lint)).
 
 See `planning/implementation-status.md` for detailed status.
 

@@ -27,13 +27,67 @@ lexicon-docx build contract.md -o contract.docx
 
 The output flag is optional — without `-o`, the output file uses the input filename with a `.docx` extension.
 
-### Validate without building
+### Lint a contract
 
 ```bash
-lexicon-docx validate contract.md
+lexicon-docx lint contract.md
+lexicon-docx lint contract.md --format json   # machine-readable, for editors / CI / AI agents
+lexicon-docx lint contract.md --strict        # fail on warnings too
 ```
 
-Parses the document, resolves cross-references, validates defined terms, and prints diagnostics without producing output.
+Checks the document without producing output: spec compliance (front-matter, cross-references, clause structure) plus drafting checks driven by the document's own metadata (unused defined terms, duplicate definitions, undeclared schedule references, missing exhibit files).
+
+Each diagnostic carries a severity (`error` / `warning` / `info`), a stable rule code, a human-readable location (e.g. `clause 3.1(a)`), and the source line number where known:
+
+```
+warning[unused-term]: 'Widget' is defined but never used in the document (clause 1.1, line 17)
+```
+
+Exit codes: `0` clean (warnings allowed unless `--strict`), `1` errors found (or warnings with `--strict`), `2` input file unreadable. With `--format json` the report is a single JSON object on stdout — always valid JSON, even when parsing fails:
+
+```json
+{
+  "file": "contract.md",
+  "valid": false,
+  "summary": { "errors": 1, "warnings": 2, "info": 1 },
+  "diagnostics": [
+    {
+      "level": "warning",
+      "code": "unused-term",
+      "message": "'Widget' is defined but never used in the document",
+      "location": "clause 1.1",
+      "line": 17
+    }
+  ]
+}
+```
+
+#### Lint rules
+
+| Code | Severity | Meaning |
+|------|----------|---------|
+| `parse-error` | error | Document could not be parsed (missing/invalid front-matter or YAML) |
+| `invalid-date` | error | `date` is not a valid `YYYY-MM-DD` date |
+| `missing-parties` | error | No parties defined in front-matter |
+| `missing-party-role` | error | A party has an empty `role` |
+| `exhibit-file-missing` | error | A declared exhibit `path` does not exist |
+| `exhibit-unsupported-type` | error | Exhibit file type is not png/jpg/jpeg/pdf |
+| `exhibit-url-unsupported` | error | Exhibit `path` is a URL (not supported) |
+| `broken-cross-ref` | warning | Cross-reference points to a non-existent anchor |
+| `duplicate-anchor` | warning | The same `{#id}` anchor is declared more than once |
+| `duplicate-definition` | warning | A term is bold-defined at more than one place (bold marks definitions, not references) |
+| `unused-term` | warning | A defined term (including party roles) never appears in the document text |
+| `unreferenced-schedule` | warning | A declared schedule has no referencing terms |
+| `undeclared-schedule` | warning | A definition references a schedule title not declared in front-matter |
+| `bullet-outside-clause` | warning | Bullet list in the clause hierarchy (unnumbered, not cross-referenceable) |
+| `unknown-top-heading` / `heading-after-body` | warning | Unexpected `#` top-level heading |
+| `duplicate-recitals` / `missing-body-heading` | warning | Recitals structure issues |
+| `signatures-*` / `signature-*` | warning | Signature template resolution issues (build only) |
+| `unused-anchor` | info | An anchor is declared but never referenced |
+| `missing-date` | info | No `date` set (rendered as a blank date line) |
+| `missing-party-name` | info | A party has no `name` (rendered as a placeholder) |
+
+`validate` is an alias for `lint` with text output. Info-level diagnostics are shown by `lint`/`validate` but suppressed during `build`.
 
 ### Options
 
@@ -45,6 +99,13 @@ Options:
   -s, --style <FILE>          Style configuration (TOML)
       --signatures <FILE>     Signature template definitions (TOML)
       --strict                Fail on warnings (exit code 1)
+
+lexicon-docx lint <INPUT> [OPTIONS]
+
+Options:
+      --format <FORMAT>            Output format: text (default) or json
+      --strict                     Fail on warnings as well as errors
+      --numbering-convention <C>   Convention for clause references in messages
 ```
 
 ### Config resolution and priority

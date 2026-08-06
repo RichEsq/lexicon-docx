@@ -1,0 +1,39 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH lint 1  "lint " 
+.SH NAME
+lint \- Lint a Lexicon Markdown file — checks spec compliance and common drafting errors (unused defined terms, duplicate definitions, broken cross\-references, missing exhibit files, ...) without generating output
+.SH SYNOPSIS
+\fBlint\fR [\fB\-\-format\fR] [\fB\-\-strict\fR] [\fB\-\-numbering\-convention\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIINPUT\fR> 
+.SH DESCRIPTION
+Lint a Lexicon Markdown file — checks spec compliance and common drafting errors (unused defined terms, duplicate definitions, broken cross\-references, missing exhibit files, ...) without generating output
+.SH OPTIONS
+.TP
+\fB\-\-format\fR \fI<FORMAT>\fR [default: text]
+Output format: human\-readable text or JSON (for editors, CI, and AI agents)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+text: Human\-readable diagnostics, one per line
+.IP \(bu 2
+json: Structured JSON report on stdout
+.RE
+.TP
+\fB\-\-strict\fR
+Fail on warnings as well as errors (exit code 1)
+.TP
+\fB\-\-numbering\-convention\fR \fI<NUMBERING_CONVENTION>\fR
+Numbering convention used when formatting clause references in messages
+.br
+
+.br
+[\fIpossible values: \fRcommonwealth, decimal, us\-traditional]
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+<\fIINPUT\fR>
+Input Lexicon Markdown file

@@ -2,12 +2,15 @@
 .el .ds Aq '
 .TH validate 1  "validate " 
 .SH NAME
-validate \- Validate a Lexicon Markdown file without generating output
+validate \- Validate a Lexicon Markdown file without generating output (alias for lint)
 .SH SYNOPSIS
-\fBvalidate\fR [\fB\-h\fR|\fB\-\-help\fR] <\fIINPUT\fR> 
+\fBvalidate\fR [\fB\-\-strict\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIINPUT\fR> 
 .SH DESCRIPTION
-Validate a Lexicon Markdown file without generating output
+Validate a Lexicon Markdown file without generating output (alias for lint)
 .SH OPTIONS
+.TP
+\fB\-\-strict\fR
+Fail on warnings as well as errors (exit code 1)
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

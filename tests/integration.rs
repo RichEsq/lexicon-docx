@@ -429,7 +429,7 @@ fn defined_but_unused_term_produces_warning() {
 #[test]
 fn defined_term_used_later_no_warning() {
     let input = format!(
-        "{}\n1. ## Definitions\n\n    1. **Service** means the hosted platform.\n\n1. ## Scope\n\n    1. The **Service** shall be available.\n",
+        "{}\n1. ## Definitions\n\n    1. **Service** means the hosted platform.\n\n1. ## Scope\n\n    1. The Service shall be available.\n",
         MINIMAL
     );
     let doc = parse_and_resolve(&input);
@@ -1884,4 +1884,161 @@ fn bullet_with_dash_marker_handled_the_same_as_asterisk() {
         .filter(|d| d.message.contains("Bullet point"))
         .collect();
     assert_eq!(warnings.len(), 1);
+}
+
+// ===========================================================================
+// Linter rules (resolve-level drafting checks)
+// ===========================================================================
+
+#[test]
+fn duplicate_anchor_produces_warning() {
+    let input = format!(
+        "{}\n1. ## Definitions {{#defs}}\n\n    1. Text.\n\n1. ## Scope {{#defs}}\n\n    1. More text referencing [clause 1](#defs).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "duplicate-anchor")
+        .collect();
+    assert_eq!(warnings.len(), 1, "diagnostics: {:?}", doc.diagnostics);
+    assert!(warnings[0].message.contains("#defs"));
+    assert!(warnings[0].line.is_some());
+}
+
+#[test]
+fn duplicate_definition_produces_warning() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Service** means the hosted platform.\n\n1. ## Scope\n\n    1. The **Service** shall be available at all times.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "duplicate-definition")
+        .collect();
+    assert_eq!(warnings.len(), 1, "diagnostics: {:?}", doc.diagnostics);
+    assert!(warnings[0].message.contains("Service"));
+    // The bolded second occurrence counts as an appearance, so no
+    // unused-term warning should accompany the duplicate.
+    assert!(
+        !doc.diagnostics
+            .iter()
+            .any(|d| d.code == "unused-term" && d.message.contains("Service"))
+    );
+}
+
+#[test]
+fn role_redefined_in_body_not_flagged_as_duplicate() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Buyer** means the party purchasing the goods.\n\n1. ## Scope\n\n    1. The Buyer shall pay.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        !doc.diagnostics
+            .iter()
+            .any(|d| d.code == "duplicate-definition"),
+        "front-matter roles may be formally re-defined in the body: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn undeclared_schedule_reference_produces_warning() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Fee** has the meaning given by the Payment Schedule.\n\n    2. The Buyer pays the Fee to the Seller.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "undeclared-schedule")
+        .collect();
+    assert_eq!(warnings.len(), 1, "diagnostics: {:?}", doc.diagnostics);
+    assert!(warnings[0].message.contains("Payment Schedule"));
+}
+
+#[test]
+fn declared_schedule_reference_produces_no_warning() {
+    let input = "---\ntitle: Test\ndate: 2026-01-01\nparties:\n  - name: Alice\n    role: Buyer\n  - name: Bob\n    role: Seller\nschedule:\n  - title: Payment Schedule\n---\n\n1. ## Definitions\n\n    1. **Fee** has the meaning given by the Payment Schedule.\n\n    2. The Buyer pays the Fee to the Seller.\n";
+    let doc = parse_and_resolve(input);
+    assert!(
+        !doc.diagnostics
+            .iter()
+            .any(|d| d.code == "undeclared-schedule"),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn unused_anchor_produces_info() {
+    let input = format!(
+        "{}\n1. ## Definitions {{#defs}}\n\n    1. Text about the Buyer, the Seller, and this Test Agreement.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let infos: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "unused-anchor")
+        .collect();
+    assert_eq!(infos.len(), 1, "diagnostics: {:?}", doc.diagnostics);
+    assert!(matches!(
+        infos[0].level,
+        lexicon_docx::error::DiagLevel::Info
+    ));
+}
+
+#[test]
+fn referenced_anchor_not_flagged_unused() {
+    let input = format!(
+        "{}\n1. ## Definitions {{#defs}}\n\n    1. See [clause 1](#defs).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        !doc.diagnostics.iter().any(|d| d.code == "unused-anchor"),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn broken_cross_ref_has_line_number() {
+    let input = format!(
+        "{}\n1. ## Scope\n\n    1. See [clause 9](#nowhere).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let warning = doc
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "broken-cross-ref")
+        .expect("expected broken-cross-ref warning");
+    // MINIMAL has 8 front-matter lines; the clause item is 2 lines below the
+    // heading list item which starts on line 10.
+    assert!(warning.line.is_some());
+    assert!(warning.line.unwrap() > 8, "line: {:?}", warning.line);
+}
+
+#[test]
+fn unused_term_flagged_even_though_definition_mentions_it() {
+    // The bold definition site itself must not count as a usage.
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Gadget** means a device. The Buyer and Seller sign this Test Agreement.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        doc.diagnostics
+            .iter()
+            .any(|d| d.code == "unused-term" && d.message.contains("Gadget")),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
 }

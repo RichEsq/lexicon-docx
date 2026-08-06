@@ -109,6 +109,8 @@ pub struct Clause {
     pub heading: Option<ClauseHeading>,
     pub anchor: Option<String>,
     pub number: Option<ClauseNumber>,
+    /// 1-based line in the source file where this clause starts.
+    pub source_line: Option<usize>,
     /// Interleaved content and children, preserving source order.
     /// This ensures continuation paragraphs after sub-lists render
     /// in the correct position.
@@ -367,6 +369,8 @@ pub struct Addendum {
     pub number: u32,
     pub title: String,
     pub anchor: Option<String>,
+    /// 1-based line in the source file where this addendum's heading appears.
+    pub source_line: Option<usize>,
     pub content: Vec<AddendumContent>,
 }
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::error::{DiagLevel, Diagnostic};
+use crate::error::Diagnostic;
 use crate::model::*;
 use crate::style::NumberingConvention;
 
@@ -15,6 +15,14 @@ static FORMAL_DEF_ALT_RE: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
+/// A registered anchor target: the reference text it resolves to, where it
+/// was declared, and whether any cross-reference points at it.
+struct AnchorInfo {
+    reference: String,
+    line: Option<usize>,
+    used: bool,
+}
+
 pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
     // Number recitals and body clauses
     if let Some(ref mut recitals) = doc.recitals {
@@ -23,16 +31,34 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
     assign_clause_numbers(&mut doc.body);
 
     // Build anchor → reference text map (from both recitals and body)
-    let mut anchor_map: HashMap<String, String> = HashMap::new();
+    let mut anchor_map: HashMap<String, AnchorInfo> = HashMap::new();
     if let Some(ref recitals) = doc.recitals {
-        collect_body_anchors(&recitals.body, &mut anchor_map, "Recital", convention);
+        collect_body_anchors(
+            &recitals.body,
+            &mut anchor_map,
+            "Recital",
+            convention,
+            &mut doc.diagnostics,
+        );
     }
-    collect_body_anchors(&doc.body, &mut anchor_map, "clause", convention);
+    collect_body_anchors(
+        &doc.body,
+        &mut anchor_map,
+        "clause",
+        convention,
+        &mut doc.diagnostics,
+    );
 
     // Register addendum heading anchors
     for addendum in &doc.addenda {
         if let Some(ref anchor_id) = addendum.anchor {
-            anchor_map.insert(anchor_id.clone(), format!("Addendum {}", addendum.number));
+            register_anchor(
+                &mut anchor_map,
+                anchor_id,
+                format!("Addendum {}", addendum.number),
+                addendum.source_line,
+                &mut doc.diagnostics,
+            );
         }
     }
 
@@ -40,21 +66,73 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
     if let Some(ref mut recitals) = doc.recitals {
         resolve_cross_refs(
             &mut recitals.body,
-            &anchor_map,
+            &mut anchor_map,
             &mut doc.diagnostics,
             convention,
         );
     }
-    resolve_cross_refs(&mut doc.body, &anchor_map, &mut doc.diagnostics, convention);
+    resolve_cross_refs(
+        &mut doc.body,
+        &mut anchor_map,
+        &mut doc.diagnostics,
+        convention,
+    );
     for addendum in &mut doc.addenda {
-        resolve_addendum_cross_refs(addendum, &anchor_map, &mut doc.diagnostics, convention);
+        resolve_addendum_cross_refs(addendum, &mut anchor_map, &mut doc.diagnostics, convention);
     }
 
-    // Build schedule phrase patterns from front-matter
-    let schedule_patterns = build_schedule_phrase_patterns(&doc.meta.schedule);
+    // Report anchors that no cross-reference points at (drafting cruft)
+    let mut unused: Vec<(&String, &AnchorInfo)> =
+        anchor_map.iter().filter(|(_, a)| !a.used).collect();
+    unused.sort_by_key(|(id, a)| (a.line.unwrap_or(0), id.as_str()));
+    for (id, info) in unused {
+        doc.diagnostics.push(
+            Diagnostic::info(
+                "unused-anchor",
+                format!("Anchor '#{}' is never referenced by a cross-reference", id),
+            )
+            .at(info.reference.clone())
+            .at_line(info.line),
+        );
+    }
+
+    // Build schedule matching context from front-matter
+    let schedule_ctx = ScheduleContext::new(&doc.meta.schedule);
 
     // Collect schedule items and validate defined terms (single pass)
-    collect_and_validate_terms(doc, &schedule_patterns, convention);
+    collect_and_validate_terms(doc, &schedule_ctx, convention);
+}
+
+/// Insert an anchor into the map, warning if the id is already taken.
+fn register_anchor(
+    map: &mut HashMap<String, AnchorInfo>,
+    anchor_id: &str,
+    reference: String,
+    line: Option<usize>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if let Some(existing) = map.get(anchor_id) {
+        diagnostics.push(
+            Diagnostic::warning(
+                "duplicate-anchor",
+                format!(
+                    "Anchor '#{}' is declared more than once (first declared at {}); cross-references will resolve to the first declaration",
+                    anchor_id, existing.reference
+                ),
+            )
+            .at(reference)
+            .at_line(line),
+        );
+    } else {
+        map.insert(
+            anchor_id.to_string(),
+            AnchorInfo {
+                reference,
+                line,
+                used: false,
+            },
+        );
+    }
 }
 
 // --- Clause numbering ---
@@ -124,30 +202,38 @@ fn assign_children_numbers(parent: &mut Clause, top: u32) {
 
 fn collect_body_anchors(
     body: &[BodyElement],
-    map: &mut HashMap<String, String>,
+    map: &mut HashMap<String, AnchorInfo>,
     prefix: &str,
     convention: NumberingConvention,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     for element in body {
         if let BodyElement::Clause(clause) = element {
-            collect_anchors(clause, map, prefix, convention);
+            collect_anchors(clause, map, prefix, convention, diagnostics);
         }
     }
 }
 
 fn collect_anchors(
     clause: &Clause,
-    map: &mut HashMap<String, String>,
+    map: &mut HashMap<String, AnchorInfo>,
     prefix: &str,
     convention: NumberingConvention,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     if let (Some(anchor), Some(number)) = (&clause.anchor, &clause.number) {
-        map.insert(anchor.clone(), number.full_reference(prefix, convention));
+        register_anchor(
+            map,
+            anchor,
+            number.full_reference(prefix, convention),
+            clause.source_line,
+            diagnostics,
+        );
     }
     for element in &clause.body {
         if let ClauseBody::Children(kids) = element {
             for child in kids {
-                collect_anchors(child, map, prefix, convention);
+                collect_anchors(child, map, prefix, convention, diagnostics);
             }
         }
     }
@@ -157,7 +243,7 @@ fn collect_anchors(
 
 fn resolve_cross_refs(
     body: &mut [BodyElement],
-    anchor_map: &HashMap<String, String>,
+    anchor_map: &mut HashMap<String, AnchorInfo>,
     diagnostics: &mut Vec<Diagnostic>,
     convention: NumberingConvention,
 ) {
@@ -167,11 +253,11 @@ fn resolve_cross_refs(
                 resolve_clause_cross_refs(clause, anchor_map, diagnostics, convention);
             }
             BodyElement::Prose(inlines) => {
-                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, None);
+                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, None, None);
             }
             BodyElement::BulletList(items) => {
                 for item_inlines in items.iter_mut() {
-                    resolve_inlines_cross_refs(item_inlines, anchor_map, diagnostics, None);
+                    resolve_inlines_cross_refs(item_inlines, anchor_map, diagnostics, None, None);
                 }
             }
         }
@@ -180,7 +266,7 @@ fn resolve_cross_refs(
 
 fn resolve_clause_cross_refs(
     clause: &mut Clause,
-    anchor_map: &HashMap<String, String>,
+    anchor_map: &mut HashMap<String, AnchorInfo>,
     diagnostics: &mut Vec<Diagnostic>,
     convention: NumberingConvention,
 ) {
@@ -188,6 +274,7 @@ fn resolve_clause_cross_refs(
         .number
         .as_ref()
         .map(|n| n.full_reference("clause", convention));
+    let clause_line = clause.source_line;
 
     if let Some(ref mut heading) = clause.heading {
         resolve_inlines_cross_refs(
@@ -195,6 +282,7 @@ fn resolve_clause_cross_refs(
             anchor_map,
             diagnostics,
             clause_loc.as_deref(),
+            clause_line,
         );
     }
     for element in &mut clause.body {
@@ -206,6 +294,7 @@ fn resolve_clause_cross_refs(
                         anchor_map,
                         diagnostics,
                         clause_loc.as_deref(),
+                        clause_line,
                     );
                 }
                 ClauseContent::BulletList(items) => {
@@ -215,6 +304,7 @@ fn resolve_clause_cross_refs(
                             anchor_map,
                             diagnostics,
                             clause_loc.as_deref(),
+                            clause_line,
                         );
                     }
                 }
@@ -231,9 +321,10 @@ fn resolve_clause_cross_refs(
 
 fn resolve_inlines_cross_refs(
     inlines: &mut [InlineContent],
-    anchor_map: &HashMap<String, String>,
+    anchor_map: &mut HashMap<String, AnchorInfo>,
     diagnostics: &mut Vec<Diagnostic>,
     location: Option<&str>,
+    line: Option<usize>,
 ) {
     for inline in inlines.iter_mut() {
         if let InlineContent::CrossRef {
@@ -242,17 +333,21 @@ fn resolve_inlines_cross_refs(
             display,
         } = inline
         {
-            if let Some(ref_text) = anchor_map.get(anchor_id.as_str()) {
-                *resolved = Some(ref_text.clone());
+            if let Some(info) = anchor_map.get_mut(anchor_id.as_str()) {
+                *resolved = Some(info.reference.clone());
+                info.used = true;
             } else {
-                diagnostics.push(Diagnostic {
-                    level: DiagLevel::Warning,
-                    message: format!(
-                        "Cross-reference '{}' (#{}) points to non-existent anchor",
-                        display, anchor_id
-                    ),
-                    location: location.map(String::from),
-                });
+                diagnostics.push(
+                    Diagnostic::warning(
+                        "broken-cross-ref",
+                        format!(
+                            "Cross-reference '{}' (#{}) points to non-existent anchor",
+                            display, anchor_id
+                        ),
+                    )
+                    .at_opt(location)
+                    .at_line(line),
+                );
             }
         }
     }
@@ -260,18 +355,19 @@ fn resolve_inlines_cross_refs(
 
 fn resolve_addendum_cross_refs(
     addendum: &mut Addendum,
-    anchor_map: &HashMap<String, String>,
+    anchor_map: &mut HashMap<String, AnchorInfo>,
     diagnostics: &mut Vec<Diagnostic>,
     convention: NumberingConvention,
 ) {
     let loc = addendum.heading();
+    let line = addendum.source_line;
     for content in &mut addendum.content {
         match content {
             AddendumContent::Paragraph(inlines) => {
-                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc));
+                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc), line);
             }
             AddendumContent::Heading(_, inlines) => {
-                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc));
+                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc), line);
             }
             AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
@@ -280,7 +376,13 @@ fn resolve_addendum_cross_refs(
             }
             AddendumContent::NumberedList(items) | AddendumContent::BulletList(items) => {
                 for item_inlines in items {
-                    resolve_inlines_cross_refs(item_inlines, anchor_map, diagnostics, Some(&loc));
+                    resolve_inlines_cross_refs(
+                        item_inlines,
+                        anchor_map,
+                        diagnostics,
+                        Some(&loc),
+                        line,
+                    );
                 }
             }
             _ => {}
@@ -290,38 +392,85 @@ fn resolve_addendum_cross_refs(
 
 // --- Schedule phrase pattern building ---
 
-/// Build regex patterns for matching schedule-referencing phrases in defined term text.
-/// Each schedule title produces one compiled regex with all phrases as alternations.
-fn build_schedule_phrase_patterns(schedules: &[ScheduleDecl]) -> Vec<(usize, Regex)> {
-    let phrase_templates = [
-        "given by the {title}",
-        "set out in the {title}",
-        "specified in the {title}",
-        "described in the {title}",
-        "defined in the {title}",
-        "provided in the {title}",
-        "contained in the {title}",
-        "stated in the {title}",
-        "referred to in the {title}",
-        "as per the {title}",
-        "in accordance with the {title}",
-        "pursuant to the {title}",
-        "detailed in the {title}",
-    ];
+const SCHEDULE_PHRASE_TEMPLATES: [&str; 13] = [
+    "given by the {title}",
+    "set out in the {title}",
+    "specified in the {title}",
+    "described in the {title}",
+    "defined in the {title}",
+    "provided in the {title}",
+    "contained in the {title}",
+    "stated in the {title}",
+    "referred to in the {title}",
+    "as per the {title}",
+    "in accordance with the {title}",
+    "pursuant to the {title}",
+    "detailed in the {title}",
+];
 
-    schedules
-        .iter()
-        .enumerate()
-        .map(|(idx, sched)| {
-            let escaped_title = regex::escape(&sched.title);
-            let alternations: Vec<String> = phrase_templates
-                .iter()
-                .map(|t| t.replace("{title}", &escaped_title))
-                .collect();
-            let pattern = format!(r"(?i)({})", alternations.join("|"));
-            (idx, Regex::new(&pattern).unwrap())
+/// Matches a schedule-referencing phrase with an arbitrary Title-Case
+/// schedule-like title (containing "Schedule", "Annexure", or "Appendix"),
+/// used to detect references to schedules not declared in front-matter.
+static GENERIC_SCHEDULE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?:given by|set out in|specified in|described in|defined in|provided in|contained in|stated in|referred to in|as per|in accordance with|pursuant to|detailed in) the ((?:[A-Z][A-Za-z]*\s+)*(?:Schedule|Annexure|Appendix)\b(?:\s+(?:[A-Z][A-Za-z]*|[0-9]+)\b)*)",
+    )
+    .unwrap()
+});
+
+/// Schedule matching context built from the front-matter declarations.
+struct ScheduleContext {
+    /// One compiled regex per declared schedule, with all phrases as alternations.
+    patterns: Vec<(usize, Regex)>,
+    /// Declared titles, lower-cased, for undeclared-reference detection.
+    declared_lower: Vec<String>,
+}
+
+impl ScheduleContext {
+    fn new(schedules: &[ScheduleDecl]) -> Self {
+        let patterns = schedules
+            .iter()
+            .enumerate()
+            .map(|(idx, sched)| {
+                let escaped_title = regex::escape(&sched.title);
+                let alternations: Vec<String> = SCHEDULE_PHRASE_TEMPLATES
+                    .iter()
+                    .map(|t| t.replace("{title}", &escaped_title))
+                    .collect();
+                let pattern = format!(r"(?i)({})", alternations.join("|"));
+                (idx, Regex::new(&pattern).unwrap())
+            })
+            .collect();
+        let declared_lower = schedules.iter().map(|s| s.title.to_lowercase()).collect();
+        ScheduleContext {
+            patterns,
+            declared_lower,
+        }
+    }
+
+    /// Check whether a captured schedule-like title matches a declared one.
+    /// Prefix matches in either direction are accepted so that over- or
+    /// under-capture of surrounding Title-Case words doesn't cause false
+    /// positives (e.g. captured "Schedule The" vs declared "Schedule").
+    fn is_declared(&self, captured: &str) -> bool {
+        let cap = captured.trim().to_lowercase();
+        self.declared_lower.iter().any(|d| {
+            cap == *d || cap.starts_with(&format!("{} ", d)) || d.starts_with(&format!("{} ", cap))
         })
-        .collect()
+    }
+}
+
+/// Concatenate all text content after the bold term in this inline sequence.
+fn text_after_bold(inlines: &[InlineContent], bold_index: usize) -> String {
+    let mut after_text = String::new();
+    for inline in &inlines[bold_index + 1..] {
+        match inline {
+            InlineContent::Text(t) => after_text.push_str(t),
+            InlineContent::Bold(t) | InlineContent::Italic(t) => after_text.push_str(t),
+            _ => {}
+        }
+    }
+    after_text
 }
 
 /// Check if inline text following a bold term contains a schedule phrase.
@@ -335,15 +484,7 @@ fn check_schedule_phrase(
         return None;
     }
 
-    // Concatenate all text content after the bold term in this inline sequence
-    let mut after_text = String::new();
-    for inline in &inlines[bold_index + 1..] {
-        match inline {
-            InlineContent::Text(t) => after_text.push_str(t),
-            InlineContent::Bold(t) | InlineContent::Italic(t) => after_text.push_str(t),
-            _ => {}
-        }
-    }
+    let after_text = text_after_bold(inlines, bold_index);
 
     for (idx, pattern) in patterns {
         if pattern.is_match(&after_text) {
@@ -362,6 +503,10 @@ fn check_schedule_phrase(
 struct TermDefinition {
     term: String,
     location: Option<String>,
+    line: Option<usize>,
+    /// True for terms defined implicitly by front-matter (party roles, short
+    /// title) rather than bold text in the document body.
+    from_front_matter: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -374,17 +519,20 @@ enum TermKind {
 
 fn collect_and_validate_terms(
     doc: &mut Document,
-    schedule_patterns: &[(usize, Regex)],
+    schedule_ctx: &ScheduleContext,
     convention: NumberingConvention,
 ) {
     let mut definitions: Vec<TermDefinition> = Vec::new();
     let mut schedule_items: Vec<ScheduleItem> = Vec::new();
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Party roles are automatic definitions
     for party in &doc.meta.parties {
         definitions.push(TermDefinition {
             term: party.role.clone(),
             location: Some("front-matter".to_string()),
+            line: None,
+            from_front_matter: true,
         });
     }
 
@@ -393,6 +541,8 @@ fn collect_and_validate_terms(
     definitions.push(TermDefinition {
         term: doc_type.to_string(),
         location: Some("front-matter".to_string()),
+        line: None,
+        from_front_matter: true,
     });
 
     // Collect all bold terms — definitions and schedule items in one pass
@@ -404,8 +554,9 @@ fn collect_and_validate_terms(
                         clause,
                         &mut definitions,
                         &mut schedule_items,
-                        schedule_patterns,
+                        schedule_ctx,
                         convention,
+                        &mut diagnostics,
                     );
                 }
                 BodyElement::Prose(inlines) => {
@@ -413,8 +564,10 @@ fn collect_and_validate_terms(
                         inlines,
                         &mut definitions,
                         &mut schedule_items,
-                        schedule_patterns,
+                        schedule_ctx,
                         Some("recitals"),
+                        None,
+                        &mut diagnostics,
                     );
                 }
                 BodyElement::BulletList(items) => {
@@ -423,8 +576,10 @@ fn collect_and_validate_terms(
                             item_inlines,
                             &mut definitions,
                             &mut schedule_items,
-                            schedule_patterns,
+                            schedule_ctx,
                             Some("recitals"),
+                            None,
+                            &mut diagnostics,
                         );
                     }
                 }
@@ -438,8 +593,9 @@ fn collect_and_validate_terms(
                     clause,
                     &mut definitions,
                     &mut schedule_items,
-                    schedule_patterns,
+                    schedule_ctx,
                     convention,
+                    &mut diagnostics,
                 );
             }
             BodyElement::Prose(inlines) => {
@@ -447,8 +603,10 @@ fn collect_and_validate_terms(
                     inlines,
                     &mut definitions,
                     &mut schedule_items,
-                    schedule_patterns,
+                    schedule_ctx,
                     None,
+                    None,
+                    &mut diagnostics,
                 );
             }
             BodyElement::BulletList(items) => {
@@ -457,8 +615,10 @@ fn collect_and_validate_terms(
                         item_inlines,
                         &mut definitions,
                         &mut schedule_items,
-                        schedule_patterns,
+                        schedule_ctx,
                         None,
+                        None,
+                        &mut diagnostics,
                     );
                 }
             }
@@ -469,11 +629,13 @@ fn collect_and_validate_terms(
             addendum,
             &mut definitions,
             &mut schedule_items,
-            schedule_patterns,
+            schedule_ctx,
             convention,
+            &mut diagnostics,
         );
     }
 
+    doc.diagnostics.extend(diagnostics);
     doc.schedule_items = schedule_items;
 
     // Warn on declared schedules with no referencing terms
@@ -483,25 +645,68 @@ fn collect_and_validate_terms(
     }
     for (idx, sched) in doc.meta.schedule.iter().enumerate() {
         if !referenced_schedules.contains(&idx) {
-            doc.diagnostics.push(Diagnostic {
-                level: DiagLevel::Warning,
-                message: format!(
-                    "Schedule '{}' is declared but no terms reference it",
-                    sched.title
-                ),
-                location: Some("front-matter".to_string()),
-            });
+            doc.diagnostics.push(
+                Diagnostic::warning(
+                    "unreferenced-schedule",
+                    format!(
+                        "Schedule '{}' is declared but no terms reference it",
+                        sched.title
+                    ),
+                )
+                .at("front-matter"),
+            );
         }
     }
 
-    // Build definition set (term → first location)
-    let mut def_map: HashMap<String, String> = HashMap::new();
-    for def in &definitions {
-        let loc = def.location.clone().unwrap_or_default();
-        def_map.entry(def.term.clone()).or_insert(loc);
+    // Warn on terms defined more than once in the document body.
+    // Front-matter auto-definitions (party roles, short title) are exempt:
+    // formally re-defining a role in the body is common practice.
+    let mut body_defs: HashMap<&str, Vec<&TermDefinition>> = HashMap::new();
+    let mut term_order: Vec<&str> = Vec::new();
+    for def in definitions.iter().filter(|d| !d.from_front_matter) {
+        let entry = body_defs.entry(def.term.as_str()).or_default();
+        if entry.is_empty() {
+            term_order.push(def.term.as_str());
+        }
+        entry.push(def);
+    }
+    for term in term_order {
+        let defs = &body_defs[term];
+        if defs.len() > 1 {
+            let first_loc = defs[0]
+                .location
+                .clone()
+                .unwrap_or_else(|| "unknown location".to_string());
+            let second = defs[1];
+            doc.diagnostics.push(
+                Diagnostic::warning(
+                    "duplicate-definition",
+                    format!(
+                        "'{}' is defined {} times (first defined at {}). Bold marks a definition site — use plain text for references",
+                        term,
+                        defs.len(),
+                        first_loc
+                    ),
+                )
+                .at_opt(second.location.clone())
+                .at_line(second.line),
+            );
+        }
     }
 
-    // Collect all plain text from the document for usage scanning
+    // Build definition set (term → first location + line) and per-term
+    // definition site counts (front-matter and body sites alike)
+    let mut def_map: HashMap<String, (String, Option<usize>)> = HashMap::new();
+    let mut def_site_counts: HashMap<&str, usize> = HashMap::new();
+    for def in &definitions {
+        let loc = def.location.clone().unwrap_or_default();
+        def_map.entry(def.term.clone()).or_insert((loc, def.line));
+        *def_site_counts.entry(def.term.as_str()).or_insert(0) += 1;
+    }
+
+    // Collect all plain text from the document for usage scanning. Bold text
+    // is excluded: bold marks definition sites, not references, so a term's
+    // own definition must not count as a usage of it.
     let mut all_text = String::new();
     if let Some(ref recitals) = doc.recitals {
         for element in &recitals.body {
@@ -516,27 +721,36 @@ fn collect_and_validate_terms(
     }
     let text_lower = all_text.to_lowercase();
 
-    // Warn on definitions never used in the document text (with fuzzy matching)
-    // Schedule terms are exempt — they appear in the schedule table
+    // Warn on definitions never used in the document text (with fuzzy matching).
+    // Schedule terms are exempt — they appear in the schedule table. A term
+    // with two or more definition sites also counts as used: it appears in the
+    // document more than once, and the duplicate-definition warning already
+    // covers the questionable markup.
     let schedule_terms: std::collections::HashSet<&str> = doc
         .schedule_items
         .iter()
         .map(|si| si.term.as_str())
         .collect();
 
-    for (term, loc) in &def_map {
-        if schedule_terms.contains(term.as_str()) {
-            continue;
-        }
-        let variants = term_variants(term);
-        let is_used = variants.iter().any(|v| text_lower.contains(v));
-        if !is_used {
-            doc.diagnostics.push(Diagnostic {
-                level: DiagLevel::Warning,
-                message: format!("'{}' is defined but never used in the document", term),
-                location: Some(loc.clone()),
-            });
-        }
+    let mut unused: Vec<(&String, &(String, Option<usize>))> = def_map
+        .iter()
+        .filter(|(term, _)| !schedule_terms.contains(term.as_str()))
+        .filter(|(term, _)| def_site_counts.get(term.as_str()).copied().unwrap_or(0) < 2)
+        .filter(|(term, _)| {
+            let variants = term_variants(term);
+            !variants.iter().any(|v| text_lower.contains(v))
+        })
+        .collect();
+    unused.sort_by_key(|(term, (_, line))| (line.unwrap_or(0), term.as_str()));
+    for (term, (loc, line)) in unused {
+        doc.diagnostics.push(
+            Diagnostic::warning(
+                "unused-term",
+                format!("'{}' is defined but never used in the document", term),
+            )
+            .at(loc.clone())
+            .at_line(*line),
+        );
     }
 }
 
@@ -544,8 +758,9 @@ fn collect_clause_terms(
     clause: &Clause,
     defs: &mut Vec<TermDefinition>,
     schedule_items: &mut Vec<ScheduleItem>,
-    patterns: &[(usize, Regex)],
+    schedule_ctx: &ScheduleContext,
     convention: NumberingConvention,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     let clause_loc = clause
         .number
@@ -560,8 +775,10 @@ fn collect_clause_terms(
                         inlines,
                         defs,
                         schedule_items,
-                        patterns,
+                        schedule_ctx,
                         clause_loc.as_deref(),
+                        clause.source_line,
+                        diagnostics,
                     );
                 }
                 ClauseContent::BulletList(items) => {
@@ -570,8 +787,10 @@ fn collect_clause_terms(
                             item_inlines,
                             defs,
                             schedule_items,
-                            patterns,
+                            schedule_ctx,
                             clause_loc.as_deref(),
+                            clause.source_line,
+                            diagnostics,
                         );
                     }
                 }
@@ -579,7 +798,14 @@ fn collect_clause_terms(
             },
             ClauseBody::Children(kids) => {
                 for child in kids {
-                    collect_clause_terms(child, defs, schedule_items, patterns, convention);
+                    collect_clause_terms(
+                        child,
+                        defs,
+                        schedule_items,
+                        schedule_ctx,
+                        convention,
+                        diagnostics,
+                    );
                 }
             }
         }
@@ -590,24 +816,49 @@ fn collect_addendum_terms(
     addendum: &Addendum,
     defs: &mut Vec<TermDefinition>,
     schedule_items: &mut Vec<ScheduleItem>,
-    patterns: &[(usize, Regex)],
+    schedule_ctx: &ScheduleContext,
     convention: NumberingConvention,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     let heading = addendum.heading();
     let loc = Some(heading.as_str());
+    let line = addendum.source_line;
     for content in &addendum.content {
         match content {
             AddendumContent::Paragraph(inlines) | AddendumContent::Heading(_, inlines) => {
-                collect_inline_terms(inlines, defs, schedule_items, patterns, loc);
+                collect_inline_terms(
+                    inlines,
+                    defs,
+                    schedule_items,
+                    schedule_ctx,
+                    loc,
+                    line,
+                    diagnostics,
+                );
             }
             AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
-                    collect_clause_terms(clause, defs, schedule_items, patterns, convention);
+                    collect_clause_terms(
+                        clause,
+                        defs,
+                        schedule_items,
+                        schedule_ctx,
+                        convention,
+                        diagnostics,
+                    );
                 }
             }
             AddendumContent::NumberedList(items) | AddendumContent::BulletList(items) => {
                 for item_inlines in items {
-                    collect_inline_terms(item_inlines, defs, schedule_items, patterns, loc);
+                    collect_inline_terms(
+                        item_inlines,
+                        defs,
+                        schedule_items,
+                        schedule_ctx,
+                        loc,
+                        line,
+                        diagnostics,
+                    );
                 }
             }
             _ => {}
@@ -616,27 +867,55 @@ fn collect_addendum_terms(
 }
 
 /// Collect bold terms: definitions and schedule items in one pass.
+/// Also warns when a definition references a schedule-like title that is not
+/// declared in front-matter (spec 10.2.4).
 fn collect_inline_terms(
     inlines: &[InlineContent],
     defs: &mut Vec<TermDefinition>,
     schedule_items: &mut Vec<ScheduleItem>,
-    patterns: &[(usize, Regex)],
+    schedule_ctx: &ScheduleContext,
     location: Option<&str>,
+    line: Option<usize>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (i, inline) in inlines.iter().enumerate() {
         if let InlineContent::Bold(term) = inline {
-            let kind = classify_term(term, inlines, i, patterns);
+            let kind = classify_term(term, inlines, i, &schedule_ctx.patterns);
             match kind {
                 TermKind::FormalDefinition | TermKind::InlineDefinition => {
                     defs.push(TermDefinition {
                         term: term.clone(),
                         location: location.map(String::from),
+                        line,
+                        from_front_matter: false,
                     });
+                    // The definition didn't match a declared schedule — check
+                    // whether it references a schedule-like title that was
+                    // never declared in front-matter.
+                    let after = text_after_bold(inlines, i);
+                    if let Some(caps) = GENERIC_SCHEDULE_RE.captures(&after) {
+                        let title = caps.get(1).map(|m| m.as_str().trim()).unwrap_or("");
+                        if !title.is_empty() && !schedule_ctx.is_declared(title) {
+                            diagnostics.push(
+                                Diagnostic::warning(
+                                    "undeclared-schedule",
+                                    format!(
+                                        "'{}' appears to reference schedule '{}', which is not declared in front-matter",
+                                        term, title
+                                    ),
+                                )
+                                .at_opt(location)
+                                .at_line(line),
+                            );
+                        }
+                    }
                 }
                 TermKind::ScheduleDefinition(schedule_idx) => {
                     defs.push(TermDefinition {
                         term: term.clone(),
                         location: location.map(String::from),
+                        line,
+                        from_front_matter: false,
                     });
                     schedule_items.push(ScheduleItem {
                         term: term.clone(),
@@ -716,7 +995,10 @@ fn collect_inlines_text(inlines: &[InlineContent], out: &mut String) {
                 out.push_str(t);
                 out.push(' ');
             }
-            InlineContent::Bold(t) | InlineContent::Italic(t) => {
+            // Bold marks definition sites, not references — excluded so a
+            // term's own definition doesn't count as a usage of it.
+            InlineContent::Bold(_) => {}
+            InlineContent::Italic(t) => {
                 out.push_str(t);
                 out.push(' ');
             }
@@ -883,7 +1165,7 @@ mod tests {
                 title: t.to_string(),
             })
             .collect();
-        build_schedule_phrase_patterns(&decls)
+        ScheduleContext::new(&decls).patterns
     }
 
     #[test]
