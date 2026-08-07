@@ -562,6 +562,220 @@ fn addendum_without_title() {
     assert_eq!(doc.addenda[0].heading(), "ADDENDUM 1");
 }
 
+/// Collect (anchor_id, resolved) pairs for every cross-reference inside an
+/// addendum's content.
+fn addendum_crossrefs(addendum: &Addendum) -> Vec<(String, Option<String>)> {
+    fn from_inlines(inlines: &[InlineContent], out: &mut Vec<(String, Option<String>)>) {
+        for inline in inlines {
+            if let InlineContent::CrossRef {
+                anchor_id,
+                resolved,
+                ..
+            } = inline
+            {
+                out.push((anchor_id.clone(), resolved.clone()));
+            }
+        }
+    }
+    fn from_clause(clause: &Clause, out: &mut Vec<(String, Option<String>)>) {
+        for body in &clause.body {
+            match body {
+                ClauseBody::Content(ClauseContent::Paragraph(inlines)) => {
+                    from_inlines(inlines, out)
+                }
+                ClauseBody::Children(kids) => {
+                    for kid in kids {
+                        from_clause(kid, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for content in &addendum.content {
+        match content {
+            AddendumContent::Paragraph(inlines) => from_inlines(inlines, &mut out),
+            AddendumContent::ClauseList(clauses) => {
+                for clause in clauses {
+                    from_clause(clause, &mut out);
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+#[test]
+fn cross_ref_to_addendum_heading_resolves_to_label() {
+    let input = format!(
+        "{}1. ## Clause\n\n    1. See [the addendum](#dp).\n\n# ADDENDUM - Details of Processing {{#dp}}\n\nAddendum text.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let inlines = first_clause_paragraph_inlines(&doc);
+    let resolved = inlines.iter().find_map(|i| match i {
+        InlineContent::CrossRef { resolved, .. } => resolved.clone(),
+        _ => None,
+    });
+    assert_eq!(resolved.as_deref(), Some("Addendum 1"));
+    assert!(
+        !doc.diagnostics.iter().any(|d| d.code == "broken-cross-ref"),
+        "No broken cross-refs expected: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn cross_ref_from_body_into_addendum_clause_resolves() {
+    let input = format!(
+        "{}1. ## Clause\n\n    1. See [the audit clause](#audit) and [the sub-clause](#audit-sub).\n\n# ADDENDUM - Security\n\n1. ## Audit {{#audit}}\n\n    1. Audit sub-clause text. {{#audit-sub}}\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let inlines = first_clause_paragraph_inlines(&doc);
+    let resolved: Vec<_> = inlines
+        .iter()
+        .filter_map(|i| match i {
+            InlineContent::CrossRef {
+                anchor_id,
+                resolved,
+                ..
+            } => Some((anchor_id.as_str(), resolved.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        resolved,
+        vec![
+            ("audit", Some("Addendum 1, clause 1".to_string())),
+            ("audit-sub", Some("Addendum 1, clause 1.1".to_string())),
+        ]
+    );
+    assert!(
+        !doc.diagnostics.iter().any(|d| d.code == "broken-cross-ref"),
+        "No broken cross-refs expected: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn addendum_internal_cross_ref_resolves() {
+    let input = format!(
+        "{}1. ## Clause\n\n    1. Body text.\n\n# ADDENDUM - Security\n\n1. ## Audit {{#audit}}\n\n    1. Audit text.\n\n1. ## Reports\n\n    1. As per [the audit clause](#audit).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let refs = addendum_crossrefs(&doc.addenda[0]);
+    assert_eq!(
+        refs,
+        vec![(
+            "audit".to_string(),
+            Some("Addendum 1, clause 1".to_string())
+        )]
+    );
+    assert!(
+        !doc.diagnostics.iter().any(|d| d.code == "broken-cross-ref"),
+        "Intra-addendum cross-refs should resolve: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn addendum_to_body_cross_ref_still_resolves() {
+    let input = format!(
+        "{}1. ## Payment {{#payment}}\n\n    1. Payment text.\n\n# ADDENDUM - Extra Terms\n\nAs set out in [clause 1](#payment).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let refs = addendum_crossrefs(&doc.addenda[0]);
+    assert_eq!(
+        refs,
+        vec![("payment".to_string(), Some("clause 1".to_string()))]
+    );
+}
+
+#[test]
+fn addendum_clause_numbering_restarts_per_addendum() {
+    let input = format!(
+        "{}1. ## First\n\n    1. Text.\n\n1. ## Second\n\n    1. Text.\n\n# ADDENDUM - One\n\n1. ## Alpha {{#alpha}}\n\n    1. Text.\n\n1. ## Beta\n\n    1. Text.\n\n# ADDENDUM - Two\n\n1. ## Gamma {{#gamma}}\n\n    1. See [Alpha](#alpha).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    // Numbering restarts at 1 inside each addendum — it does not continue
+    // the body's sequence (body already has clauses 1 and 2).
+    for addendum in &doc.addenda {
+        let first_number = addendum
+            .content
+            .iter()
+            .find_map(|c| match c {
+                AddendumContent::ClauseList(clauses) => clauses.first(),
+                _ => None,
+            })
+            .and_then(|clause| clause.number.clone());
+        assert!(
+            matches!(first_number, Some(ClauseNumber::TopLevel(1))),
+            "First clause of each addendum should be numbered 1, got {:?}",
+            first_number
+        );
+    }
+
+    // A cross-addendum reference carries the owning addendum's label.
+    let refs = addendum_crossrefs(&doc.addenda[1]);
+    assert_eq!(
+        refs,
+        vec![(
+            "alpha".to_string(),
+            Some("Addendum 1, clause 1".to_string())
+        )]
+    );
+}
+
+#[test]
+fn unnumbered_addendum_label_falls_back_to_title() {
+    // The parser auto-numbers addenda sequentially (spec 8.1.1), so parsed
+    // addenda always carry a number; the fallback covers an Addendum
+    // constructed without one, mirroring lexicon-web's semantics.
+    let addendum = Addendum {
+        number: 0,
+        title: "Special Terms".to_string(),
+        anchor: None,
+        source_pos: None,
+        content: Vec::new(),
+    };
+    assert_eq!(addendum.label(), "Special Terms");
+
+    let input = format!("{}# ADDENDUM - Special Terms\n\nText.\n", MINIMAL);
+    let doc = parse_and_resolve(&input);
+    assert_eq!(doc.addenda[0].label(), "Addendum 1");
+}
+
+#[test]
+fn broken_cross_ref_in_addendum_still_warns() {
+    let input = format!(
+        "{}1. ## Clause\n\n    1. Body text.\n\n# ADDENDUM - Security\n\n1. ## Audit\n\n    1. See [nothing](#nonexistent).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+
+    let warning = doc
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "broken-cross-ref")
+        .expect("expected broken-cross-ref warning");
+    assert!(
+        warning.message.contains("nonexistent"),
+        "Warning should name the missing anchor: {}",
+        warning.message
+    );
+}
+
 // ===========================================================================
 // Prose (non-clause body text)
 // ===========================================================================

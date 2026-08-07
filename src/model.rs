@@ -169,13 +169,17 @@ impl std::fmt::Display for ClauseNumber {
 use crate::style::NumberingConvention;
 
 impl ClauseNumber {
-    pub fn full_reference(&self, prefix: &str, convention: NumberingConvention) -> String {
-        let num = match convention {
+    /// The bare formatted number under a convention, e.g. "1.1(a)".
+    pub fn formatted(&self, convention: NumberingConvention) -> String {
+        match convention {
             NumberingConvention::Commonwealth => self.format_commonwealth(),
             NumberingConvention::Decimal => self.format_decimal(),
             NumberingConvention::UsTraditional => self.format_us_traditional(),
-        };
-        format!("{} {}", prefix, num)
+        }
+    }
+
+    pub fn full_reference(&self, prefix: &str, convention: NumberingConvention) -> String {
+        format!("{} {}", prefix, self.formatted(convention))
     }
 
     fn format_commonwealth(&self) -> String {
@@ -381,6 +385,17 @@ impl Addendum {
             format!("ADDENDUM {}", self.number)
         } else {
             format!("ADDENDUM {} - {}", self.number, self.title)
+        }
+    }
+
+    /// The section label used when resolving cross-references into this
+    /// addendum, e.g. "Addendum 1". An addendum without a number falls back
+    /// to its title.
+    pub fn label(&self) -> String {
+        if self.number > 0 {
+            format!("Addendum {}", self.number)
+        } else {
+            self.title.clone()
         }
     }
 }

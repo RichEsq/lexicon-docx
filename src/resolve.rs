@@ -15,10 +15,46 @@ static FORMAL_DEF_ALT_RE: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
-/// A registered anchor target: the reference text it resolves to, where it
-/// was declared, and whether any cross-reference points at it.
+/// What kind of location an anchor marks — determines how a cross-reference
+/// to it is worded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AnchorKind {
+    BodyClause,
+    RecitalClause,
+    AddendumClause,
+    SectionHeading,
+}
+
+/// A structured anchor resolution: the bare value (clause number or section
+/// label), what kind of target it is, and the containing section for clauses
+/// inside a named section (e.g. an addendum).
+struct AnchorResolution {
+    /// "1.1(a)", "Background", "Addendum 1"
+    value: String,
+    kind: AnchorKind,
+    /// "Recital", "Addendum 1" — for clauses within sections
+    section: Option<String>,
+}
+
+impl AnchorResolution {
+    /// The display text a cross-reference to this anchor resolves to.
+    fn display(&self) -> String {
+        match self.kind {
+            AnchorKind::BodyClause => format!("clause {}", self.value),
+            AnchorKind::RecitalClause => format!("Recital {}", self.value),
+            AnchorKind::SectionHeading => self.value.clone(),
+            AnchorKind::AddendumClause => match &self.section {
+                Some(section) => format!("{}, clause {}", section, self.value),
+                None => format!("clause {}", self.value),
+            },
+        }
+    }
+}
+
+/// A registered anchor target: the resolution it produces, where it was
+/// declared, and whether any cross-reference points at it.
 struct AnchorInfo {
-    reference: String,
+    resolution: AnchorResolution,
     pos: Option<SourcePos>,
     used: bool,
 }
@@ -30,13 +66,27 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
     }
     assign_clause_numbers(&mut doc.body);
 
-    // Build anchor → reference text map (from both recitals and body)
+    // Number addendum clauses in a separate pass. Numbering restarts at 1
+    // inside each addendum (continuing across a single addendum's clause
+    // lists) — addenda do not continue the body's numbered clause structure
+    // (spec 8.1.2).
+    for addendum in &mut doc.addenda {
+        let mut top_counter = 0u32;
+        for content in &mut addendum.content {
+            if let AddendumContent::ClauseList(clauses) = content {
+                assign_clause_list_numbers(clauses, &mut top_counter);
+            }
+        }
+    }
+
+    // Build anchor → resolution map (recitals, body, and addenda)
     let mut anchor_map: HashMap<String, AnchorInfo> = HashMap::new();
     if let Some(ref recitals) = doc.recitals {
         collect_body_anchors(
             &recitals.body,
             &mut anchor_map,
-            "Recital",
+            AnchorKind::RecitalClause,
+            None,
             convention,
             &mut doc.diagnostics,
         );
@@ -44,21 +94,43 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
     collect_body_anchors(
         &doc.body,
         &mut anchor_map,
-        "clause",
+        AnchorKind::BodyClause,
+        None,
         convention,
         &mut doc.diagnostics,
     );
 
-    // Register addendum heading anchors
+    // Register addendum anchors: the heading's own anchor resolves to the
+    // addendum label; clause anchors inside it resolve to the addendum-local
+    // clause number qualified by the label ("Addendum 1, clause 2.1(a)").
     for addendum in &doc.addenda {
+        let label = addendum.label();
         if let Some(ref anchor_id) = addendum.anchor {
             register_anchor(
                 &mut anchor_map,
                 anchor_id,
-                format!("Addendum {}", addendum.number),
+                AnchorResolution {
+                    value: label.clone(),
+                    kind: AnchorKind::SectionHeading,
+                    section: None,
+                },
                 addendum.source_pos,
                 &mut doc.diagnostics,
             );
+        }
+        for content in &addendum.content {
+            if let AddendumContent::ClauseList(clauses) = content {
+                for clause in clauses {
+                    collect_anchors(
+                        clause,
+                        &mut anchor_map,
+                        AnchorKind::AddendumClause,
+                        Some(&label),
+                        convention,
+                        &mut doc.diagnostics,
+                    );
+                }
+            }
         }
     }
 
@@ -91,7 +163,7 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
                 "unused-anchor",
                 format!("Anchor '#{}' is never referenced by a cross-reference", id),
             )
-            .at(info.reference.clone())
+            .at(info.resolution.display())
             .at_pos(info.pos),
         );
     }
@@ -107,7 +179,7 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
 fn register_anchor(
     map: &mut HashMap<String, AnchorInfo>,
     anchor_id: &str,
-    reference: String,
+    resolution: AnchorResolution,
     pos: Option<SourcePos>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
@@ -117,17 +189,18 @@ fn register_anchor(
                 "duplicate-anchor",
                 format!(
                     "Anchor '#{}' is declared more than once (first declared at {}); cross-references will resolve to the first declaration",
-                    anchor_id, existing.reference
+                    anchor_id,
+                    existing.resolution.display()
                 ),
             )
-            .at(reference)
+            .at(resolution.display())
             .at_pos(pos),
         );
     } else {
         map.insert(
             anchor_id.to_string(),
             AnchorInfo {
-                reference,
+                resolution,
                 pos,
                 used: false,
             },
@@ -141,10 +214,19 @@ fn assign_clause_numbers(body: &mut [BodyElement]) {
     let mut top_counter = 0u32;
     for element in body.iter_mut() {
         if let BodyElement::Clause(clause) = element {
-            top_counter += 1;
-            clause.number = Some(ClauseNumber::TopLevel(top_counter));
-            assign_children_numbers(clause, top_counter);
+            assign_clause_list_numbers(std::slice::from_mut(clause), &mut top_counter);
         }
+    }
+}
+
+/// Number a flat list of top-level clauses, continuing from `top_counter`.
+/// Used for both body clauses and addendum clause lists (where the counter
+/// is addendum-local, so numbering restarts at 1 per addendum).
+fn assign_clause_list_numbers(clauses: &mut [Clause], top_counter: &mut u32) {
+    for clause in clauses.iter_mut() {
+        *top_counter += 1;
+        clause.number = Some(ClauseNumber::TopLevel(*top_counter));
+        assign_children_numbers(clause, *top_counter);
     }
 }
 
@@ -203,13 +285,14 @@ fn assign_children_numbers(parent: &mut Clause, top: u32) {
 fn collect_body_anchors(
     body: &[BodyElement],
     map: &mut HashMap<String, AnchorInfo>,
-    prefix: &str,
+    kind: AnchorKind,
+    section: Option<&str>,
     convention: NumberingConvention,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for element in body {
         if let BodyElement::Clause(clause) = element {
-            collect_anchors(clause, map, prefix, convention, diagnostics);
+            collect_anchors(clause, map, kind, section, convention, diagnostics);
         }
     }
 }
@@ -217,7 +300,8 @@ fn collect_body_anchors(
 fn collect_anchors(
     clause: &Clause,
     map: &mut HashMap<String, AnchorInfo>,
-    prefix: &str,
+    kind: AnchorKind,
+    section: Option<&str>,
     convention: NumberingConvention,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
@@ -225,7 +309,11 @@ fn collect_anchors(
         register_anchor(
             map,
             anchor,
-            number.full_reference(prefix, convention),
+            AnchorResolution {
+                value: number.formatted(convention),
+                kind,
+                section: section.map(str::to_string),
+            },
             clause.source_pos,
             diagnostics,
         );
@@ -233,7 +321,7 @@ fn collect_anchors(
     for element in &clause.body {
         if let ClauseBody::Children(kids) = element {
             for child in kids {
-                collect_anchors(child, map, prefix, convention, diagnostics);
+                collect_anchors(child, map, kind, section, convention, diagnostics);
             }
         }
     }
@@ -250,7 +338,7 @@ fn resolve_cross_refs(
     for element in body.iter_mut() {
         match element {
             BodyElement::Clause(clause) => {
-                resolve_clause_cross_refs(clause, anchor_map, diagnostics, convention);
+                resolve_clause_cross_refs(clause, anchor_map, diagnostics, None, convention);
             }
             BodyElement::Prose(inlines) => {
                 resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, None, None);
@@ -268,12 +356,16 @@ fn resolve_clause_cross_refs(
     clause: &mut Clause,
     anchor_map: &mut HashMap<String, AnchorInfo>,
     diagnostics: &mut Vec<Diagnostic>,
+    section: Option<&str>,
     convention: NumberingConvention,
 ) {
-    let clause_loc = clause
-        .number
-        .as_ref()
-        .map(|n| n.full_reference("clause", convention));
+    let clause_loc = clause.number.as_ref().map(|n| {
+        let loc = n.full_reference("clause", convention);
+        match section {
+            Some(section) => format!("{}, {}", section, loc),
+            None => loc,
+        }
+    });
     let clause_pos = clause.source_pos;
 
     if let Some(ref mut heading) = clause.heading {
@@ -312,7 +404,7 @@ fn resolve_clause_cross_refs(
             },
             ClauseBody::Children(kids) => {
                 for child in kids {
-                    resolve_clause_cross_refs(child, anchor_map, diagnostics, convention);
+                    resolve_clause_cross_refs(child, anchor_map, diagnostics, section, convention);
                 }
             }
         }
@@ -334,7 +426,7 @@ fn resolve_inlines_cross_refs(
         } = inline
         {
             if let Some(info) = anchor_map.get_mut(anchor_id.as_str()) {
-                *resolved = Some(info.reference.clone());
+                *resolved = Some(info.resolution.display());
                 info.used = true;
             } else {
                 diagnostics.push(
@@ -360,6 +452,7 @@ fn resolve_addendum_cross_refs(
     convention: NumberingConvention,
 ) {
     let loc = addendum.heading();
+    let label = addendum.label();
     let pos = addendum.source_pos;
     for content in &mut addendum.content {
         match content {
@@ -371,7 +464,13 @@ fn resolve_addendum_cross_refs(
             }
             AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
-                    resolve_clause_cross_refs(clause, anchor_map, diagnostics, convention);
+                    resolve_clause_cross_refs(
+                        clause,
+                        anchor_map,
+                        diagnostics,
+                        Some(&label),
+                        convention,
+                    );
                 }
             }
             AddendumContent::NumberedList(items) | AddendumContent::BulletList(items) => {
