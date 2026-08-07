@@ -413,9 +413,21 @@ const SCHEDULE_PHRASE_TEMPLATES: [&str; 13] = [
 /// used to detect references to schedules not declared in front-matter.
 static GENERIC_SCHEDULE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?:given by|set out in|specified in|described in|defined in|provided in|contained in|stated in|referred to in|as per|in accordance with|pursuant to|detailed in) the ((?:[A-Z][A-Za-z]*\s+)*(?:Schedule|Annexure|Appendix)\b(?:\s+(?:[A-Z][A-Za-z]*|[0-9]+)\b)*)",
+        r"(?:given by|set out in|specified in|described in|defined in|provided in|contained in|stated in|referred to in|as per|in accordance with|pursuant to|detailed in) the ((?:[A-Z][A-Za-z]*\s+)*(?:Schedules?|Annexures?|Appendix(?:es)?|Appendices)\b(?:\s+(?:[A-Z][A-Za-z]*|[0-9]+)\b)*)",
     )
     .unwrap()
+});
+
+/// A schedule mention immediately followed by "to the X" / "of the X" is a
+/// schedule OF another instrument ("the Schedule to the Corporations Act"),
+/// not one of this contract's schedules.
+static STATUTE_FOLLOW_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(?:to|of)\s+the\s+[A-Z0-9]").unwrap());
+
+/// A captured schedule-like title that names a statute is a statutory
+/// reference, not a contract schedule ("GST Act Schedule 2").
+static STATUTE_TITLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\b(?:Act|Acts|Regulation|Regulations|Code|Statute|Ordinance|Directive)\b").unwrap()
 });
 
 /// Schedule matching context built from the front-matter declarations.
@@ -454,9 +466,15 @@ impl ScheduleContext {
     /// positives (e.g. captured "Schedule The" vs declared "Schedule").
     fn is_declared(&self, captured: &str) -> bool {
         let cap = captured.trim().to_lowercase();
-        self.declared_lower.iter().any(|d| {
-            cap == *d || cap.starts_with(&format!("{} ", d)) || d.starts_with(&format!("{} ", cap))
-        })
+        // A capture that begins with a declared title is accepted so that
+        // over-capture of trailing Title-Case words doesn't cause false
+        // positives. The reverse is deliberately NOT accepted: a bare
+        // "the Schedule" when only "Schedule of Particulars" is declared
+        // should warn — the phrase won't produce a schedule item, so
+        // silence would hide a real problem.
+        self.declared_lower
+            .iter()
+            .any(|d| cap == *d || cap.starts_with(&format!("{} ", d)))
     }
 }
 
@@ -487,8 +505,12 @@ fn check_schedule_phrase(
     let after_text = text_after_bold(inlines, bold_index);
 
     for (idx, pattern) in patterns {
-        if pattern.is_match(&after_text) {
-            return Some(*idx);
+        for m in pattern.find_iter(&after_text) {
+            // "the Schedule to the Corporations Act" is a statutory
+            // reference, not this contract's schedule.
+            if !STATUTE_FOLLOW_RE.is_match(&after_text[m.end()..]) {
+                return Some(*idx);
+            }
         }
     }
     None
@@ -507,6 +529,10 @@ struct TermDefinition {
     /// True for terms defined implicitly by front-matter (party roles, short
     /// title) rather than bold text in the document body.
     from_front_matter: bool,
+    /// True for definition sites inside an addendum — a term redefined there
+    /// ("for the purposes of this Addendum, **X** means ...") is scoped
+    /// drafting, not a duplicate of the main-body definition.
+    in_addendum: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -533,17 +559,22 @@ fn collect_and_validate_terms(
             location: Some("front-matter".to_string()),
             pos: None,
             from_front_matter: true,
+            in_addendum: false,
         });
     }
 
-    // Short title is an automatic definition
-    let doc_type = doc.meta.doc_type.as_deref().unwrap_or("Agreement");
-    definitions.push(TermDefinition {
-        term: doc_type.to_string(),
-        location: Some("front-matter".to_string()),
-        pos: None,
-        from_front_matter: true,
-    });
+    // An explicitly declared short title is an automatic definition. The
+    // implicit default ("Agreement") is not — warning about a term the
+    // drafter never wrote would be noise.
+    if let Some(ref doc_type) = doc.meta.doc_type {
+        definitions.push(TermDefinition {
+            term: doc_type.clone(),
+            location: Some("front-matter".to_string()),
+            pos: None,
+            from_front_matter: true,
+            in_addendum: false,
+        });
+    }
 
     // Collect all bold terms — definitions and schedule items in one pass
     if let Some(ref recitals) = doc.recitals {
@@ -556,6 +587,7 @@ fn collect_and_validate_terms(
                         &mut schedule_items,
                         schedule_ctx,
                         convention,
+                        false,
                         &mut diagnostics,
                     );
                 }
@@ -567,6 +599,7 @@ fn collect_and_validate_terms(
                         schedule_ctx,
                         Some("recitals"),
                         None,
+                        false,
                         &mut diagnostics,
                     );
                 }
@@ -579,6 +612,7 @@ fn collect_and_validate_terms(
                             schedule_ctx,
                             Some("recitals"),
                             None,
+                            false,
                             &mut diagnostics,
                         );
                     }
@@ -595,6 +629,7 @@ fn collect_and_validate_terms(
                     &mut schedule_items,
                     schedule_ctx,
                     convention,
+                    false,
                     &mut diagnostics,
                 );
             }
@@ -606,6 +641,7 @@ fn collect_and_validate_terms(
                     schedule_ctx,
                     None,
                     None,
+                    false,
                     &mut diagnostics,
                 );
             }
@@ -618,6 +654,7 @@ fn collect_and_validate_terms(
                         schedule_ctx,
                         None,
                         None,
+                        false,
                         &mut diagnostics,
                     );
                 }
@@ -658,20 +695,24 @@ fn collect_and_validate_terms(
         }
     }
 
-    // Warn on terms defined more than once in the document body.
-    // Front-matter auto-definitions (party roles, short title) are exempt:
-    // formally re-defining a role in the body is common practice.
-    let mut body_defs: HashMap<&str, Vec<&TermDefinition>> = HashMap::new();
-    let mut term_order: Vec<&str> = Vec::new();
+    // Warn on terms defined more than once within the same scope.
+    // Front-matter auto-definitions (party roles, short title) are exempt —
+    // formally re-defining a role in the body is common practice — and a
+    // main-body term redefined in an addendum ("for the purposes of this
+    // Addendum, **X** means ...") is scoped drafting, not a duplicate, so
+    // duplicates are only counted among body sites or among addendum sites.
+    let mut scoped_defs: HashMap<(&str, bool), Vec<&TermDefinition>> = HashMap::new();
+    let mut scope_order: Vec<(&str, bool)> = Vec::new();
     for def in definitions.iter().filter(|d| !d.from_front_matter) {
-        let entry = body_defs.entry(def.term.as_str()).or_default();
+        let key = (def.term.as_str(), def.in_addendum);
+        let entry = scoped_defs.entry(key).or_default();
         if entry.is_empty() {
-            term_order.push(def.term.as_str());
+            scope_order.push(key);
         }
         entry.push(def);
     }
-    for term in term_order {
-        let defs = &body_defs[term];
+    for key in scope_order {
+        let defs = &scoped_defs[&key];
         if defs.len() > 1 {
             let first_loc = defs[0]
                 .location
@@ -682,8 +723,8 @@ fn collect_and_validate_terms(
                 Diagnostic::warning(
                     "duplicate-definition",
                     format!(
-                        "'{}' is defined {} times (first defined at {}). Bold marks a definition site — use plain text for references",
-                        term,
+                        "'{}' is bold-defined {} times (first at {}). If a later occurrence is a reference rather than a new definition, use plain text — bold marks definition sites",
+                        key.0,
                         defs.len(),
                         first_loc
                     ),
@@ -719,27 +760,51 @@ fn collect_and_validate_terms(
     for addendum in &doc.addenda {
         collect_addendum_text(addendum, &mut all_text);
     }
-    let text_lower = all_text.to_lowercase();
 
-    // Warn on definitions never used in the document text (with fuzzy matching).
+    // Warn on definitions never used in the document text. Matching is
+    // word-boundary and case-sensitive (spec 4.4.1: lowercase "agreement"
+    // does not reference defined "Agreement"; substring hits like "Act"
+    // inside "Contract" must not count). All terms' variants are compiled
+    // into one RegexSet so the document text is scanned once.
     // Schedule terms are exempt — they appear in the schedule table. A term
-    // with two or more definition sites also counts as used: it appears in the
-    // document more than once, and the duplicate-definition warning already
-    // covers the questionable markup.
+    // with two or more definition sites also counts as used: it appears in
+    // the document more than once, and the duplicate-definition warning
+    // already covers the questionable markup.
     let schedule_terms: std::collections::HashSet<&str> = doc
         .schedule_items
         .iter()
         .map(|si| si.term.as_str())
         .collect();
 
-    let mut unused: Vec<(&String, &(String, Option<SourcePos>))> = def_map
+    let candidates: Vec<(&String, &(String, Option<SourcePos>))> = def_map
         .iter()
         .filter(|(term, _)| !schedule_terms.contains(term.as_str()))
         .filter(|(term, _)| def_site_counts.get(term.as_str()).copied().unwrap_or(0) < 2)
-        .filter(|(term, _)| {
-            let variants = term_variants(term);
-            !variants.iter().any(|v| text_lower.contains(v))
-        })
+        .collect();
+
+    let mut patterns: Vec<String> = Vec::new();
+    let mut owners: Vec<usize> = Vec::new();
+    for (i, (term, _)) in candidates.iter().enumerate() {
+        for variant in term_variants(term) {
+            if variant.is_empty() {
+                continue;
+            }
+            patterns.push(format!(r"\b{}\b", regex::escape(&variant)));
+            owners.push(i);
+        }
+    }
+    let mut used = vec![false; candidates.len()];
+    if let Ok(set) = regex::RegexSet::new(&patterns) {
+        for m in set.matches(&all_text) {
+            used[owners[m]] = true;
+        }
+    }
+
+    let mut unused: Vec<(&String, &(String, Option<SourcePos>))> = candidates
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !used[*i])
+        .map(|(_, c)| *c)
         .collect();
     unused.sort_by_key(|(term, (_, pos))| (pos.map_or(0, |p| p.line), term.as_str()));
     for (term, (loc, pos)) in unused {
@@ -754,12 +819,14 @@ fn collect_and_validate_terms(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_clause_terms(
     clause: &Clause,
     defs: &mut Vec<TermDefinition>,
     schedule_items: &mut Vec<ScheduleItem>,
     schedule_ctx: &ScheduleContext,
     convention: NumberingConvention,
+    in_addendum: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let clause_loc = clause
@@ -778,6 +845,7 @@ fn collect_clause_terms(
                         schedule_ctx,
                         clause_loc.as_deref(),
                         clause.source_pos,
+                        in_addendum,
                         diagnostics,
                     );
                 }
@@ -790,6 +858,7 @@ fn collect_clause_terms(
                             schedule_ctx,
                             clause_loc.as_deref(),
                             clause.source_pos,
+                            in_addendum,
                             diagnostics,
                         );
                     }
@@ -804,6 +873,7 @@ fn collect_clause_terms(
                         schedule_items,
                         schedule_ctx,
                         convention,
+                        in_addendum,
                         diagnostics,
                     );
                 }
@@ -833,6 +903,7 @@ fn collect_addendum_terms(
                     schedule_ctx,
                     loc,
                     pos,
+                    true,
                     diagnostics,
                 );
             }
@@ -844,6 +915,7 @@ fn collect_addendum_terms(
                         schedule_items,
                         schedule_ctx,
                         convention,
+                        true,
                         diagnostics,
                     );
                 }
@@ -857,6 +929,7 @@ fn collect_addendum_terms(
                         schedule_ctx,
                         loc,
                         pos,
+                        true,
                         diagnostics,
                     );
                 }
@@ -869,6 +942,7 @@ fn collect_addendum_terms(
 /// Collect bold terms: definitions and schedule items in one pass.
 /// Also warns when a definition references a schedule-like title that is not
 /// declared in front-matter (spec 10.2.4).
+#[allow(clippy::too_many_arguments)]
 fn collect_inline_terms(
     inlines: &[InlineContent],
     defs: &mut Vec<TermDefinition>,
@@ -876,6 +950,7 @@ fn collect_inline_terms(
     schedule_ctx: &ScheduleContext,
     location: Option<&str>,
     pos: Option<SourcePos>,
+    in_addendum: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (i, inline) in inlines.iter().enumerate() {
@@ -888,14 +963,24 @@ fn collect_inline_terms(
                         location: location.map(String::from),
                         pos,
                         from_front_matter: false,
+                        in_addendum,
                     });
                     // The definition didn't match a declared schedule — check
                     // whether it references a schedule-like title that was
-                    // never declared in front-matter.
+                    // never declared in front-matter. Statutory references
+                    // ("the Schedule to the Corporations Act", "the GST Act
+                    // Schedule 2") are everyday drafting and are skipped.
                     let after = text_after_bold(inlines, i);
-                    if let Some(caps) = GENERIC_SCHEDULE_RE.captures(&after) {
-                        let title = caps.get(1).map(|m| m.as_str().trim()).unwrap_or("");
-                        if !title.is_empty() && !schedule_ctx.is_declared(title) {
+                    for caps in GENERIC_SCHEDULE_RE.captures_iter(&after) {
+                        let capture = caps.get(1).unwrap();
+                        let title = capture.as_str().trim();
+                        if title.is_empty()
+                            || STATUTE_TITLE_RE.is_match(title)
+                            || STATUTE_FOLLOW_RE.is_match(&after[capture.end()..])
+                        {
+                            continue;
+                        }
+                        if !schedule_ctx.is_declared(title) {
                             diagnostics.push(
                                 Diagnostic::warning(
                                     "undeclared-schedule",
@@ -907,6 +992,7 @@ fn collect_inline_terms(
                                 .at_opt(location)
                                 .at_pos(pos),
                             );
+                            break;
                         }
                     }
                 }
@@ -916,6 +1002,7 @@ fn collect_inline_terms(
                         location: location.map(String::from),
                         pos,
                         from_front_matter: false,
+                        in_addendum,
                     });
                     schedule_items.push(ScheduleItem {
                         term: term.clone(),
@@ -1028,24 +1115,26 @@ fn term_variants(term: &str) -> Vec<String> {
         s.truncate(s.len() - 2);
     }
 
-    let lower = s.to_lowercase();
-    let mut variants = vec![lower.clone()];
+    // Case is preserved: matching is case-sensitive per spec 4.4.1 ("the
+    // word 'agreement' in lowercase does not reference" defined "Agreement").
+    let base = s;
+    let mut variants = vec![base.clone()];
 
     // Apply suffix rules, each producing a variant
     let suffix_rules: &[(&str, &str)] = &[
-        ("ies", "y"), // Authorities → authority
-        ("ing", ""),  // Processing → process
-        ("ed", ""),   // Processed → process
-        ("es", "e"),  // Affiliates → affiliate
-        ("es", ""),   // Breaches → breach
-        ("s", ""),    // Members → member
+        ("ies", "y"), // Authorities → Authority
+        ("ing", ""),  // Processing → Process
+        ("ed", ""),   // Processed → Process
+        ("es", "e"),  // Affiliates → Affiliate
+        ("es", ""),   // Breaches → Breach
+        ("s", ""),    // Members → Member
     ];
 
     for &(suffix, replacement) in suffix_rules {
-        if lower.ends_with(suffix) && lower.len() > suffix.len() + 2 {
-            let stem = &lower[..lower.len() - suffix.len()];
+        if base.ends_with(suffix) && base.len() > suffix.len() + 2 {
+            let stem = &base[..base.len() - suffix.len()];
             let variant = format!("{}{}", stem, replacement);
-            if variant != lower {
+            if variant != base {
                 variants.push(variant);
             }
         }
@@ -1053,7 +1142,7 @@ fn term_variants(term: &str) -> Vec<String> {
 
     // Generate forward plural forms (spec 4.4.3) so the defined term
     // matches its plural in the document text.
-    let last_word = lower.rsplit_once(' ').map_or(lower.as_str(), |(_, w)| w);
+    let last_word = base.rsplit_once(' ').map_or(base.as_str(), |(_, w)| w);
     if last_word.len() > 2 {
         let plural = if last_word.ends_with('y')
             && !last_word.ends_with("ay")
@@ -1062,7 +1151,7 @@ fn term_variants(term: &str) -> Vec<String> {
             && !last_word.ends_with("uy")
         {
             // consonant + y → ies (Party → Parties, Authority → Authorities)
-            format!("{}ies", &lower[..lower.len() - 1])
+            format!("{}ies", &base[..base.len() - 1])
         } else if last_word.ends_with('s')
             || last_word.ends_with('x')
             || last_word.ends_with('z')
@@ -1070,12 +1159,12 @@ fn term_variants(term: &str) -> Vec<String> {
             || last_word.ends_with("ch")
         {
             // sibilant endings → +es (Business → Businesses)
-            format!("{}es", lower)
+            format!("{}es", base)
         } else {
             // default → +s (Agreement → Agreements)
-            format!("{}s", lower)
+            format!("{}s", base)
         };
-        if plural != lower {
+        if plural != base {
             variants.push(plural);
         }
     }
@@ -1087,11 +1176,16 @@ fn term_variants(term: &str) -> Vec<String> {
 /// In the source, bold marks definition sites only. This classifies the type of
 /// definition, or identifies field labels (structural bold, not a term).
 fn classify_term(
-    _term: &str,
+    term: &str,
     inlines: &[InlineContent],
     index: usize,
     schedule_patterns: &[(usize, Regex)],
 ) -> TermKind {
+    // Field label with the colon inside the bold: **Label:** value
+    if term.trim_end().ends_with(':') {
+        return TermKind::FieldLabel;
+    }
+
     // Check for inline definition pattern: ("**Term**") or (the "**Term**")
     if index > 0
         && let Some(InlineContent::Text(before)) = inlines.get(index - 1)

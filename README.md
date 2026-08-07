@@ -91,7 +91,7 @@ missing-date = "warning"
 
 CLI flags merge on top: `--ignore <code>` (repeatable) adds to the ignore list, `--min-severity <error|warning|info>` hides lower-severity diagnostics from the report.
 
-Individual findings can be suppressed inline with an HTML comment on the same line as the finding or the line directly above it; `lexicon-ignore-file` disables rules for the whole file:
+Individual findings can be suppressed inline with an HTML comment; `lexicon-ignore-file` disables rules for the whole file:
 
 ```markdown
 1. **UCPA** means the Utah Consumer Privacy Act. <!-- lexicon-ignore: unused-term -->
@@ -99,7 +99,18 @@ Individual findings can be suppressed inline with an HTML comment on the same li
 <!-- lexicon-ignore-file: unused-anchor -->
 ```
 
-Comments pass through Markdown renderers invisibly and never appear in the .docx output. Suppressions that match nothing are reported as `unused-suppression` (info) so stale ones don't accumulate. `build` applies the same `[lint]` config and inline suppressions, so build and lint never disagree about a finding. `parse-error` and `io-error` can never be ignored or suppressed.
+Diagnostics are anchored to the **first line of the clause** (or addendum) that contains the finding — the line reported in the diagnostic — so place the comment on that line or the line directly above it. For a clause whose text spans several source lines, a comment on a continuation line will not match (the linter reports it as `unused-suppression` so it can't fail silently). A bare `<!-- lexicon-ignore -->` with no codes suppresses every rule anchored to those two lines — prefer naming the rule.
+
+Comments pass through Markdown renderers invisibly and never appear in the .docx output. Directives only count in ordinary document text — inside code spans, code fences, or front-matter strings they are literal content and have no effect. Suppressions that match nothing are reported as `unused-suppression` (info) so stale ones don't accumulate, and suppression machinery diagnostics (`unused-suppression`, `unknown-lint-rule`, `invalid-suppression`, `invalid-lint-config`) cannot themselves be suppressed inline (use the config ignore list). `build` applies the same `[lint]` config and inline suppressions, so build and lint never disagree about a finding.
+
+Guard rails: `parse-error`, `io-error`, and `style-error` can never be ignored or suppressed, and rules whose default severity is error (`invalid-date`, `exhibit-file-missing`, ...) cannot be demoted below warning — otherwise a report could claim `valid: true` for a document the renderer refuses to build. Invalid config entries are reported as `invalid-lint-config`.
+
+#### Known limitations
+
+- Diagnostics carry the start line of the containing clause or addendum, not the exact line of the offending text within it.
+- A clause keeps only its **last** `{#id}` anchor; declaring more than one produces a `multiple-anchors` warning (put each anchor on its own sub-clause).
+- Table cells are not scanned: terms, term usage, and cross-references inside tables are invisible to the linter (the Lexicon spec does not anticipate defined terms in tables).
+- Schedule-phrase detection is heuristic. References to statutory schedules ("the Schedule to the Corporations Act") are recognised and skipped, but unusual phrasing may still be misread — check the generated schedule table when in doubt.
 
 #### Lint rules
 
@@ -124,6 +135,9 @@ Comments pass through Markdown renderers invisibly and never appear in the .docx
 | `signatures-*` / `signature-*` | warning | Signature template resolution issues (build only) |
 | `unknown-lint-rule` | warning | Config, flag, or suppression names a rule code that doesn't exist |
 | `invalid-suppression` | warning | Malformed suppression comment |
+| `invalid-lint-config` | warning | Lint configuration entry that cannot take effect |
+| `multiple-anchors` | warning | A clause declares more than one `{#id}` anchor; only the last is kept |
+| `style-error` | error | Style configuration file could not be loaded |
 | `unused-anchor` | info | An anchor is declared but never referenced |
 | `missing-date` | info | No `date` set (rendered as a blank date line) |
 | `missing-party-name` | info | A party has no `name` (rendered as a placeholder) |

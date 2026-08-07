@@ -172,6 +172,21 @@ pub const RULES: &[Rule] = &[
         description: "Malformed suppression comment",
     },
     Rule {
+        code: "invalid-lint-config",
+        severity: DiagLevel::Warning,
+        description: "Lint configuration entry that cannot take effect",
+    },
+    Rule {
+        code: "multiple-anchors",
+        severity: DiagLevel::Warning,
+        description: "A clause declares more than one {#id} anchor; only the last is kept",
+    },
+    Rule {
+        code: "style-error",
+        severity: DiagLevel::Error,
+        description: "Style configuration file could not be loaded",
+    },
+    Rule {
         code: "unused-anchor",
         severity: DiagLevel::Info,
         description: "An anchor is declared but never referenced",
@@ -199,7 +214,18 @@ pub fn is_known_rule(code: &str) -> bool {
 
 /// Rules that can never be ignored, suppressed, or re-levelled: a report must
 /// not claim a file is valid when it could not be read or parsed.
-const UNFILTERABLE: &[&str] = &["parse-error", "io-error"];
+const UNFILTERABLE: &[&str] = &["parse-error", "io-error", "style-error"];
+
+/// Diagnostics about the filtering machinery itself are exempt from inline
+/// suppression (line and file directives) — otherwise a dead directive could
+/// silence the very report that says it is dead. They can still be disabled
+/// via the config/CLI ignore list.
+const SUPPRESSION_EXEMPT: &[&str] = &[
+    "unused-suppression",
+    "unknown-lint-rule",
+    "invalid-suppression",
+    "invalid-lint-config",
+];
 
 /// Render the rule registry as aligned text.
 pub fn rules_to_text() -> String {
@@ -279,8 +305,11 @@ impl LintOptions {
         }
     }
 
-    /// Warn about configured rule codes that don't exist, and strip
-    /// unfilterable codes from ignore/severity so they can't be silenced.
+    /// Warn about configured rule codes that don't exist, strip unfilterable
+    /// codes from ignore/severity (loudly), and clamp severity demotions:
+    /// a rule whose default severity is Error cannot be demoted below
+    /// Warning — otherwise `valid: true` could be reported for a document
+    /// the renderer refuses to build.
     fn validate(&mut self) -> Vec<Diagnostic> {
         let mut diags = Vec::new();
         for code in self.ignore.iter().chain(self.severity.keys()) {
@@ -289,11 +318,31 @@ impl LintOptions {
                     "unknown-lint-rule",
                     format!("Unknown lint rule '{}' in lint configuration", code),
                 ));
+            } else if UNFILTERABLE.contains(&code.as_str()) {
+                diags.push(Diagnostic::warning(
+                    "invalid-lint-config",
+                    format!("Rule '{}' cannot be ignored or re-levelled", code),
+                ));
             }
         }
         self.ignore.retain(|c| !UNFILTERABLE.contains(&c.as_str()));
         self.severity
             .retain(|c, _| !UNFILTERABLE.contains(&c.as_str()));
+        for (code, level) in self.severity.iter_mut() {
+            let default_error = RULES
+                .iter()
+                .any(|r| r.code == code && r.severity == DiagLevel::Error);
+            if default_error && *level == DiagLevel::Info {
+                diags.push(Diagnostic::warning(
+                    "invalid-lint-config",
+                    format!(
+                        "Rule '{}' is an error-level rule and cannot be demoted below warning; using warning",
+                        code
+                    ),
+                ));
+                *level = DiagLevel::Warning;
+            }
+        }
         diags
     }
 }
@@ -356,13 +405,54 @@ impl Suppressions {
 
 /// Scan the raw source for suppression comments. Returns the directives and
 /// any diagnostics about malformed or unknown ones.
+/// True if the byte offset on a line falls inside an inline code span —
+/// i.e. an odd number of backticks precede it on that line.
+fn inside_inline_code(line_text: &str, offset: usize) -> bool {
+    line_text[..offset].bytes().filter(|b| *b == b'`').count() % 2 == 1
+}
+
 fn scan_suppressions(input: &str) -> (Suppressions, Vec<Diagnostic>) {
     let mut supp = Suppressions::default();
     let mut diags = Vec::new();
 
+    // Directives are only honored in ordinary document text. Front-matter
+    // (everything up to the closing ---) and fenced code blocks are literal
+    // content — a directive-shaped string there must stay inert.
+    let mut in_front_matter = input.trim_start().starts_with("---");
+    let mut seen_front_matter_open = false;
+    let mut in_fence: Option<char> = None;
+
     for (idx, line_text) in input.lines().enumerate() {
         let line = idx + 1;
+
+        if in_front_matter {
+            let delim = line_text.trim_end_matches('\r') == "---";
+            if delim && seen_front_matter_open {
+                in_front_matter = false;
+            } else if delim || !seen_front_matter_open {
+                seen_front_matter_open = seen_front_matter_open || delim;
+            }
+            continue;
+        }
+
+        let trimmed = line_text.trim_start();
+        if let Some(fence_char) = in_fence {
+            if trimmed.starts_with(&fence_char.to_string().repeat(3)) {
+                in_fence = None;
+            }
+            continue;
+        } else if trimmed.starts_with("```") {
+            in_fence = Some('`');
+            continue;
+        } else if trimmed.starts_with("~~~") {
+            in_fence = Some('~');
+            continue;
+        }
+
         for caps in SUPPRESSION_RE.captures_iter(line_text) {
+            if inside_inline_code(line_text, caps.get(0).unwrap().start()) {
+                continue;
+            }
             let file_level = caps.get(1).is_some();
             let codes: Vec<String> = caps
                 .get(2)
@@ -458,7 +548,7 @@ fn apply_filters(
         if let Some(level) = options.severity.get(d.code) {
             d.level = *level;
         }
-        if supp.matches(d.code, d.line) {
+        if !SUPPRESSION_EXEMPT.contains(&d.code) && supp.matches(d.code, d.line) {
             continue;
         }
         if options.ignore.iter().any(|c| c == d.code) {
@@ -1259,6 +1349,116 @@ schedule:
                 .any(|d| d.message.contains("Cog") && d.level == DiagLevel::Error),
             "got: {:?}",
             diagnostics
+        );
+    }
+
+    #[test]
+    fn directive_in_inline_code_is_inert() {
+        let input = format!(
+            "{}\n1. ## Definitions\n\n    1. **Widget** means a thing described in `<!-- lexicon-ignore: unused-term -->` text. The Seller signs.\n",
+            CLEAN_BASE
+        );
+        let report = lint_str(&input);
+        assert!(
+            report.diagnostics.iter().any(|d| d.code == "unused-term"),
+            "directive inside inline code must not suppress: {:?}",
+            report.diagnostics
+        );
+    }
+
+    #[test]
+    fn directive_in_code_fence_is_inert() {
+        let input = format!(
+            "{}\n1. ## Definitions {{#w}}\n\n    1. The syntax is:\n\n       ```\n       <!-- lexicon-ignore-file: unused-anchor -->\n       ```\n\n    2. The Seller signs.\n",
+            CLEAN_BASE
+        );
+        let report = lint_str(&input);
+        assert!(
+            report.diagnostics.iter().any(|d| d.code == "unused-anchor"),
+            "directive inside code fence must not suppress: {:?}",
+            report.diagnostics
+        );
+    }
+
+    #[test]
+    fn directive_in_front_matter_is_inert() {
+        let input = "---\ntitle: \"T <!-- lexicon-ignore-file: unused-term -->\"\ndate: 2026-01-01\nparties:\n  - name: Alice\n    role: Seller\n---\n\n1. ## Definitions\n\n    1. **Widget** means a thing. The Seller signs.\n";
+        let report = lint_str(input);
+        assert!(
+            report.diagnostics.iter().any(|d| d.code == "unused-term"),
+            "directive inside front-matter string must not suppress: {:?}",
+            report.diagnostics
+        );
+    }
+
+    #[test]
+    fn error_rule_cannot_be_demoted_below_warning() {
+        let mut options = LintOptions::default();
+        options
+            .severity
+            .insert("invalid-date".to_string(), DiagLevel::Info);
+        let input = "---\ntitle: T\ndate: not-a-date\nparties:\n  - name: Alice\n    role: Seller\n---\n\n1. ## Obligations\n\n    1. The Seller signs.\n";
+        let report = lint_opts(input, &options);
+        // Clamped to warning (still visible, still fails --strict)...
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "invalid-date" && d.level == DiagLevel::Warning),
+            "got: {:?}",
+            report.diagnostics
+        );
+        // ...and the config mistake is reported.
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "invalid-lint-config")
+        );
+    }
+
+    #[test]
+    fn bare_directive_cannot_hide_suppression_meta_diagnostics() {
+        // A dead bare directive and a typo'd directive on the same line:
+        // the unknown-rule warning and the unused-suppression report must
+        // both survive.
+        let input = format!(
+            "{}\n1. ## Obligations\n\n    1. The Seller signs. <!-- lexicon-ignore --> <!-- lexicon-ignore: unused-trem -->\n",
+            CLEAN_BASE
+        );
+        let report = lint_str(&input);
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "unknown-lint-rule" && d.message.contains("unused-trem")),
+            "got: {:?}",
+            report.diagnostics
+        );
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "unused-suppression"),
+            "got: {:?}",
+            report.diagnostics
+        );
+    }
+
+    #[test]
+    fn file_directive_cannot_silence_its_own_unused_report() {
+        let input = format!(
+            "{}\n<!-- lexicon-ignore-file: unused-suppression -->\n\n1. ## Obligations\n\n    1. The Seller signs.\n",
+            CLEAN_BASE
+        );
+        let report = lint_str(&input);
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "unused-suppression"),
+            "dead file directive must be reported: {:?}",
+            report.diagnostics
         );
     }
 

@@ -347,6 +347,19 @@ fn extract_clause_from_item<'a>(
                 if let Some(InlineContent::Text(t)) = inlines.last() {
                     let (cleaned, para_anchor) = strip_anchor(t);
                     if para_anchor.is_some() {
+                        if let Some(ref previous) = anchor {
+                            diagnostics.push(
+                                Diagnostic::warning(
+                                    "multiple-anchors",
+                                    format!(
+                                        "Clause declares more than one anchor; '#{}' is dropped in favour of '#{}'. Cross-references to the dropped anchor will not resolve — move it to its own sub-clause",
+                                        previous,
+                                        para_anchor.as_deref().unwrap_or_default()
+                                    ),
+                                )
+                                .at_pos(node_pos(child, line_offset)),
+                            );
+                        }
                         anchor = para_anchor;
                         if cleaned.is_empty() {
                             inlines.pop();

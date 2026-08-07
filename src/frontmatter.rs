@@ -11,6 +11,9 @@ pub struct FrontMatterResult {
 }
 
 pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
+    // Tolerate a UTF-8 BOM (common from Windows editors) — it is not Rust
+    // whitespace, so trim_start() alone would reject the file.
+    let input = input.strip_prefix('\u{feff}').unwrap_or(input);
     let trimmed = input.trim_start();
     if !trimmed.starts_with("---") {
         return Err(LexiconError::FrontMatter(

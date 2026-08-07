@@ -2042,3 +2042,184 @@ fn unused_term_flagged_even_though_definition_mentions_it() {
         doc.diagnostics
     );
 }
+
+// ===========================================================================
+// Red-team regression tests
+// ===========================================================================
+
+#[test]
+fn bom_prefixed_document_parses() {
+    let input = format!(
+        "\u{feff}{}\n1. ## Obligations\n\n    1. The Buyer pays the Seller.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert_eq!(doc.meta.title, "Test Agreement");
+}
+
+#[test]
+fn statutory_schedule_reference_not_a_schedule_item() {
+    let input = "---\ntitle: Test\ndate: 2026-01-01\nparties:\n  - name: A\n    role: Buyer\n  - name: B\n    role: Seller\nschedule:\n  - title: Schedule\n---\n\n1. ## Definitions\n\n    1. **Approved Form** means the form described in the Schedule to the Corporations Act 2001. The Buyer gives the Seller the Approved Form.\n\n    2. **Fee** is set out in the Schedule.\n";
+    let doc = parse_and_resolve(input);
+    // "Schedule to the Corporations Act" must not create a schedule item...
+    assert!(
+        !doc.schedule_items.iter().any(|i| i.term == "Approved Form"),
+        "statutory reference misclassified: {:?}",
+        doc.schedule_items
+    );
+    // ...while the genuine schedule reference still does.
+    assert!(doc.schedule_items.iter().any(|i| i.term == "Fee"));
+    // And no undeclared-schedule noise for the statutory reference.
+    assert!(
+        !doc.diagnostics
+            .iter()
+            .any(|d| d.code == "undeclared-schedule"),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn statutory_act_schedule_title_not_flagged_undeclared() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Levy** means the amount payable in accordance with the GST Act Schedule 2 provisions. The Buyer pays the Levy to the Seller.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        !doc.diagnostics
+            .iter()
+            .any(|d| d.code == "undeclared-schedule"),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn plural_schedules_reference_flagged_undeclared() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Outgoings** means the amounts set out in the Schedules. The Buyer pays the Outgoings to the Seller.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        doc.diagnostics
+            .iter()
+            .any(|d| d.code == "undeclared-schedule"),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn short_declared_title_reference_warns_instead_of_silence() {
+    // Declared "Schedule of Particulars"; text says just "the Schedule" —
+    // no schedule item can be generated, so the linter must warn.
+    let input = "---\ntitle: Test\ndate: 2026-01-01\nparties:\n  - name: A\n    role: Buyer\n  - name: B\n    role: Seller\nschedule:\n  - title: Schedule of Particulars\n---\n\n1. ## Definitions\n\n    1. **Duty** means the duty set out in the Schedule. The Buyer pays the Duty to the Seller.\n";
+    let doc = parse_and_resolve(input);
+    assert!(
+        doc.diagnostics
+            .iter()
+            .any(|d| d.code == "undeclared-schedule"),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn colon_inside_bold_is_field_label() {
+    let input = format!(
+        "{}\n1. ## Details\n\n    1. **Position:** Senior Engineer, reporting to the Buyer and the Seller.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        !doc.diagnostics
+            .iter()
+            .any(|d| d.message.contains("Position")),
+        "field label flagged: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn implicit_agreement_doc_type_not_flagged() {
+    // No `type:` in front-matter — the implicit default "Agreement" must not
+    // produce an unused-term warning the drafter never wrote.
+    let input = format!(
+        "{}\n1. ## Obligations\n\n    1. The Buyer pays the Seller.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        !doc.diagnostics
+            .iter()
+            .any(|d| d.message.contains("'Agreement'")),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn lowercase_usage_does_not_count_case_sensitive() {
+    // Spec 4.4.1: lowercase "company" does not reference defined "Company".
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Company** means Acme Pty Ltd. The Buyer notifies the Seller and the company representative.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        doc.diagnostics
+            .iter()
+            .any(|d| d.code == "unused-term" && d.message.contains("Company")),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn substring_usage_does_not_count_word_boundary() {
+    // "Act" inside "Contract" must not count as a use of defined "Act".
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Act** means the legislation described below. This Contract binds the Buyer and the Seller.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        doc.diagnostics
+            .iter()
+            .any(|d| d.code == "unused-term" && d.message.contains("'Act'")),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn addendum_redefinition_not_flagged_duplicate() {
+    let input = format!(
+        "{}\n1. ## Definitions\n\n    1. **Personal Data** means data about a person. The Buyer gives Personal Data to the Seller.\n\n# ADDENDUM - EU Terms\n\nFor the purposes of this Addendum, **Personal Data** means personal data as defined in the GDPR.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        !doc.diagnostics
+            .iter()
+            .any(|d| d.code == "duplicate-definition"),
+        "scoped addendum redefinition flagged: {:?}",
+        doc.diagnostics
+    );
+}
+
+#[test]
+fn multiple_anchors_on_one_clause_warn() {
+    let input = format!(
+        "{}\n1. ## Payment\n\n    1. Invoices monthly. {{#invoice}}\n\n       Payment in 30 days. {{#payment-due}}\n\n    2. See [clause 1.1](#payment-due) and [clause 1.1](#invoice).\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        doc.diagnostics.iter().any(|d| d.code == "multiple-anchors"),
+        "diagnostics: {:?}",
+        doc.diagnostics
+    );
+}

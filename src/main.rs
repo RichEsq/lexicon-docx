@@ -78,7 +78,7 @@ enum Commands {
         numbering_convention: Option<NumberingConventionArg>,
 
         /// List all lint rules (code, default severity, description) and exit
-        #[arg(long)]
+        #[arg(long, conflicts_with = "inputs")]
         list_rules: bool,
     },
 
@@ -773,7 +773,13 @@ fn main() {
                     );
                     let has_errors = print_diagnostics(&diagnostics);
 
-                    if has_errors || (strict && !diagnostics.is_empty()) {
+                    // --strict counts warnings only — info diagnostics are
+                    // lint-only and not even printed here, so failing on them
+                    // would be undiagnosable (and would disagree with lint).
+                    let has_warnings = diagnostics
+                        .iter()
+                        .any(|d| d.level == lexicon_docx::error::DiagLevel::Warning);
+                    if has_errors || (strict && has_warnings) {
                         eprintln!("Build failed due to errors.");
                         std::process::exit(1);
                     }
@@ -880,8 +886,10 @@ fn run_lint(
         let input_dir = input.parent();
 
         // Resolve style config for this file: --style flag, else the file's
-        // own directory, else XDG, else defaults. Errors loading an explicit
-        // or discovered config are fatal (same as build).
+        // own directory, else XDG, else defaults. A config that fails to load
+        // becomes a style-error diagnostic for this file (keeping JSON output
+        // valid and other files' reports intact) and exits 2 like an
+        // unreadable input.
         let style_path = style_flag
             .map(|p| p.to_path_buf())
             .or_else(|| lexicon_docx::resolve_config_path("style.toml", input_dir));
@@ -889,8 +897,21 @@ fn run_lint(
             Some(path) => match lexicon_docx::style::StyleConfig::load(&path) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("Error loading style config from {}: {}", path.display(), e);
-                    std::process::exit(2);
+                    any_unreadable = true;
+                    reports.push((
+                        file_label,
+                        lexicon_docx::lint::LintReport::from_diagnostic(
+                            lexicon_docx::error::Diagnostic::error(
+                                "style-error",
+                                format!(
+                                    "Error loading style config from {}: {}",
+                                    path.display(),
+                                    e
+                                ),
+                            ),
+                        ),
+                    ));
+                    continue;
                 }
             },
             None => lexicon_docx::style::StyleConfig::default(),
