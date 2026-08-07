@@ -1,13 +1,39 @@
 use std::fmt;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DiagLevel {
     Error,
     Warning,
     Info,
+}
+
+impl DiagLevel {
+    /// Numeric rank for severity comparisons (higher = more severe).
+    pub fn rank(&self) -> u8 {
+        match self {
+            DiagLevel::Error => 2,
+            DiagLevel::Warning => 1,
+            DiagLevel::Info => 0,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DiagLevel::Error => "error",
+            DiagLevel::Warning => "warning",
+            DiagLevel::Info => "info",
+        }
+    }
+}
+
+/// A 1-based position in the source file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourcePos {
+    pub line: usize,
+    pub column: usize,
 }
 
 /// A diagnostic produced while parsing, resolving, or linting a document.
@@ -25,6 +51,8 @@ pub struct Diagnostic {
     pub location: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<usize>,
 }
 
 impl Diagnostic {
@@ -35,6 +63,7 @@ impl Diagnostic {
             message: message.into(),
             location: None,
             line: None,
+            column: None,
         }
     }
 
@@ -67,16 +96,24 @@ impl Diagnostic {
         self.line = line;
         self
     }
+
+    /// Attach a 1-based source position (line and column).
+    pub fn at_pos(mut self, pos: Option<SourcePos>) -> Self {
+        self.line = pos.map(|p| p.line);
+        self.column = pos.map(|p| p.column);
+        self
+    }
 }
 
 impl fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let prefix = match self.level {
-            DiagLevel::Error => "error",
-            DiagLevel::Warning => "warning",
-            DiagLevel::Info => "info",
-        };
-        write!(f, "{}[{}]: {}", prefix, self.code, self.message)?;
+        write!(
+            f,
+            "{}[{}]: {}",
+            self.level.as_str(),
+            self.code,
+            self.message
+        )?;
         match (&self.location, self.line) {
             (Some(loc), Some(line)) => write!(f, " ({}, line {})", loc, line),
             (Some(loc), None) => write!(f, " ({})", loc),

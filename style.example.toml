@@ -96,3 +96,13 @@ enabled = true                # true: render signature blocks for each party
 #   { title = "Company Secretary" },
 # ]
 # witness = true                           # force a witness column for this party
+
+# Linter configuration (applies to `lint`, `validate`, and build diagnostics)
+# [lint]
+# ignore = ["unused-anchor"]  # rule codes to disable entirely
+#
+# Per-rule severity overrides ("error" | "warning" | "info").
+# Promoting a rule to "error" fails lint and build.
+# [lint.severity]
+# unused-term = "error"
+# missing-date = "warning"

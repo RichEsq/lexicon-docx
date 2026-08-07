@@ -38,6 +38,26 @@ pub struct StyleConfig {
     pub schedule_order: ScheduleOrder,
     pub numbering_convention: NumberingConvention,
     pub signatures: SignaturesConfig,
+    pub lint: LintSettings,
+}
+
+/// Linter configuration — the `[lint]` section of style.toml.
+///
+/// ```toml
+/// [lint]
+/// ignore = ["unused-anchor"]
+///
+/// [lint.severity]
+/// unused-term = "error"
+/// missing-date = "warning"
+/// ```
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct LintSettings {
+    /// Rule codes to disable entirely.
+    pub ignore: Vec<String>,
+    /// Per-rule severity overrides (rule code -> "error" | "warning" | "info").
+    pub severity: std::collections::HashMap<String, crate::error::DiagLevel>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -250,6 +270,7 @@ impl Default for StyleConfig {
             schedule_order: ScheduleOrder::default(),
             numbering_convention: NumberingConvention::default(),
             signatures: SignaturesConfig::default(),
+            lint: LintSettings::default(),
         }
     }
 }

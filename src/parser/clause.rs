@@ -3,7 +3,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 use super::anchors::strip_anchor;
-use crate::error::Diagnostic;
+use crate::error::{Diagnostic, SourcePos};
 use crate::model::*;
 
 static ADDENDUM_RE: LazyLock<Regex> =
@@ -21,14 +21,17 @@ type ExtractBodyResult = (
     Vec<Diagnostic>,
 );
 
-/// 1-based line in the source file for a comrak node, given the number of
+/// 1-based position in the source file for a comrak node, given the number of
 /// lines consumed before the body (front-matter and delimiters).
-fn node_line<'a>(node: &'a AstNode<'a>, line_offset: usize) -> Option<usize> {
-    let line = node.data.borrow().sourcepos.start.line;
-    if line == 0 {
+fn node_pos<'a>(node: &'a AstNode<'a>, line_offset: usize) -> Option<SourcePos> {
+    let start = node.data.borrow().sourcepos.start;
+    if start.line == 0 {
         None
     } else {
-        Some(line + line_offset)
+        Some(SourcePos {
+            line: start.line + line_offset,
+            column: start.column.max(1),
+        })
     }
 }
 
@@ -63,7 +66,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>, line_offset: usize) -> ExtractBod
                                 "Duplicate recitals/background heading. Only one recitals section is allowed.",
                             )
                             .at("document body")
-                            .at_line(node_line(child, line_offset)),
+                            .at_pos(node_pos(child, line_offset)),
                         );
                     } else {
                         in_recitals = true;
@@ -87,7 +90,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>, line_offset: usize) -> ExtractBod
                         number: addendum_counter,
                         title,
                         anchor: heading_anchor.clone(),
-                        source_line: node_line(child, line_offset),
+                        source_pos: node_pos(child, line_offset),
                         content: Vec::new(),
                     });
                 } else if in_recitals {
@@ -105,7 +108,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>, line_offset: usize) -> ExtractBod
                             ),
                         )
                         .at("document body")
-                        .at_line(node_line(child, line_offset)),
+                        .at_pos(node_pos(child, line_offset)),
                     );
                 } else {
                     // Recitals already ended, unexpected extra heading
@@ -118,7 +121,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>, line_offset: usize) -> ExtractBod
                             ),
                         )
                         .at("document body")
-                        .at_line(node_line(child, line_offset)),
+                        .at_pos(node_pos(child, line_offset)),
                     );
                 }
             }
@@ -211,7 +214,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>, line_offset: usize) -> ExtractBod
                                 "Bullet point in recitals — bullets are not part of the structured outline and will not be numbered.",
                             )
                             .at("recitals")
-                            .at_line(node_line(child, line_offset)),
+                            .at_pos(node_pos(child, line_offset)),
                         );
                         rec.body.push(BodyElement::BulletList(items));
                     }
@@ -222,7 +225,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>, line_offset: usize) -> ExtractBod
                             "Bullet point at top level of document body — bullets are not part of the structured outline and will not be numbered.",
                         )
                         .at("document body")
-                        .at_line(node_line(child, line_offset)),
+                        .at_pos(node_pos(child, line_offset)),
                     );
                     body.push(BodyElement::BulletList(items));
                 }
@@ -379,7 +382,7 @@ fn extract_clause_from_item<'a>(
                         "Bullet point inside clause body — bullets are not part of the structured outline, will not be numbered, and cannot be cross-referenced.",
                     )
                     .at(location)
-                    .at_line(node_line(child, line_offset)),
+                    .at_pos(node_pos(child, line_offset)),
                 );
                 body.push(ClauseBody::Content(ClauseContent::BulletList(items)));
             }
@@ -407,7 +410,7 @@ fn extract_clause_from_item<'a>(
         heading,
         anchor,
         number: None,
-        source_line: node_line(item, line_offset),
+        source_pos: node_pos(item, line_offset),
         body,
     }
 }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::error::Diagnostic;
+use crate::error::{Diagnostic, SourcePos};
 use crate::model::*;
 use crate::style::NumberingConvention;
 
@@ -19,7 +19,7 @@ static FORMAL_DEF_ALT_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// was declared, and whether any cross-reference points at it.
 struct AnchorInfo {
     reference: String,
-    line: Option<usize>,
+    pos: Option<SourcePos>,
     used: bool,
 }
 
@@ -56,7 +56,7 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
                 &mut anchor_map,
                 anchor_id,
                 format!("Addendum {}", addendum.number),
-                addendum.source_line,
+                addendum.source_pos,
                 &mut doc.diagnostics,
             );
         }
@@ -84,7 +84,7 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
     // Report anchors that no cross-reference points at (drafting cruft)
     let mut unused: Vec<(&String, &AnchorInfo)> =
         anchor_map.iter().filter(|(_, a)| !a.used).collect();
-    unused.sort_by_key(|(id, a)| (a.line.unwrap_or(0), id.as_str()));
+    unused.sort_by_key(|(id, a)| (a.pos.map_or(0, |p| p.line), id.as_str()));
     for (id, info) in unused {
         doc.diagnostics.push(
             Diagnostic::info(
@@ -92,7 +92,7 @@ pub fn resolve(doc: &mut Document, convention: NumberingConvention) {
                 format!("Anchor '#{}' is never referenced by a cross-reference", id),
             )
             .at(info.reference.clone())
-            .at_line(info.line),
+            .at_pos(info.pos),
         );
     }
 
@@ -108,7 +108,7 @@ fn register_anchor(
     map: &mut HashMap<String, AnchorInfo>,
     anchor_id: &str,
     reference: String,
-    line: Option<usize>,
+    pos: Option<SourcePos>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     if let Some(existing) = map.get(anchor_id) {
@@ -121,14 +121,14 @@ fn register_anchor(
                 ),
             )
             .at(reference)
-            .at_line(line),
+            .at_pos(pos),
         );
     } else {
         map.insert(
             anchor_id.to_string(),
             AnchorInfo {
                 reference,
-                line,
+                pos,
                 used: false,
             },
         );
@@ -226,7 +226,7 @@ fn collect_anchors(
             map,
             anchor,
             number.full_reference(prefix, convention),
-            clause.source_line,
+            clause.source_pos,
             diagnostics,
         );
     }
@@ -274,7 +274,7 @@ fn resolve_clause_cross_refs(
         .number
         .as_ref()
         .map(|n| n.full_reference("clause", convention));
-    let clause_line = clause.source_line;
+    let clause_pos = clause.source_pos;
 
     if let Some(ref mut heading) = clause.heading {
         resolve_inlines_cross_refs(
@@ -282,7 +282,7 @@ fn resolve_clause_cross_refs(
             anchor_map,
             diagnostics,
             clause_loc.as_deref(),
-            clause_line,
+            clause_pos,
         );
     }
     for element in &mut clause.body {
@@ -294,7 +294,7 @@ fn resolve_clause_cross_refs(
                         anchor_map,
                         diagnostics,
                         clause_loc.as_deref(),
-                        clause_line,
+                        clause_pos,
                     );
                 }
                 ClauseContent::BulletList(items) => {
@@ -304,7 +304,7 @@ fn resolve_clause_cross_refs(
                             anchor_map,
                             diagnostics,
                             clause_loc.as_deref(),
-                            clause_line,
+                            clause_pos,
                         );
                     }
                 }
@@ -324,7 +324,7 @@ fn resolve_inlines_cross_refs(
     anchor_map: &mut HashMap<String, AnchorInfo>,
     diagnostics: &mut Vec<Diagnostic>,
     location: Option<&str>,
-    line: Option<usize>,
+    pos: Option<SourcePos>,
 ) {
     for inline in inlines.iter_mut() {
         if let InlineContent::CrossRef {
@@ -346,7 +346,7 @@ fn resolve_inlines_cross_refs(
                         ),
                     )
                     .at_opt(location)
-                    .at_line(line),
+                    .at_pos(pos),
                 );
             }
         }
@@ -360,14 +360,14 @@ fn resolve_addendum_cross_refs(
     convention: NumberingConvention,
 ) {
     let loc = addendum.heading();
-    let line = addendum.source_line;
+    let pos = addendum.source_pos;
     for content in &mut addendum.content {
         match content {
             AddendumContent::Paragraph(inlines) => {
-                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc), line);
+                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc), pos);
             }
             AddendumContent::Heading(_, inlines) => {
-                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc), line);
+                resolve_inlines_cross_refs(inlines, anchor_map, diagnostics, Some(&loc), pos);
             }
             AddendumContent::ClauseList(clauses) => {
                 for clause in clauses {
@@ -381,7 +381,7 @@ fn resolve_addendum_cross_refs(
                         anchor_map,
                         diagnostics,
                         Some(&loc),
-                        line,
+                        pos,
                     );
                 }
             }
@@ -503,7 +503,7 @@ fn check_schedule_phrase(
 struct TermDefinition {
     term: String,
     location: Option<String>,
-    line: Option<usize>,
+    pos: Option<SourcePos>,
     /// True for terms defined implicitly by front-matter (party roles, short
     /// title) rather than bold text in the document body.
     from_front_matter: bool,
@@ -531,7 +531,7 @@ fn collect_and_validate_terms(
         definitions.push(TermDefinition {
             term: party.role.clone(),
             location: Some("front-matter".to_string()),
-            line: None,
+            pos: None,
             from_front_matter: true,
         });
     }
@@ -541,7 +541,7 @@ fn collect_and_validate_terms(
     definitions.push(TermDefinition {
         term: doc_type.to_string(),
         location: Some("front-matter".to_string()),
-        line: None,
+        pos: None,
         from_front_matter: true,
     });
 
@@ -689,18 +689,18 @@ fn collect_and_validate_terms(
                     ),
                 )
                 .at_opt(second.location.clone())
-                .at_line(second.line),
+                .at_pos(second.pos),
             );
         }
     }
 
     // Build definition set (term → first location + line) and per-term
     // definition site counts (front-matter and body sites alike)
-    let mut def_map: HashMap<String, (String, Option<usize>)> = HashMap::new();
+    let mut def_map: HashMap<String, (String, Option<SourcePos>)> = HashMap::new();
     let mut def_site_counts: HashMap<&str, usize> = HashMap::new();
     for def in &definitions {
         let loc = def.location.clone().unwrap_or_default();
-        def_map.entry(def.term.clone()).or_insert((loc, def.line));
+        def_map.entry(def.term.clone()).or_insert((loc, def.pos));
         *def_site_counts.entry(def.term.as_str()).or_insert(0) += 1;
     }
 
@@ -732,7 +732,7 @@ fn collect_and_validate_terms(
         .map(|si| si.term.as_str())
         .collect();
 
-    let mut unused: Vec<(&String, &(String, Option<usize>))> = def_map
+    let mut unused: Vec<(&String, &(String, Option<SourcePos>))> = def_map
         .iter()
         .filter(|(term, _)| !schedule_terms.contains(term.as_str()))
         .filter(|(term, _)| def_site_counts.get(term.as_str()).copied().unwrap_or(0) < 2)
@@ -741,15 +741,15 @@ fn collect_and_validate_terms(
             !variants.iter().any(|v| text_lower.contains(v))
         })
         .collect();
-    unused.sort_by_key(|(term, (_, line))| (line.unwrap_or(0), term.as_str()));
-    for (term, (loc, line)) in unused {
+    unused.sort_by_key(|(term, (_, pos))| (pos.map_or(0, |p| p.line), term.as_str()));
+    for (term, (loc, pos)) in unused {
         doc.diagnostics.push(
             Diagnostic::warning(
                 "unused-term",
                 format!("'{}' is defined but never used in the document", term),
             )
             .at(loc.clone())
-            .at_line(*line),
+            .at_pos(*pos),
         );
     }
 }
@@ -777,7 +777,7 @@ fn collect_clause_terms(
                         schedule_items,
                         schedule_ctx,
                         clause_loc.as_deref(),
-                        clause.source_line,
+                        clause.source_pos,
                         diagnostics,
                     );
                 }
@@ -789,7 +789,7 @@ fn collect_clause_terms(
                             schedule_items,
                             schedule_ctx,
                             clause_loc.as_deref(),
-                            clause.source_line,
+                            clause.source_pos,
                             diagnostics,
                         );
                     }
@@ -822,7 +822,7 @@ fn collect_addendum_terms(
 ) {
     let heading = addendum.heading();
     let loc = Some(heading.as_str());
-    let line = addendum.source_line;
+    let pos = addendum.source_pos;
     for content in &addendum.content {
         match content {
             AddendumContent::Paragraph(inlines) | AddendumContent::Heading(_, inlines) => {
@@ -832,7 +832,7 @@ fn collect_addendum_terms(
                     schedule_items,
                     schedule_ctx,
                     loc,
-                    line,
+                    pos,
                     diagnostics,
                 );
             }
@@ -856,7 +856,7 @@ fn collect_addendum_terms(
                         schedule_items,
                         schedule_ctx,
                         loc,
-                        line,
+                        pos,
                         diagnostics,
                     );
                 }
@@ -875,7 +875,7 @@ fn collect_inline_terms(
     schedule_items: &mut Vec<ScheduleItem>,
     schedule_ctx: &ScheduleContext,
     location: Option<&str>,
-    line: Option<usize>,
+    pos: Option<SourcePos>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (i, inline) in inlines.iter().enumerate() {
@@ -886,7 +886,7 @@ fn collect_inline_terms(
                     defs.push(TermDefinition {
                         term: term.clone(),
                         location: location.map(String::from),
-                        line,
+                        pos,
                         from_front_matter: false,
                     });
                     // The definition didn't match a declared schedule — check
@@ -905,7 +905,7 @@ fn collect_inline_terms(
                                     ),
                                 )
                                 .at_opt(location)
-                                .at_line(line),
+                                .at_pos(pos),
                             );
                         }
                     }
@@ -914,7 +914,7 @@ fn collect_inline_terms(
                     defs.push(TermDefinition {
                         term: term.clone(),
                         location: location.map(String::from),
-                        line,
+                        pos,
                         from_front_matter: false,
                     });
                     schedule_items.push(ScheduleItem {

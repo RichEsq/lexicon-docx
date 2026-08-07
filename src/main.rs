@@ -42,14 +42,16 @@ enum Commands {
         overrides: Box<StyleOverrides>,
     },
 
-    /// Lint a Lexicon Markdown file — checks spec compliance and common
+    /// Lint Lexicon Markdown files — checks spec compliance and common
     /// drafting errors (unused defined terms, duplicate definitions, broken
     /// cross-references, missing exhibit files, ...) without generating output
     Lint {
-        /// Input Lexicon Markdown file
-        input: PathBuf,
+        /// Input Lexicon Markdown file(s)
+        #[arg(required_unless_present = "list_rules")]
+        inputs: Vec<PathBuf>,
 
-        /// Output format: human-readable text or JSON (for editors, CI, and AI agents)
+        /// Output format: human-readable text, JSON (for editors, CI, and AI
+        /// agents), or GitHub Actions annotations
         #[arg(long, value_enum, default_value = "text")]
         format: LintFormatArg,
 
@@ -57,9 +59,27 @@ enum Commands {
         #[arg(long)]
         strict: bool,
 
+        /// Disable a rule by code (repeatable; merged with [lint] ignore in style.toml)
+        #[arg(long = "ignore", value_name = "CODE")]
+        ignore: Vec<String>,
+
+        /// Hide diagnostics below this severity
+        #[arg(long, value_enum, value_name = "LEVEL")]
+        min_severity: Option<SeverityArg>,
+
+        /// Style configuration file (TOML; supplies the [lint] section and
+        /// numbering convention). If not specified, searches for style.toml
+        /// next to each input, then in $XDG_CONFIG_HOME/lexicon/.
+        #[arg(short, long)]
+        style: Option<PathBuf>,
+
         /// Numbering convention used when formatting clause references in messages
         #[arg(long, value_enum)]
         numbering_convention: Option<NumberingConventionArg>,
+
+        /// List all lint rules (code, default severity, description) and exit
+        #[arg(long)]
+        list_rules: bool,
     },
 
     /// Validate a Lexicon Markdown file without generating output (alias for lint)
@@ -151,6 +171,25 @@ enum LintFormatArg {
     Text,
     /// Structured JSON report on stdout
     Json,
+    /// GitHub Actions workflow-command annotations
+    Github,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum SeverityArg {
+    Error,
+    Warning,
+    Info,
+}
+
+impl SeverityArg {
+    fn to_level(self) -> lexicon_docx::error::DiagLevel {
+        match self {
+            SeverityArg::Error => lexicon_docx::error::DiagLevel::Error,
+            SeverityArg::Warning => lexicon_docx::error::DiagLevel::Warning,
+            SeverityArg::Info => lexicon_docx::error::DiagLevel::Info,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -725,6 +764,13 @@ fn main() {
                 signatures_path.as_deref(),
             ) {
                 Ok((bytes, diagnostics)) => {
+                    // Apply the same [lint] config and inline suppressions the
+                    // linter uses, so build and lint never disagree.
+                    let diagnostics = lexicon_docx::lint::filter_build_diagnostics(
+                        &input_text,
+                        diagnostics,
+                        &style_config,
+                    );
                     let has_errors = print_diagnostics(&diagnostics);
 
                     if has_errors || (strict && !diagnostics.is_empty()) {
@@ -750,23 +796,42 @@ fn main() {
         }
 
         Commands::Lint {
-            input,
+            inputs,
             format,
             strict,
+            ignore,
+            min_severity,
+            style,
             numbering_convention,
+            list_rules,
         } => {
-            let convention = numbering_convention
-                .map(|c| c.to_style())
-                .unwrap_or(lexicon_docx::style::NumberingConvention::Commonwealth);
-            run_lint(&input, &format, strict, convention);
+            if list_rules {
+                match format {
+                    LintFormatArg::Json => print!("{}", lexicon_docx::lint::rules_to_json()),
+                    _ => print!("{}", lexicon_docx::lint::rules_to_text()),
+                }
+                std::process::exit(0);
+            }
+            run_lint(
+                &inputs,
+                &format,
+                strict,
+                &ignore,
+                min_severity,
+                style.as_deref(),
+                numbering_convention.map(|c| c.to_style()),
+            );
         }
 
         Commands::Validate { input, strict } => {
             run_lint(
-                &input,
+                std::slice::from_ref(&input),
                 &LintFormatArg::Text,
                 strict,
-                lexicon_docx::style::NumberingConvention::Commonwealth,
+                &[],
+                None,
+                None,
+                None,
             );
         }
 
@@ -792,46 +857,79 @@ fn print_diagnostics(diagnostics: &[lexicon_docx::error::Diagnostic]) -> bool {
     has_errors
 }
 
-/// Run the linter on a file and exit with an appropriate status code:
-/// 0 = clean (or warnings without --strict), 1 = errors (or warnings with
-/// --strict), 2 = the input file could not be read.
+/// Run the linter over one or more files and exit with an appropriate status
+/// code: 0 = clean (or warnings without --strict), 1 = errors (or warnings
+/// with --strict), 2 = any input file could not be read.
+///
+/// Each file is linted with its own resolved style.toml (unless --style pins
+/// one), so the [lint] section and numbering convention follow the document.
 fn run_lint(
-    input: &std::path::Path,
+    inputs: &[PathBuf],
     format: &LintFormatArg,
     strict: bool,
-    convention: lexicon_docx::style::NumberingConvention,
+    cli_ignore: &[String],
+    min_severity: Option<SeverityArg>,
+    style_flag: Option<&std::path::Path>,
+    convention_flag: Option<lexicon_docx::style::NumberingConvention>,
 ) -> ! {
-    let file_label = input.display().to_string();
+    let mut reports: Vec<(String, lexicon_docx::lint::LintReport)> = Vec::new();
+    let mut any_unreadable = false;
 
-    let input_text = match std::fs::read_to_string(input) {
-        Ok(t) => t,
-        Err(e) => {
-            match format {
-                LintFormatArg::Json => {
-                    let report = lexicon_docx::lint::LintReport {
-                        diagnostics: vec![lexicon_docx::error::Diagnostic::error(
-                            "io-error",
-                            format!("Error reading {}: {}", file_label, e),
-                        )],
-                    };
-                    println!("{}", report.to_json(&file_label));
+    for input in inputs {
+        let file_label = input.display().to_string();
+        let input_dir = input.parent();
+
+        // Resolve style config for this file: --style flag, else the file's
+        // own directory, else XDG, else defaults. Errors loading an explicit
+        // or discovered config are fatal (same as build).
+        let style_path = style_flag
+            .map(|p| p.to_path_buf())
+            .or_else(|| lexicon_docx::resolve_config_path("style.toml", input_dir));
+        let style_config = match style_path {
+            Some(path) => match lexicon_docx::style::StyleConfig::load(&path) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Error loading style config from {}: {}", path.display(), e);
+                    std::process::exit(2);
                 }
-                LintFormatArg::Text => {
-                    eprintln!("Error reading {}: {}", file_label, e);
-                }
-            }
-            std::process::exit(2);
+            },
+            None => lexicon_docx::style::StyleConfig::default(),
+        };
+
+        let mut options = lexicon_docx::lint::LintOptions::from_style(&style_config);
+        options.ignore.extend(cli_ignore.iter().cloned());
+        if let Some(level) = min_severity {
+            options.min_severity = level.to_level();
         }
-    };
+        let convention = convention_flag.unwrap_or(style_config.numbering_convention);
 
-    let report = lexicon_docx::lint::lint(&input_text, input.parent(), convention);
-
-    match format {
-        LintFormatArg::Text => print!("{}", report.to_text(&file_label)),
-        LintFormatArg::Json => println!("{}", report.to_json(&file_label)),
+        let report = match std::fs::read_to_string(input) {
+            Ok(text) => lexicon_docx::lint::lint(&text, input_dir, convention, &options),
+            Err(e) => {
+                any_unreadable = true;
+                lexicon_docx::lint::LintReport::from_diagnostic(
+                    lexicon_docx::error::Diagnostic::error(
+                        "io-error",
+                        format!("Error reading {}: {}", file_label, e),
+                    ),
+                )
+            }
+        };
+        reports.push((file_label, report));
     }
 
-    if report.has_errors() || (strict && report.has_warnings()) {
+    match format {
+        LintFormatArg::Text => print!("{}", lexicon_docx::lint::reports_to_text(&reports)),
+        LintFormatArg::Json => println!("{}", lexicon_docx::lint::reports_to_json(&reports)),
+        LintFormatArg::Github => print!("{}", lexicon_docx::lint::reports_to_github(&reports)),
+    }
+
+    let has_errors = reports.iter().any(|(_, r)| r.has_errors());
+    let has_warnings = reports.iter().any(|(_, r)| r.has_warnings());
+    if any_unreadable {
+        std::process::exit(2);
+    }
+    if has_errors || (strict && has_warnings) {
         std::process::exit(1);
     }
     std::process::exit(0);
