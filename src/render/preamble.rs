@@ -20,13 +20,13 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             let mut opening = Paragraph::new();
             opening = opening.add_run(
                 Run::new()
-                    .add_text(format!("This {} (", &meta.title))
+                    .add_text(format!("This {} (", meta.title))
                     .size(body_half_pts),
             );
             opening = render_defined_term(opening, doc_type, body_half_pts, None, term_style);
             opening = opening.add_run(
                 Run::new()
-                    .add_text(format!(") is made on {}", &formatted_date))
+                    .add_text(format!(") is made on {}", formatted_date))
                     .size(body_half_pts),
             );
             docx = docx.add_paragraph(opening);
@@ -79,7 +79,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
             let mut para = Paragraph::new();
             para = para.add_run(
                 Run::new()
-                    .add_text(format!("This {} (", &meta.title))
+                    .add_text(format!("This {} (", meta.title))
                     .size(body_half_pts),
             );
             para = render_defined_term(para, doc_type, body_half_pts, None, term_style);
@@ -87,7 +87,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
                 Run::new()
                     .add_text(format!(
                         ") is entered into as of {} {} ",
-                        &formatted_date,
+                        formatted_date,
                         if meta.parties.len() == 1 {
                             "by"
                         } else {
@@ -168,7 +168,7 @@ pub fn render_preamble(mut docx: Docx, doc: &Document, style: &StyleConfig) -> D
 
                 // Append separator to all but the last party
                 let line = if i < party_count - 1 {
-                    format!("{}{}", cleaned, &preamble.party_separator)
+                    format!("{}{}", cleaned, preamble.party_separator)
                 } else {
                     cleaned
                 };

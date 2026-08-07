@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH lexicon 1  "lexicon 0.1.0" 
+.TH lexicon 1  "lexicon 0.2.0" 
 .SH NAME
 lexicon \- Lexicon Markdown processor for legal contracts
 .SH SYNOPSIS
@@ -19,8 +19,11 @@ Print version
 lexicon\-build(1)
 Build a .docx from a Lexicon Markdown file
 .TP
+lexicon\-lint(1)
+Lint Lexicon Markdown files — checks spec compliance and common drafting errors (unused defined terms, duplicate definitions, broken cross\-references, missing exhibit files, ...) without generating output
+.TP
 lexicon\-validate(1)
-Validate a Lexicon Markdown file without generating output
+Validate a Lexicon Markdown file without generating output (alias for lint)
 .TP
 lexicon\-man(1)
 Generate man pages to a directory
@@ -28,4 +31,4 @@ Generate man pages to a directory
 lexicon\-help(1)
 Print this message or the help of the given subcommand(s)
 .SH VERSION
-v0.1.0
+v0.2.0

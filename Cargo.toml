@@ -12,6 +12,7 @@ clap_mangen = "0.2"
 comrak = "0.36"
 docx-rs = "0.4"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 serde_yaml = "0.9"
 toml = "0.8"
 regex = "1"

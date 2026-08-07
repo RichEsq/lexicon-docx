@@ -1,5 +1,6 @@
 pub mod error;
 pub mod frontmatter;
+pub mod lint;
 pub mod model;
 pub mod parser;
 pub mod render;
@@ -77,11 +78,10 @@ pub fn process(
         let definitions = match signatures_path {
             Some(path) => signatures::load_definitions(path, &mut sig_diagnostics),
             None => {
-                sig_diagnostics.push(Diagnostic {
-                    level: error::DiagLevel::Warning,
-                    message: "Signatures enabled but no definitions file found (searched input directory and $XDG_CONFIG_HOME/lexicon/)".to_string(),
-                    location: None,
-                });
+                sig_diagnostics.push(Diagnostic::warning(
+                    "signatures-definitions-missing",
+                    "Signatures enabled but no definitions file found (searched input directory and $XDG_CONFIG_HOME/lexicon/)",
+                ));
                 None
             }
         };

@@ -1,0 +1,57 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH lint 1  "lint " 
+.SH NAME
+lint \- Lint Lexicon Markdown files — checks spec compliance and common drafting errors (unused defined terms, duplicate definitions, broken cross\-references, missing exhibit files, ...) without generating output
+.SH SYNOPSIS
+\fBlint\fR [\fB\-\-format\fR] [\fB\-\-strict\fR] [\fB\-\-ignore\fR] [\fB\-\-min\-severity\fR] [\fB\-s\fR|\fB\-\-style\fR] [\fB\-\-numbering\-convention\fR] [\fB\-\-list\-rules\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIINPUTS\fR] 
+.SH DESCRIPTION
+Lint Lexicon Markdown files — checks spec compliance and common drafting errors (unused defined terms, duplicate definitions, broken cross\-references, missing exhibit files, ...) without generating output
+.SH OPTIONS
+.TP
+\fB\-\-format\fR \fI<FORMAT>\fR [default: text]
+Output format: human\-readable text, JSON (for editors, CI, and AI agents), or GitHub Actions annotations
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+text: Human\-readable diagnostics, one per line
+.IP \(bu 2
+json: Structured JSON report on stdout
+.IP \(bu 2
+github: GitHub Actions workflow\-command annotations
+.RE
+.TP
+\fB\-\-strict\fR
+Fail on warnings as well as errors (exit code 1)
+.TP
+\fB\-\-ignore\fR \fI<CODE>\fR
+Disable a rule by code (repeatable; merged with [lint] ignore in style.toml)
+.TP
+\fB\-\-min\-severity\fR \fI<LEVEL>\fR
+Hide diagnostics below this severity
+.br
+
+.br
+[\fIpossible values: \fRerror, warning, info]
+.TP
+\fB\-s\fR, \fB\-\-style\fR \fI<STYLE>\fR
+Style configuration file (TOML; supplies the [lint] section and numbering convention). If not specified, searches for style.toml next to each input, then in $XDG_CONFIG_HOME/lexicon/
+.TP
+\fB\-\-numbering\-convention\fR \fI<NUMBERING_CONVENTION>\fR
+Numbering convention used when formatting clause references in messages
+.br
+
+.br
+[\fIpossible values: \fRcommonwealth, decimal, us\-traditional]
+.TP
+\fB\-\-list\-rules\fR
+List all lint rules (code, default severity, description) and exit
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+[\fIINPUTS\fR]
+Input Lexicon Markdown file(s)

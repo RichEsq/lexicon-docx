@@ -3,7 +3,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 use super::anchors::strip_anchor;
-use crate::error::{DiagLevel, Diagnostic};
+use crate::error::{Diagnostic, SourcePos};
 use crate::model::*;
 
 static ADDENDUM_RE: LazyLock<Regex> =
@@ -21,9 +21,25 @@ type ExtractBodyResult = (
     Vec<Diagnostic>,
 );
 
+/// 1-based position in the source file for a comrak node, given the number of
+/// lines consumed before the body (front-matter and delimiters).
+fn node_pos<'a>(node: &'a AstNode<'a>, line_offset: usize) -> Option<SourcePos> {
+    let start = node.data.borrow().sourcepos.start;
+    if start.line == 0 {
+        None
+    } else {
+        Some(SourcePos {
+            line: start.line + line_offset,
+            column: start.column.max(1),
+        })
+    }
+}
+
 /// Walk a comrak AST and extract the document body as a list of BodyElements.
-/// `root` should be the Document node from comrak.
-pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
+/// `root` should be the Document node from comrak. `line_offset` is the number
+/// of source lines preceding the body (used to map node positions back to the
+/// input file).
+pub fn extract_body<'a>(root: &'a AstNode<'a>, line_offset: usize) -> ExtractBodyResult {
     let mut body = Vec::new();
     let mut addenda = Vec::new();
     let mut diagnostics = Vec::new();
@@ -44,11 +60,14 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
 
                 if RECITALS_RE.is_match(&heading_text) {
                     if recitals.is_some() {
-                        diagnostics.push(Diagnostic {
-                            level: DiagLevel::Warning,
-                            message: "Duplicate recitals/background heading. Only one recitals section is allowed.".to_string(),
-                            location: Some("document body".to_string()),
-                        });
+                        diagnostics.push(
+                            Diagnostic::warning(
+                                "duplicate-recitals",
+                                "Duplicate recitals/background heading. Only one recitals section is allowed.",
+                            )
+                            .at("document body")
+                            .at_pos(node_pos(child, line_offset)),
+                        );
                     } else {
                         in_recitals = true;
                         recitals = Some(Recitals {
@@ -71,6 +90,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                         number: addendum_counter,
                         title,
                         anchor: heading_anchor.clone(),
+                        source_pos: node_pos(child, line_offset),
                         content: Vec::new(),
                     });
                 } else if in_recitals {
@@ -79,24 +99,30 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                     body_heading = Some(heading_text);
                 } else if recitals.is_none() {
                     // No recitals in document — unrecognised heading (existing behaviour)
-                    diagnostics.push(Diagnostic {
-                        level: DiagLevel::Warning,
-                        message: format!(
-                            "Unrecognised top-level heading '# {}'. Top-level headings must be 'RECITALS', 'BACKGROUND', or begin with 'ADDENDUM'.",
-                            heading_text
-                        ),
-                        location: Some("document body".to_string()),
-                    });
+                    diagnostics.push(
+                        Diagnostic::warning(
+                            "unknown-top-heading",
+                            format!(
+                                "Unrecognised top-level heading '# {}'. Top-level headings must be 'RECITALS', 'BACKGROUND', or begin with 'ADDENDUM'.",
+                                heading_text
+                            ),
+                        )
+                        .at("document body")
+                        .at_pos(node_pos(child, line_offset)),
+                    );
                 } else {
                     // Recitals already ended, unexpected extra heading
-                    diagnostics.push(Diagnostic {
-                        level: DiagLevel::Warning,
-                        message: format!(
-                            "Unexpected top-level heading '# {}' after body section.",
-                            heading_text
-                        ),
-                        location: Some("document body".to_string()),
-                    });
+                    diagnostics.push(
+                        Diagnostic::warning(
+                            "heading-after-body",
+                            format!(
+                                "Unexpected top-level heading '# {}' after body section.",
+                                heading_text
+                            ),
+                        )
+                        .at("document body")
+                        .at_pos(node_pos(child, line_offset)),
+                    );
                 }
             }
 
@@ -108,6 +134,7 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                             child,
                             ClauseLevel::TopLevel,
                             &mut diagnostics,
+                            line_offset,
                         );
                         add.content.push(AddendumContent::ClauseList(clauses));
                     } else {
@@ -120,14 +147,19 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                             child,
                             ClauseLevel::TopLevel,
                             &mut diagnostics,
+                            line_offset,
                         );
                         for clause in clauses {
                             rec.body.push(BodyElement::Clause(clause));
                         }
                     }
                 } else {
-                    let clauses =
-                        extract_clauses_from_list(child, ClauseLevel::TopLevel, &mut diagnostics);
+                    let clauses = extract_clauses_from_list(
+                        child,
+                        ClauseLevel::TopLevel,
+                        &mut diagnostics,
+                        line_offset,
+                    );
                     for clause in clauses {
                         body.push(BodyElement::Clause(clause));
                     }
@@ -176,19 +208,25 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
                     add.content.push(AddendumContent::BulletList(items));
                 } else if in_recitals {
                     if let Some(ref mut rec) = recitals {
-                        diagnostics.push(Diagnostic {
-                            level: DiagLevel::Warning,
-                            message: "Bullet point in recitals — bullets are not part of the structured outline and will not be numbered.".to_string(),
-                            location: Some("recitals".to_string()),
-                        });
+                        diagnostics.push(
+                            Diagnostic::warning(
+                                "bullet-outside-clause",
+                                "Bullet point in recitals — bullets are not part of the structured outline and will not be numbered.",
+                            )
+                            .at("recitals")
+                            .at_pos(node_pos(child, line_offset)),
+                        );
                         rec.body.push(BodyElement::BulletList(items));
                     }
                 } else {
-                    diagnostics.push(Diagnostic {
-                        level: DiagLevel::Warning,
-                        message: "Bullet point at top level of document body — bullets are not part of the structured outline and will not be numbered.".to_string(),
-                        location: Some("document body".to_string()),
-                    });
+                    diagnostics.push(
+                        Diagnostic::warning(
+                            "bullet-outside-clause",
+                            "Bullet point at top level of document body — bullets are not part of the structured outline and will not be numbered.",
+                        )
+                        .at("document body")
+                        .at_pos(node_pos(child, line_offset)),
+                    );
                     body.push(BodyElement::BulletList(items));
                 }
             }
@@ -204,11 +242,13 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>) -> ExtractBodyResult {
 
     // Warn if recitals present but no body heading
     if recitals.is_some() && body_heading.is_none() {
-        diagnostics.push(Diagnostic {
-            level: DiagLevel::Warning,
-            message: "Recitals section present but no body heading found. Add a top-level heading (e.g. '# Operative Provisions') before the contract clauses.".to_string(),
-            location: Some("document body".to_string()),
-        });
+        diagnostics.push(
+            Diagnostic::warning(
+                "missing-body-heading",
+                "Recitals section present but no body heading found. Add a top-level heading (e.g. '# Operative Provisions') before the contract clauses.",
+            )
+            .at("document body"),
+        );
     }
 
     (recitals, body_heading, body, addenda, diagnostics)
@@ -243,6 +283,7 @@ fn extract_clauses_from_list<'a>(
     list_node: &'a AstNode<'a>,
     level: ClauseLevel,
     diagnostics: &mut Vec<Diagnostic>,
+    line_offset: usize,
 ) -> Vec<Clause> {
     let mut clauses = Vec::new();
 
@@ -253,7 +294,7 @@ fn extract_clauses_from_list<'a>(
         }
         drop(item_data);
 
-        let clause = extract_clause_from_item(item, level, diagnostics);
+        let clause = extract_clause_from_item(item, level, diagnostics, line_offset);
         clauses.push(clause);
     }
 
@@ -265,6 +306,7 @@ fn extract_clause_from_item<'a>(
     item: &'a AstNode<'a>,
     level: ClauseLevel,
     diagnostics: &mut Vec<Diagnostic>,
+    line_offset: usize,
 ) -> Clause {
     let mut heading = None;
     let mut anchor = None;
@@ -305,6 +347,19 @@ fn extract_clause_from_item<'a>(
                 if let Some(InlineContent::Text(t)) = inlines.last() {
                     let (cleaned, para_anchor) = strip_anchor(t);
                     if para_anchor.is_some() {
+                        if let Some(ref previous) = anchor {
+                            diagnostics.push(
+                                Diagnostic::warning(
+                                    "multiple-anchors",
+                                    format!(
+                                        "Clause declares more than one anchor; '#{}' is dropped in favour of '#{}'. Cross-references to the dropped anchor will not resolve — move it to its own sub-clause",
+                                        previous,
+                                        para_anchor.as_deref().unwrap_or_default()
+                                    ),
+                                )
+                                .at_pos(node_pos(child, line_offset)),
+                            );
+                        }
                         anchor = para_anchor;
                         if cleaned.is_empty() {
                             inlines.pop();
@@ -323,7 +378,8 @@ fn extract_clause_from_item<'a>(
             NodeValue::List(list) if list.list_type == comrak::nodes::ListType::Ordered => {
                 drop(data);
                 let child_level = next_level(level);
-                let child_clauses = extract_clauses_from_list(child, child_level, diagnostics);
+                let child_clauses =
+                    extract_clauses_from_list(child, child_level, diagnostics, line_offset);
                 body.push(ClauseBody::Children(child_clauses));
             }
 
@@ -333,11 +389,14 @@ fn extract_clause_from_item<'a>(
                 drop(data);
                 let items = extract_bullet_list(child);
                 let location = clause_location_hint(&heading, &body);
-                diagnostics.push(Diagnostic {
-                    level: DiagLevel::Warning,
-                    message: "Bullet point inside clause body — bullets are not part of the structured outline, will not be numbered, and cannot be cross-referenced.".to_string(),
-                    location: Some(location),
-                });
+                diagnostics.push(
+                    Diagnostic::warning(
+                        "bullet-outside-clause",
+                        "Bullet point inside clause body — bullets are not part of the structured outline, will not be numbered, and cannot be cross-referenced.",
+                    )
+                    .at(location)
+                    .at_pos(node_pos(child, line_offset)),
+                );
                 body.push(ClauseBody::Content(ClauseContent::BulletList(items)));
             }
 
@@ -364,6 +423,7 @@ fn extract_clause_from_item<'a>(
         heading,
         anchor,
         number: None,
+        source_pos: node_pos(item, line_offset),
         body,
     }
 }

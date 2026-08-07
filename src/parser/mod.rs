@@ -11,6 +11,7 @@ pub fn parse(input: &str) -> Result<Document> {
     let FrontMatterResult {
         meta,
         body,
+        body_line_offset,
         mut diagnostics,
     } = frontmatter::parse_frontmatter(input)?;
 
@@ -22,7 +23,8 @@ pub fn parse(input: &str) -> Result<Document> {
     let root = parse_document(&arena, &body, &opts);
 
     // Extract clause structure, recitals, and addenda
-    let (recitals, body_heading, body_elements, addenda, parser_diags) = clause::extract_body(root);
+    let (recitals, body_heading, body_elements, addenda, parser_diags) =
+        clause::extract_body(root, body_line_offset);
     diagnostics.extend(parser_diags);
 
     Ok(Document {
