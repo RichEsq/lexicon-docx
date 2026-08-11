@@ -36,6 +36,7 @@ lexicon-docx lint contract.md --format json   # machine-readable, for editors / 
 lexicon-docx lint contract.md --format github # GitHub Actions annotations for PR diffs
 lexicon-docx lint contract.md --strict        # fail on warnings too
 lexicon-docx lint contract.md --ignore unused-anchor --min-severity warning
+lexicon-docx lint contract.md --fix           # normalise hand-numbered ordinals in place
 lexicon-docx lint --list-rules                # all rules with default severity
 ```
 
@@ -105,6 +106,27 @@ Comments pass through Markdown renderers invisibly and never appear in the .docx
 
 Guard rails: `parse-error`, `io-error`, and `style-error` can never be ignored or suppressed, and rules whose default severity is error (`invalid-date`, `exhibit-file-missing`, ...) cannot be demoted below warning — otherwise a report could claim `valid: true` for a document the renderer refuses to build. Invalid config entries are reported as `invalid-lint-config`.
 
+#### Continuation indent
+
+Continuation content — a paragraph, blockquote or table after a blank line inside a clause — must be indented to the clause's **content column**, which depends on the width of the marker as written in the source, not on the nesting level (spec 3.4):
+
+```
+content column = marker indent + len(marker literal) + spaces after marker
+```
+
+So `1. ` at indent 4 has a content column of 7, but `10. ` has 8 and `100. ` has 9. Indenting below that column is silent in both directions, which is why there are two rules for it:
+
+- **`continuation-indent` (error)** — the block fell 4 or more spaces short, so CommonMark reinterpreted it as an indented code block and it is dropped from the output entirely.
+- **`continuation-reattached` (warning)** — the block fell short by less, so it still renders, but under an ancestor clause rather than the one it was written for. Nothing is missing from the output, so proofreading will not catch it; in a contract this means a proviso silently governs the wrong clause. The message names both the clause it was aimed at and the clause it will actually render under.
+
+The processor renumbers every item on render, so the ordinal you type is discarded. Writing `1.` for every marker keeps the content column fixed per level and makes the whole class unreachable — that is what `hand-numbered-ordinal` (info) recommends, and `--fix` applies it:
+
+```bash
+lexicon-docx lint contract.md --fix
+```
+
+`--fix` rewrites each wide ordinal to `1.` and dedents that item's content by the width the marker loses, so every column relationship in the source is preserved. The result is verified against the original by structural fingerprint before anything is written: if the rewrite would move, drop or re-level any content, it is abandoned and the file is left untouched. That happens when the document already has `continuation-indent` findings — narrowing a marker moves the content column under content that is already in the wrong place — so fix those first, then re-run.
+
 #### Known limitations
 
 - Diagnostics carry the start line of the containing clause or addendum, not the exact line of the offending text within it.
@@ -123,7 +145,10 @@ Guard rails: `parse-error`, `io-error`, and `style-error` can never be ignored o
 | `exhibit-file-missing` | error | A declared exhibit `path` does not exist |
 | `exhibit-unsupported-type` | error | Exhibit file type is not png/jpg/jpeg/pdf |
 | `exhibit-url-unsupported` | error | Exhibit `path` is a URL (not supported) |
+| `continuation-indent` | error | Continuation content is indented too far below its clause and will be dropped |
 | `broken-cross-ref` | warning | Cross-reference points to a non-existent anchor |
+| `continuation-reattached` | warning | Continuation content will render under an ancestor clause, not the one it was written for |
+| `unsupported-block` | warning | A block-level element the Lexicon format has no representation for |
 | `duplicate-anchor` | warning | The same `{#id}` anchor is declared more than once |
 | `duplicate-definition` | warning | A term is bold-defined at more than one place (bold marks definitions, not references) |
 | `unused-term` | warning | A defined term (including party roles) never appears in the document text |
@@ -142,6 +167,7 @@ Guard rails: `parse-error`, `io-error`, and `style-error` can never be ignored o
 | `missing-date` | info | No `date` set (rendered as a blank date line) |
 | `missing-party-name` | info | A party has no `name` (rendered as a placeholder) |
 | `unused-suppression` | info | A suppression comment matched no diagnostic |
+| `hand-numbered-ordinal` | info | A source list ordinal of `10.` or wider (widens the clause content column) |
 
 Run `lexicon-docx lint --list-rules` (add `--format json` for machine consumption) for the authoritative list. `validate` is an alias for `lint` with text output. Info-level diagnostics are shown by `lint`/`validate` but suppressed during `build`.
 

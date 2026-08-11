@@ -1,4 +1,5 @@
 pub mod error;
+pub mod fix;
 pub mod frontmatter;
 pub mod lint;
 pub mod model;

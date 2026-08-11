@@ -35,6 +35,178 @@ fn node_pos<'a>(node: &'a AstNode<'a>, line_offset: usize) -> Option<SourcePos> 
     }
 }
 
+/// 1-based source column of a list item's marker.
+fn item_marker_col<'a>(item: &'a AstNode<'a>) -> usize {
+    item.data.borrow().sourcepos.start.column.max(1)
+}
+
+/// 1-based source column at which a list item's content begins.
+///
+/// This is a property of the marker **as written in the source**, not of the
+/// nesting level: comrak's `padding` counts the marker literal plus the spaces
+/// after it, so `1. ` gives 3, `10. ` gives 4 and `100. ` gives 5. Continuation
+/// content must reach this column to stay inside the clause (spec 3.4).
+fn item_content_col<'a>(item: &'a AstNode<'a>) -> usize {
+    let data = item.data.borrow();
+    let padding = match &data.value {
+        NodeValue::Item(list) => list.padding,
+        _ => 0,
+    };
+    data.sourcepos.start.column.max(1) + padding
+}
+
+/// Number of leading spaces corresponding to a 1-based source column.
+fn col_to_indent(col: usize) -> usize {
+    col.saturating_sub(1)
+}
+
+fn last_item<'a>(list_node: &'a AstNode<'a>) -> Option<&'a AstNode<'a>> {
+    list_node
+        .children()
+        .filter(|n| matches!(n.data.borrow().value, NodeValue::Item(_)))
+        .last()
+}
+
+fn last_ordered_sublist<'a>(item: &'a AstNode<'a>) -> Option<&'a AstNode<'a>> {
+    item.children()
+        .filter(|c| {
+            matches!(&c.data.borrow().value,
+                NodeValue::List(l) if l.list_type == comrak::nodes::ListType::Ordered)
+        })
+        .last()
+}
+
+/// The chain of list items a trailing nested list leaves "open": the list's
+/// last item, then that item's own trailing nested list's last item, and so on.
+/// Continuation content that under-indents falls out of one of these and lands
+/// on an ancestor. Ordered shallowest-first.
+fn open_item_chain<'a>(list_node: &'a AstNode<'a>) -> Vec<&'a AstNode<'a>> {
+    let mut chain = Vec::new();
+    let mut current = last_item(list_node);
+    while let Some(item) = current {
+        chain.push(item);
+        current = last_ordered_sublist(item).and_then(last_item);
+    }
+    chain
+}
+
+/// Short label for a list item, for diagnostics emitted before numbering.
+fn item_label<'a>(item: &'a AstNode<'a>) -> String {
+    for child in item.children() {
+        let is_para = matches!(child.data.borrow().value, NodeValue::Paragraph);
+        if !is_para {
+            continue;
+        }
+        let text = collect_plain_text(child);
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            let snippet: String = trimmed.chars().take(40).collect();
+            return format!("clause starting '{}…'", snippet);
+        }
+    }
+    "the preceding clause".to_string()
+}
+
+/// Warn when a content block is indented past its clause's content column but
+/// not far enough to reach the clause it was evidently written for. The block
+/// still renders, one or more levels too shallow, under the wrong clause —
+/// nothing is missing from the output, so proofreading will not catch it
+/// (spec 3.4.1, failure mode 2).
+fn check_reattached<'a>(
+    block: &'a AstNode<'a>,
+    prev_list: Option<&'a AstNode<'a>>,
+    location: String,
+    diagnostics: &mut Vec<Diagnostic>,
+    line_offset: usize,
+) {
+    let Some(list) = prev_list else { return };
+    let col = block.data.borrow().sourcepos.start.column.max(1);
+
+    // The deepest open item the block reaches past the marker of, but falls
+    // short of the content column of — that is the clause it was aimed at.
+    let chain = open_item_chain(list);
+    let Some(target) = chain
+        .iter()
+        .rev()
+        .find(|item| item_marker_col(item) < col && col < item_content_col(item))
+    else {
+        return;
+    };
+
+    diagnostics.push(
+        Diagnostic::warning(
+            "continuation-reattached",
+            format!(
+                "Continuation content is indented {} spaces, short of the {} needed to stay inside {}. It will render under {} instead — one level too shallow.",
+                col_to_indent(col),
+                col_to_indent(item_content_col(target)),
+                item_label(target),
+                location,
+            ),
+        )
+        .at(location)
+        .at_pos(node_pos(block, line_offset)),
+    );
+}
+
+/// Error on an indented code block inside the clause hierarchy. Lexicon has no
+/// use for indented code in a contract, so one is always mis-indented
+/// continuation content: it has fallen 4 or more spaces short of its clause's
+/// content column and CommonMark has reinterpreted it as code, which means it
+/// is dropped from the output entirely (spec 3.4.1, failure mode 1).
+fn report_indented_code<'a>(
+    block: &'a AstNode<'a>,
+    required_col: Option<usize>,
+    location: String,
+    diagnostics: &mut Vec<Diagnostic>,
+    line_offset: usize,
+) {
+    let fix = match required_col {
+        Some(col) => format!(" Indent it to {} spaces.", col_to_indent(col)),
+        None => String::new(),
+    };
+    diagnostics.push(
+        Diagnostic::error(
+            "continuation-indent",
+            format!(
+                "Content is indented too far below its clause's content column and has been parsed as an indented code block. It will be dropped from the output.{}",
+                fix
+            ),
+        )
+        .at(location)
+        .at_pos(node_pos(block, line_offset)),
+    );
+}
+
+/// Catch-all for block-level nodes the parser has no representation for. These
+/// would otherwise fall through silently and vanish from the output.
+fn report_unsupported_block<'a>(
+    block: &'a AstNode<'a>,
+    location: String,
+    diagnostics: &mut Vec<Diagnostic>,
+    line_offset: usize,
+) {
+    let kind = match &block.data.borrow().value {
+        NodeValue::CodeBlock(_) => "fenced code block",
+        NodeValue::HtmlBlock(_) => "raw HTML block",
+        NodeValue::ThematicBreak => "thematic break",
+        NodeValue::FootnoteDefinition(_) => "footnote definition",
+        NodeValue::DescriptionList => "description list",
+        _ => return,
+    };
+    diagnostics.push(
+        Diagnostic::warning(
+            "unsupported-block",
+            format!(
+                "A {} is not part of the Lexicon format and will not appear in the output.",
+                kind
+            ),
+        )
+        .at(location)
+        .at_pos(node_pos(block, line_offset)),
+    );
+}
+
 /// Walk a comrak AST and extract the document body as a list of BodyElements.
 /// `root` should be the Document node from comrak. `line_offset` is the number
 /// of source lines preceding the body (used to map node positions back to the
@@ -231,7 +403,42 @@ pub fn extract_body<'a>(root: &'a AstNode<'a>, line_offset: usize) -> ExtractBod
                 }
             }
 
-            _ => {}
+            // Indented code block outside any clause — same mis-indentation
+            // hazard as inside one, and equally silent without this.
+            NodeValue::CodeBlock(cb) if !cb.fenced => {
+                drop(data);
+                let location = if in_addendum.is_some() {
+                    "addendum content"
+                } else if in_recitals {
+                    "recitals"
+                } else {
+                    "document body"
+                };
+                report_indented_code(
+                    child,
+                    None,
+                    location.to_string(),
+                    &mut diagnostics,
+                    line_offset,
+                );
+            }
+
+            _ => {
+                drop(data);
+                let location = if in_addendum.is_some() {
+                    "addendum content"
+                } else if in_recitals {
+                    "recitals"
+                } else {
+                    "document body"
+                };
+                report_unsupported_block(
+                    child,
+                    location.to_string(),
+                    &mut diagnostics,
+                    line_offset,
+                );
+            }
         }
     }
 
@@ -289,10 +496,30 @@ fn extract_clauses_from_list<'a>(
 
     for item in list_node.children() {
         let item_data = item.data.borrow();
-        if !matches!(item_data.value, NodeValue::Item(_)) {
+        let NodeValue::Item(list) = &item_data.value else {
             continue;
-        }
+        };
+        let ordinal = list.start;
         drop(item_data);
+
+        // A marker of `10.` or wider widens the clause's content column, which
+        // is what makes under-indented continuation content possible at all.
+        // The processor renumbers every item on render, so the typed ordinal
+        // is discarded — writing `1.` costs nothing and removes the hazard.
+        if ordinal >= 10 {
+            diagnostics.push(
+                Diagnostic::info(
+                    "hand-numbered-ordinal",
+                    format!(
+                        "Source ordinal '{}.' is {} characters wide, which shifts this clause's content column to {} spaces. Write '1.' instead — the rendered numbering is unaffected.",
+                        ordinal,
+                        ordinal.to_string().len() + 1,
+                        col_to_indent(item_content_col(item)),
+                    ),
+                )
+                .at_pos(node_pos(item, line_offset)),
+            );
+        }
 
         let clause = extract_clause_from_item(item, level, diagnostics, line_offset);
         clauses.push(clause);
@@ -311,6 +538,9 @@ fn extract_clause_from_item<'a>(
     let mut heading = None;
     let mut anchor = None;
     let mut body: Vec<ClauseBody> = Vec::new();
+    // Most recent nested ordered list, used to work out which clause a
+    // mis-indented continuation block was written for.
+    let mut prev_list: Option<&'a AstNode<'a>> = None;
 
     for child in item.children() {
         let data = child.data.borrow();
@@ -371,6 +601,13 @@ fn extract_clause_from_item<'a>(
                 }
 
                 if !inlines.is_empty() {
+                    check_reattached(
+                        child,
+                        prev_list,
+                        clause_location_hint(&heading, &body),
+                        diagnostics,
+                        line_offset,
+                    );
                     body.push(ClauseBody::Content(ClauseContent::Paragraph(inlines)));
                 }
             }
@@ -381,6 +618,7 @@ fn extract_clause_from_item<'a>(
                 let child_clauses =
                     extract_clauses_from_list(child, child_level, diagnostics, line_offset);
                 body.push(ClauseBody::Children(child_clauses));
+                prev_list = Some(child);
             }
 
             // Bullet list nested inside a clause body — captured with no
@@ -402,18 +640,54 @@ fn extract_clause_from_item<'a>(
 
             NodeValue::BlockQuote => {
                 drop(data);
+                check_reattached(
+                    child,
+                    prev_list,
+                    clause_location_hint(&heading, &body),
+                    diagnostics,
+                    line_offset,
+                );
                 let inlines = extract_blockquote_inlines(child);
                 body.push(ClauseBody::Content(ClauseContent::Blockquote(inlines)));
             }
 
             NodeValue::Table(_) => {
                 drop(data);
+                check_reattached(
+                    child,
+                    prev_list,
+                    clause_location_hint(&heading, &body),
+                    diagnostics,
+                    line_offset,
+                );
                 let table = extract_table(child);
                 body.push(ClauseBody::Content(ClauseContent::Table(table)));
             }
 
+            // An indented code block in the clause hierarchy is always
+            // mis-indented continuation content, never intentional code.
+            NodeValue::CodeBlock(cb) if !cb.fenced => {
+                drop(data);
+                let required = prev_list
+                    .and_then(|l| open_item_chain(l).last().map(|i| item_content_col(i)))
+                    .unwrap_or_else(|| item_content_col(item));
+                report_indented_code(
+                    child,
+                    Some(required),
+                    clause_location_hint(&heading, &body),
+                    diagnostics,
+                    line_offset,
+                );
+            }
+
             _ => {
                 drop(data);
+                report_unsupported_block(
+                    child,
+                    clause_location_hint(&heading, &body),
+                    diagnostics,
+                    line_offset,
+                );
             }
         }
     }

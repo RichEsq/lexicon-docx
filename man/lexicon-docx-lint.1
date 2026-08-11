@@ -4,7 +4,7 @@
 .SH NAME
 lint \- Lint Lexicon Markdown files — checks spec compliance and common drafting errors (unused defined terms, duplicate definitions, broken cross\-references, missing exhibit files, ...) without generating output
 .SH SYNOPSIS
-\fBlint\fR [\fB\-\-format\fR] [\fB\-\-strict\fR] [\fB\-\-ignore\fR] [\fB\-\-min\-severity\fR] [\fB\-s\fR|\fB\-\-style\fR] [\fB\-\-numbering\-convention\fR] [\fB\-\-list\-rules\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIINPUTS\fR] 
+\fBlint\fR [\fB\-\-format\fR] [\fB\-\-strict\fR] [\fB\-\-ignore\fR] [\fB\-\-min\-severity\fR] [\fB\-s\fR|\fB\-\-style\fR] [\fB\-\-numbering\-convention\fR] [\fB\-\-list\-rules\fR] [\fB\-\-fix\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIINPUTS\fR] 
 .SH DESCRIPTION
 Lint Lexicon Markdown files — checks spec compliance and common drafting errors (unused defined terms, duplicate definitions, broken cross\-references, missing exhibit files, ...) without generating output
 .SH OPTIONS
@@ -49,6 +49,9 @@ Numbering convention used when formatting clause references in messages
 .TP
 \fB\-\-list\-rules\fR
 List all lint rules (code, default severity, description) and exit
+.TP
+\fB\-\-fix\fR
+Rewrite fixable findings in place. Currently normalises hand\-numbered ordinals (10. and wider) to 1., dedenting each item\*(Aqs content to match. Verified structurally before writing; a rewrite that would change the document is abandoned
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help (see a summary with \*(Aq\-h\*(Aq)
