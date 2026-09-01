@@ -87,6 +87,21 @@ pub const RULES: &[Rule] = &[
         description: "Exhibit path is a URL (not supported)",
     },
     Rule {
+        code: "continuation-indent",
+        severity: DiagLevel::Error,
+        description: "Continuation content is indented too far below its clause and will be dropped",
+    },
+    Rule {
+        code: "continuation-reattached",
+        severity: DiagLevel::Warning,
+        description: "Continuation content will render under an ancestor clause, not the one it was written for",
+    },
+    Rule {
+        code: "unsupported-block",
+        severity: DiagLevel::Warning,
+        description: "A block-level element the Lexicon format has no representation for",
+    },
+    Rule {
         code: "broken-cross-ref",
         severity: DiagLevel::Warning,
         description: "Cross-reference points to a non-existent anchor",
@@ -205,6 +220,11 @@ pub const RULES: &[Rule] = &[
         code: "unused-suppression",
         severity: DiagLevel::Info,
         description: "A suppression comment matched no diagnostic",
+    },
+    Rule {
+        code: "hand-numbered-ordinal",
+        severity: DiagLevel::Info,
+        description: "A source list ordinal of 10. or wider (widens the clause content column)",
     },
 ];
 

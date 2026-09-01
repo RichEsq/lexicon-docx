@@ -80,6 +80,13 @@ enum Commands {
         /// List all lint rules (code, default severity, description) and exit
         #[arg(long, conflicts_with = "inputs")]
         list_rules: bool,
+
+        /// Rewrite fixable findings in place. Currently normalises
+        /// hand-numbered ordinals (10. and wider) to 1., dedenting each item's
+        /// content to match. Verified structurally before writing; a rewrite
+        /// that would change the document is abandoned.
+        #[arg(long, conflicts_with = "list_rules")]
+        fix: bool,
     },
 
     /// Validate a Lexicon Markdown file without generating output (alias for lint)
@@ -810,6 +817,7 @@ fn main() {
             style,
             numbering_convention,
             list_rules,
+            fix,
         } => {
             if list_rules {
                 match format {
@@ -817,6 +825,9 @@ fn main() {
                     _ => print!("{}", lexicon_docx::lint::rules_to_text()),
                 }
                 std::process::exit(0);
+            }
+            if fix {
+                run_fix(&inputs);
             }
             run_lint(
                 &inputs,
@@ -861,6 +872,55 @@ fn print_diagnostics(diagnostics: &[lexicon_docx::error::Diagnostic]) -> bool {
         }
     }
     has_errors
+}
+
+/// Apply autofixes in place, then fall through to a normal lint run so the
+/// user sees what is left. Exits with status 2 if a file cannot be read or
+/// written, or if a rewrite could not be verified as structure-preserving.
+fn run_fix(inputs: &[PathBuf]) {
+    use lexicon_docx::fix::FixOutcome;
+
+    let mut failed = false;
+    for input in inputs {
+        let source = match std::fs::read_to_string(input) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("error: cannot read {}: {}", input.display(), e);
+                failed = true;
+                continue;
+            }
+        };
+        match lexicon_docx::fix::normalise_ordinals(&source) {
+            FixOutcome::Unchanged => {}
+            FixOutcome::Fixed(output, count) => {
+                if let Err(e) = std::fs::write(input, output) {
+                    eprintln!("error: cannot write {}: {}", input.display(), e);
+                    failed = true;
+                } else {
+                    eprintln!(
+                        "fixed {}: normalised {} hand-numbered ordinal{}",
+                        input.display(),
+                        count,
+                        if count == 1 { "" } else { "s" }
+                    );
+                }
+            }
+            FixOutcome::Unsafe => {
+                eprintln!(
+                    "error: {}: normalising ordinals would have changed the document structure; left unchanged.\n  \
+                     This happens when continuation content is already mis-indented: narrowing a marker moves \
+                     the content column, which changes where that content lands. Fix the continuation-indent \
+                     and continuation-reattached findings first, then re-run --fix.",
+                    input.display()
+                );
+                failed = true;
+            }
+        }
+    }
+
+    if failed {
+        std::process::exit(2);
+    }
 }
 
 /// Run the linter over one or more files and exit with an appropriate status

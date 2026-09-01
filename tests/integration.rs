@@ -2223,3 +2223,310 @@ fn multiple_anchors_on_one_clause_warn() {
         doc.diagnostics
     );
 }
+
+// ===========================================================================
+// Continuation indent (spec 3.4 / 3.4.1)
+// ===========================================================================
+
+/// The repro fixture from the continuation-indent brief. Marker widths of 1, 2
+/// and 3 digits, each with continuation content one column short of, and
+/// exactly at, the content column the marker actually implies.
+const CONTINUATION_FIXTURE: &str = r#"
+1. ## Test {#test}
+
+    9. Single digit, tail at 7:
+
+       TAILD7 expect-present.
+
+    10. Double digit, tail at 7:
+
+       TAILE7 expect-dropped.
+
+    11. Double digit, tail at 8:
+
+        TAILE8 expect-present.
+
+    100. Triple digit, tail at 8:
+
+        TAILF8 expect-dropped.
+
+    101. Triple digit, tail at 9:
+
+         TAILF9 expect-present.
+
+    12. Double digit, blockquote tail at 7:
+
+       > TAILG7 expect-dropped.
+
+    13. Double digit, blockquote tail at 8:
+
+        > TAILG8 expect-present.
+
+    14. Grandchild double digit at 8, tail at 11:
+
+        20. grandchild; and
+
+           TAILH11 expect-reattached.
+
+    15. Grandchild double digit at 8, tail at 12:
+
+        20. grandchild; and
+
+            TAILH12 expect-present.
+"#;
+
+fn fixture_source() -> String {
+    format!("{}{}", MINIMAL, CONTINUATION_FIXTURE)
+}
+
+#[test]
+fn continuation_indent_errors_on_dropped_content() {
+    let doc = parse_and_resolve(&fixture_source());
+    let errors: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "continuation-indent")
+        .collect();
+
+    // TAILE7, TAILF8 and TAILG7 all fall 4+ short and become code blocks.
+    assert_eq!(
+        errors.len(),
+        3,
+        "expected one error per dropped block: {:?}",
+        doc.diagnostics
+    );
+    assert!(
+        errors
+            .iter()
+            .all(|d| matches!(d.level, lexicon_docx::error::DiagLevel::Error)),
+        "dropped content must be an error, not a warning"
+    );
+    // The message must name the column the author should have used. The `10.`
+    // marker at indent 4 has a content column of 8, not the 7 the old spec
+    // formula gives.
+    assert!(
+        errors[0].message.contains("8 spaces"),
+        "should name the required indent: {}",
+        errors[0].message
+    );
+}
+
+#[test]
+fn continuation_reattached_warns_and_names_the_wrong_clause() {
+    let doc = parse_and_resolve(&fixture_source());
+    let warnings: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "continuation-reattached")
+        .collect();
+
+    assert_eq!(
+        warnings.len(),
+        1,
+        "only TAILH11 reattaches: {:?}",
+        doc.diagnostics
+    );
+    let msg = &warnings[0].message;
+    assert!(
+        msg.contains("grandchild"),
+        "should name the clause it was written for: {msg}"
+    );
+    assert!(
+        msg.contains("Grandchild double digit at 8, tail at 11"),
+        "should name the clause it will actually render under: {msg}"
+    );
+}
+
+#[test]
+fn correctly_indented_continuation_is_not_flagged() {
+    // Every marker width, with continuation content at exactly the content
+    // column the marker implies. None of these should produce a diagnostic.
+    let input = format!(
+        "{}\n1. ## Test\n\n    9. Nine:\n\n       AT7.\n\n    10. Ten:\n\n        AT8.\n\n    100. Hundred:\n\n         AT9.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let flagged: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "continuation-indent" || d.code == "continuation-reattached")
+        .collect();
+    assert!(flagged.is_empty(), "false positives: {:?}", flagged);
+}
+
+#[test]
+fn recommended_multiple_of_four_indent_is_not_flagged() {
+    // Spec 3.4 recommends indenting continuation content to 4 x (level + 1),
+    // which sits one column past the content column. That is the house style
+    // and must never warn.
+    let input = format!(
+        "{}\n1. ## Test\n\n    1. First.\n\n    2. Second.\n\n   Continuation at 3.\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    let flagged: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "continuation-indent" || d.code == "continuation-reattached")
+        .collect();
+    assert!(flagged.is_empty(), "false positives: {:?}", flagged);
+}
+
+#[test]
+fn hand_numbered_ordinals_are_reported() {
+    let doc = parse_and_resolve(&fixture_source());
+    let flagged: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "hand-numbered-ordinal")
+        .collect();
+
+    // 10, 11, 100, 101, 12, 13, 14, 20, 15, 20 — but not 9.
+    assert_eq!(flagged.len(), 10, "every ordinal >= 10: {:?}", flagged);
+    assert!(
+        flagged
+            .iter()
+            .all(|d| matches!(d.level, lexicon_docx::error::DiagLevel::Info)),
+        "info-level: hand-numbering is valid, just fragile"
+    );
+    assert!(
+        !flagged.iter().any(|d| d.message.contains("'9.'")),
+        "single-digit ordinals are safe and must not be flagged"
+    );
+}
+
+#[test]
+fn present_tokens_survive_to_docx_at_the_right_indent() {
+    let xml = build_and_read_document_xml(&fixture_source(), &StyleConfig::default());
+
+    for token in ["TAILD7", "TAILE8", "TAILF9", "TAILG8", "TAILH12"] {
+        assert!(xml.contains(token), "{token} should survive to the .docx");
+    }
+
+    // TAILH12 is correctly indented under the grandchild, so it must render one
+    // level deeper than TAILH11, which fell back to the parent.
+    let indent_of = |token: &str| -> String {
+        let at = xml.find(token).unwrap_or_else(|| panic!("{token} missing"));
+        let para_start = xml[..at]
+            .rfind("<w:p ")
+            .or_else(|| xml[..at].rfind("<w:p>"))
+            .unwrap();
+        let para = &xml[para_start..at];
+        let ind = para
+            .rfind("<w:ind ")
+            .expect("paragraph should carry an indent");
+        let rest = &para[ind..];
+        rest[..rest.find("/>").unwrap()].to_string()
+    };
+
+    let deep = indent_of("TAILH12");
+    let shallow = indent_of("TAILH11");
+    assert_ne!(
+        deep, shallow,
+        "correctly-indented content must not render at the same level as reattached content"
+    );
+    assert!(
+        deep.contains("w:left=\"2160\""),
+        "TAILH12 should render at grandchild level, got {deep}"
+    );
+    assert!(
+        shallow.contains("w:left=\"1440\""),
+        "TAILH11 reattaches to the parent level, got {shallow}"
+    );
+}
+
+#[test]
+fn dropped_tokens_are_absent_but_reported() {
+    // The parser cannot rescue content CommonMark has already turned into a
+    // code block — the contract is that it is never dropped *silently*.
+    let xml = build_and_read_document_xml(&fixture_source(), &StyleConfig::default());
+    for token in ["TAILE7", "TAILF8", "TAILG7"] {
+        assert!(
+            !xml.contains(token),
+            "{token} is lost to CommonMark parsing"
+        );
+    }
+    let doc = parse_and_resolve(&fixture_source());
+    assert_eq!(
+        doc.diagnostics
+            .iter()
+            .filter(|d| d.code == "continuation-indent")
+            .count(),
+        3,
+        "each dropped block must be reported"
+    );
+}
+
+#[test]
+fn unsupported_blocks_are_reported_not_dropped_silently() {
+    let input = format!(
+        "{}\n1. ## Test\n\n    1. Text.\n\n       ```\n       fenced\n       ```\n",
+        MINIMAL
+    );
+    let doc = parse_and_resolve(&input);
+    assert!(
+        doc.diagnostics
+            .iter()
+            .any(|d| d.code == "unsupported-block"),
+        "a fenced code block is not rendered, so it must be reported: {:?}",
+        doc.diagnostics
+    );
+}
+
+// ===========================================================================
+// Ordinal autofix
+// ===========================================================================
+
+#[test]
+fn autofix_normalises_ordinals_without_changing_output() {
+    use lexicon_docx::fix::{FixOutcome, normalise_ordinals};
+
+    let input = format!(
+        // The child of `100.` sits at 9 — that marker's real content column,
+        // not the 7 the level-based formula would give.
+        "{}\n1. ## Test\n\n    9. Nine:\n\n       AT7.\n\n    10. Ten:\n\n        AT8.\n\n    100. Hundred:\n\n         AT9.\n\n         1. Child of hundred.\n",
+        MINIMAL
+    );
+    let before = build_and_read_document_xml(&input, &StyleConfig::default());
+
+    let FixOutcome::Fixed(output, count) = normalise_ordinals(&input) else {
+        panic!("expected a fix on a valid document with wide ordinals");
+    };
+    assert_eq!(count, 2, "only 10. and 100. need rewriting");
+    assert!(
+        !output.contains("100. Hundred") && !output.contains("10. Ten"),
+        "ordinals should be normalised:\n{output}"
+    );
+
+    // The whole point: the rendered document is untouched. docx-rs stamps a
+    // process-global paraId counter on every paragraph, so two builds in one
+    // test run never match byte-for-byte — strip it before comparing.
+    let strip_para_ids = |xml: &str| {
+        regex::Regex::new(r#" w14:paraId="[0-9a-f]+""#)
+            .unwrap()
+            .replace_all(xml, "")
+            .into_owned()
+    };
+    let after = build_and_read_document_xml(&output, &StyleConfig::default());
+    assert_eq!(
+        strip_para_ids(&before),
+        strip_para_ids(&after),
+        "autofix must not change the rendered output"
+    );
+
+    // And the fix is idempotent.
+    assert!(matches!(normalise_ordinals(&output), FixOutcome::Unchanged));
+}
+
+#[test]
+fn autofix_refuses_when_the_rewrite_would_move_content() {
+    use lexicon_docx::fix::{FixOutcome, normalise_ordinals};
+
+    // The fixture is already mis-indented, so narrowing its markers moves the
+    // content column under content that is sitting in the wrong place. The fix
+    // must back out rather than silently rearrange the contract.
+    assert!(
+        matches!(normalise_ordinals(&fixture_source()), FixOutcome::Unsafe),
+        "must refuse to fix a document whose continuation content is already broken"
+    );
+}
