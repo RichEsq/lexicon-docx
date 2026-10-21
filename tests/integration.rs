@@ -773,6 +773,68 @@ fn docx_cover_page_absent_when_disabled() {
 }
 
 #[test]
+fn docx_cover_page_date_present_by_default() {
+    let input = format!("{}\n1. ## Clause\n\n    1. Text.\n", MINIMAL);
+    let xml = build_and_read_document_xml(&input, &StyleConfig::default());
+    assert!(
+        xml.contains("1 January 2026"),
+        "Cover page should contain the formatted date by default"
+    );
+}
+
+#[test]
+fn docx_cover_page_date_hidden_when_show_date_false() {
+    let input = format!("{}\n1. ## Clause\n\n    1. Text.\n", MINIMAL);
+    let mut style = StyleConfig::default();
+    style.cover.show_date = false;
+    let xml = build_and_read_document_xml(&input, &style);
+    assert!(
+        !xml.contains("1 January 2026"),
+        "Cover page should not contain the date when show_date is false"
+    );
+    assert!(
+        xml.contains(&style.cover.between_label),
+        "Rest of the cover page should still render"
+    );
+}
+
+#[test]
+fn docx_cover_page_date_placeholder_hidden_when_show_date_false() {
+    // No date in front-matter: the default is an underscore placeholder,
+    // which show_date = false must also suppress.
+    let input = "---\ntitle: Test Agreement\nparties:\n  - name: Alice\n    role: Buyer\n  - name: Bob\n    role: Seller\n---\n\n1. ## Clause\n\n    1. Text.\n";
+    let mut style = StyleConfig::default();
+    style.cover.show_date = false;
+    let xml = build_and_read_document_xml(input, &style);
+    assert!(
+        !xml.contains("_______________"),
+        "Date placeholder should not appear when show_date is false"
+    );
+}
+
+#[test]
+fn style_toml_cover_show_date_parses() {
+    let dir = std::env::temp_dir().join(format!("lexicon-docx-show-date-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("style.toml");
+    std::fs::write(&path, "[cover]\nshow_date = false\n").unwrap();
+    let style = StyleConfig::load(&path).unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    assert!(
+        !style.cover.show_date,
+        "show_date = false should be parsed from TOML"
+    );
+    assert!(
+        style.cover.enabled,
+        "other cover defaults should be unchanged"
+    );
+    assert!(
+        StyleConfig::default().cover.show_date,
+        "show_date defaults to true"
+    );
+}
+
+#[test]
 fn docx_toc_contains_heading_text() {
     let input = format!(
         "{}\n1. ## Definitions\n\n    1. Text.\n\n1. ## Obligations\n\n    1. Text.\n",

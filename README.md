@@ -268,6 +268,7 @@ Every style.toml setting can also be set from the command line. This is useful f
 | `--cover-ref` / `--no-cover-ref` | Show/hide reference on cover | on |
 | `--cover-author` / `--no-cover-author` | Show/hide author on cover | on |
 | `--cover-status` / `--no-cover-status` | Show/hide status on cover | on |
+| `--cover-date` / `--no-cover-date` | Show/hide date on cover | on |
 
 **Table of contents:**
 
@@ -400,9 +401,10 @@ party_format = "name_spec_role"  # "name_spec_role", "name_role", or "name_only"
 show_ref = true
 show_author = true
 show_status = true
+show_date = true
 ```
 
-Set `enabled = false` for a minimal inline title instead of a full cover page.
+Set `enabled = false` for a minimal inline title instead of a full cover page. Set `show_date = false` to omit the date line from the cover page (when the front-matter has no `date`, the default is an underscore placeholder for hand-dating at signing).
 
 ### Parties preamble
 

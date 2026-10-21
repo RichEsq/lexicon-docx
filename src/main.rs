@@ -382,6 +382,14 @@ struct StyleOverrides {
     #[arg(long, conflicts_with = "cover_status", help_heading = "Cover Page")]
     no_cover_status: bool,
 
+    /// Show date on cover page
+    #[arg(long, conflicts_with = "no_cover_date", help_heading = "Cover Page")]
+    cover_date: bool,
+
+    /// Hide date on cover page
+    #[arg(long, conflicts_with = "cover_date", help_heading = "Cover Page")]
+    no_cover_date: bool,
+
     // --- Table of Contents ---
     /// Enable table of contents
     #[arg(
@@ -626,6 +634,12 @@ impl StyleOverrides {
         }
         if self.no_cover_status {
             config.cover.show_status = false;
+        }
+        if self.cover_date {
+            config.cover.show_date = true;
+        }
+        if self.no_cover_date {
+            config.cover.show_date = false;
         }
 
         // Table of Contents
