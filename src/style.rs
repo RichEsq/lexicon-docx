@@ -104,6 +104,7 @@ pub struct CoverConfig {
     pub show_ref: bool,
     pub show_author: bool,
     pub show_status: bool,
+    pub show_date: bool,
 }
 
 impl Default for CoverConfig {
@@ -115,6 +116,7 @@ impl Default for CoverConfig {
             show_ref: true,
             show_author: true,
             show_status: true,
+            show_date: true,
         }
     }
 }

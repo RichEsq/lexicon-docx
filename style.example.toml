@@ -52,6 +52,7 @@ party_format = "name_spec_role" # "name_spec_role", "name_role", or "name_only"
 show_ref = true               # show reference number on cover
 show_author = true            # show author/firm on cover
 show_status = true            # show status and version on cover
+show_date = true              # show date on cover (false: omit the date line entirely)
 
 # Parties preamble (rendered before the contract body)
 [preamble]

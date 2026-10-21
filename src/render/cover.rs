@@ -53,12 +53,14 @@ pub fn render_cover_page(mut docx: Docx, doc: &Document, style: &StyleConfig) ->
     }
 
     // Date
-    let formatted_date = format_date_with_format(meta.date.as_deref(), &style.date_format);
-    docx = docx.add_paragraph(
-        Paragraph::new()
-            .align(AlignmentType::Center)
-            .add_run(Run::new().add_text(&formatted_date).size(body_half_pts)),
-    );
+    if cover.show_date {
+        let formatted_date = format_date_with_format(meta.date.as_deref(), &style.date_format);
+        docx = docx.add_paragraph(
+            Paragraph::new()
+                .align(AlignmentType::Center)
+                .add_run(Run::new().add_text(&formatted_date).size(body_half_pts)),
+        );
+    }
 
     // Spacer
     docx = docx.add_paragraph(Paragraph::new());
