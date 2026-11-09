@@ -112,18 +112,69 @@ parties:
 
 #[test]
 fn frontmatter_status_variants() {
+    // Spec 2.2.5: canonical values, the executed/published aliases, and
+    // comparison that ignores case, whitespace, hyphens and underscores.
     for (yaml_val, expected) in [
         ("draft", Status::Draft),
+        ("DRAFT", Status::Draft),
         ("final", Status::Final),
-        ("executed", Status::Executed),
+        ("in-force", Status::InForce),
+        ("in force", Status::InForce),
+        ("In Force", Status::InForce),
+        ("in_force", Status::InForce),
+        ("inforce", Status::InForce),
+        ("executed", Status::InForce),
+        ("Executed", Status::InForce),
+        ("published", Status::InForce),
     ] {
         let input = format!(
             "---\ntitle: T\ndate: 2026-01-01\nstatus: {}\nparties:\n  - name: A\n    role: R\n---\n",
             yaml_val
         );
         let doc = parse_and_resolve(&input);
-        assert_eq!(doc.meta.status, Some(expected));
+        assert_eq!(doc.meta.status, Some(expected), "status: {}", yaml_val);
+        assert!(
+            !doc.diagnostics.iter().any(|d| d.code == "invalid-status"),
+            "status '{}' should not be flagged",
+            yaml_val
+        );
     }
+}
+
+#[test]
+fn frontmatter_status_alias_preserved_in_raw() {
+    // The alias is a record of how the document came into force; the
+    // processor resolves it but must not normalise it away.
+    let input = "---\ntitle: T\ndate: 2026-01-01\nstatus: published\nparties:\n  - name: A\n    role: R\n---\n";
+    let doc = parse_and_resolve(input);
+    assert_eq!(doc.meta.status, Some(Status::InForce));
+    assert_eq!(doc.meta.status_raw.as_deref(), Some("published"));
+    assert_eq!(Status::InForce.to_string(), "IN FORCE");
+}
+
+#[test]
+fn frontmatter_status_omitted() {
+    let doc = parse_and_resolve(MINIMAL);
+    assert_eq!(doc.meta.status, None);
+    assert_eq!(doc.meta.status_raw, None);
+}
+
+#[test]
+fn frontmatter_invalid_status_produces_diagnostic() {
+    let input = "---\ntitle: T\ndate: 2026-01-01\nstatus: signed\nparties:\n  - name: A\n    role: R\n---\n";
+    let doc = parse_and_resolve(input);
+    let errors: Vec<_> = doc
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "invalid-status")
+        .collect();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0].level, lexicon_docx::error::DiagLevel::Error);
+    assert!(errors[0].message.contains("'signed'"));
+    assert!(errors[0].message.contains("in-force"));
+    // Unrecognised status does not resolve to anything.
+    assert_eq!(doc.meta.status, None);
+    assert_eq!(doc.meta.status_raw.as_deref(), Some("signed"));
 }
 
 // ---------------------------------------------------------------------------

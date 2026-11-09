@@ -140,7 +140,8 @@ lexicon-docx lint contract.md --fix
 |------|----------|---------|
 | `parse-error` | error | Document could not be parsed (missing/invalid front-matter or YAML) |
 | `invalid-date` | error | `date` is not a valid `YYYY-MM-DD` date |
-| `missing-parties` | error | No parties defined in front-matter |
+| `invalid-status` | error | `status` is not `draft`, `final`, `in-force`, or an alias (`executed`, `published`) |
+| `missing-parties` | error | No parties defined in front-matter (at least one is required) |
 | `missing-party-role` | error | A party has an empty `role` |
 | `exhibit-file-missing` | error | A declared exhibit `path` does not exist |
 | `exhibit-unsupported-type` | error | Exhibit file type is not png/jpg/jpeg/pdf |

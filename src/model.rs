@@ -49,6 +49,15 @@ pub struct DocumentMeta {
     #[serde(rename = "ref")]
     pub ref_: Option<String>,
     pub author: Option<String>,
+    /// The `status` value exactly as written in the front-matter. Kept so the
+    /// alias a drafter chose (`executed`, `published`) is never lost — spec
+    /// 2.2.5 says a processor must not normalise it away. Validation happens
+    /// in `frontmatter.rs`, which fills in `status`.
+    #[serde(default, rename = "status")]
+    pub status_raw: Option<String>,
+    /// The resolved status, or `None` if omitted or unrecognised (the latter
+    /// is reported as an `invalid-status` diagnostic).
+    #[serde(skip)]
     pub status: Option<Status>,
     #[serde(default, deserialize_with = "deserialize_version")]
     pub version: Option<String>,
@@ -70,12 +79,44 @@ pub struct Exhibit {
     pub path: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(rename_all = "lowercase")]
+/// The legal status of a document (spec 2.2.5).
+///
+/// `executed` and `published` in the source are aliases for `in-force` and
+/// resolve to [`Status::InForce`]; the processor treats all three identically.
+/// The alias as written survives in `DocumentMeta::status_raw`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
+    /// Terms not settled, not in force.
     Draft,
+    /// Terms settled, not yet in force.
     Final,
-    Executed,
+    /// In force as written (whether executed or unilaterally published).
+    InForce,
+}
+
+impl Status {
+    /// The canonical values and aliases accepted in front-matter, for messages.
+    pub const ACCEPTED_VALUES: &[&str] = &["draft", "final", "in-force", "executed", "published"];
+
+    /// Parse a front-matter `status` value.
+    ///
+    /// Comparison is case-insensitive and ignores whitespace, hyphens and
+    /// underscores, so `in-force`, `in force`, `In Force`, `in_force` and
+    /// `inforce` all resolve to [`Status::InForce`]. Returns `None` for an
+    /// unrecognised value.
+    pub fn parse(raw: &str) -> Option<Status> {
+        let key: String = raw
+            .chars()
+            .filter(|c| !c.is_whitespace() && *c != '-' && *c != '_')
+            .flat_map(char::to_lowercase)
+            .collect();
+        match key.as_str() {
+            "draft" => Some(Status::Draft),
+            "final" => Some(Status::Final),
+            "inforce" | "executed" | "published" => Some(Status::InForce),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Status {
@@ -83,7 +124,7 @@ impl std::fmt::Display for Status {
         match self {
             Status::Draft => write!(f, "DRAFT"),
             Status::Final => write!(f, "FINAL"),
-            Status::Executed => write!(f, "EXECUTED"),
+            Status::InForce => write!(f, "IN FORCE"),
         }
     }
 }
