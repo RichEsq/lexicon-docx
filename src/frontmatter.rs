@@ -1,5 +1,5 @@
 use crate::error::{Diagnostic, LexiconError, Result};
-use crate::model::DocumentMeta;
+use crate::model::{DocumentMeta, Status};
 
 pub struct FrontMatterResult {
     pub meta: DocumentMeta,
@@ -38,10 +38,30 @@ pub fn parse_frontmatter(input: &str) -> Result<FrontMatterResult> {
     let consumed = input.len() - body.len();
     let body_line_offset = input[..consumed].matches('\n').count();
 
-    let meta: DocumentMeta = serde_yaml::from_str(yaml_str)
+    let mut meta: DocumentMeta = serde_yaml::from_str(yaml_str)
         .map_err(|e| LexiconError::FrontMatter(format!("Invalid YAML front-matter: {}", e)))?;
 
     let mut diagnostics = Vec::new();
+
+    // Resolve status (spec 2.2.5). The raw value is kept on the meta so the
+    // alias the drafter chose is never rewritten; only the resolved enum is
+    // used downstream.
+    if let Some(raw) = meta.status_raw.as_deref() {
+        match Status::parse(raw) {
+            Some(status) => meta.status = Some(status),
+            None => diagnostics.push(
+                Diagnostic::error(
+                    "invalid-status",
+                    format!(
+                        "Status '{}' is not recognised; expected one of {}",
+                        raw.trim(),
+                        Status::ACCEPTED_VALUES.join(", ")
+                    ),
+                )
+                .at("front-matter"),
+            ),
+        }
+    }
 
     // Validate date format (only when present)
     if let Some(ref date) = meta.date

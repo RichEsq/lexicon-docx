@@ -62,9 +62,14 @@ pub const RULES: &[Rule] = &[
         description: "date is not a valid YYYY-MM-DD date",
     },
     Rule {
+        code: "invalid-status",
+        severity: DiagLevel::Error,
+        description: "status is not draft, final, in-force, or an alias (executed, published)",
+    },
+    Rule {
         code: "missing-parties",
         severity: DiagLevel::Error,
-        description: "No parties defined in front-matter",
+        description: "No parties defined in front-matter (at least one is required)",
     },
     Rule {
         code: "missing-party-role",
